@@ -38,7 +38,7 @@ void main() {
   setUp(() async {
     PackageInfo.setMockInitialValues(
       appName: 'Forui',
-      packageName: 'forui_app',
+      packageName: 'sakuga',
       version: '1.0.0',
       buildNumber: '1',
       buildSignature: '',

@@ -55,7 +55,7 @@ void main() {
         appLocale: 'en',
         packageInfo: () async => PackageInfo(
           appName: 'Forui',
-          packageName: 'forui_app',
+          packageName: 'sakuga',
           version: '2.0.0',
           buildNumber: '5',
         ),

@@ -1,4 +1,4 @@
-# forui_app 模板审计 → Jeffyfin 迁移清单
+# forui_app 模板审计 → Sakuga 迁移清单
 
 - 审计对象：`/home/foliage/projects/forui_app`（git HEAD `e197723`，**只读**，未修改）
 - 审计主机：Linux 6.18 WSL2 x86_64；项目 SDK 为 FVM 3.47.6（`.fvmrc:2`），系统 Flutter 3.47.8 / Dart 3.13.7
