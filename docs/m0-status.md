@@ -72,6 +72,22 @@ Linux 运行依赖（WSL 最小镜像）：`libva2`、`libva-drm2`、`libva-x11-
 
 详细记录：[jellyfin-10.10-probe.md](research/jellyfin-10.10-probe.md)。
 
+### 1.7 服务器配置入口
+
+- 设置页新增 **服务器** 标签（最后一个 Tab）：
+  - 服务器列表（名称/URL）；
+  - 添加/编辑对话框：名称、URL、测试连接、保存；
+  - 删除确认；
+  - 测试连接调用 `GET /System/Info/Public`，显示服务器名/版本。
+- 首页显示已保存的第一台服务器；未配置时显示“添加服务器”入口。
+- 存储：`SharedPreferences` 键 `sakuga.servers.v1`（只存名称/URL，不含密码/Token）。
+- 相关文件：
+  - `lib/data/jellyfin/server_profile.dart`
+  - `lib/data/jellyfin/server_repository.dart`
+  - `lib/data/jellyfin/jellyfin_probe.dart`
+  - `lib/features/settings/servers_section.dart`
+- 待办：登录（`/Users/AuthenticateByName`）、Token 安全存储、服务器切换、连接状态。
+
 ## 2. 待完成（M0 剩余）
 
 1. **macOS arm64**：已把 `MACOSX_DEPLOYMENT_TARGET` 改为 13.0、补 ATS/本地网络说明；在 Mac/CI 上执行 `fvm flutter build macos --arch arm64`，验证：

@@ -37,6 +37,45 @@ class AppLocalizationsZh extends AppLocalizations {
   String get emptyDownloads => '暂无下载';
 
   @override
+  String get servers => '服务器';
+
+  @override
+  String get addServer => '添加服务器';
+
+  @override
+  String get editServer => '编辑服务器';
+
+  @override
+  String get serverName => '名称';
+
+  @override
+  String get serverUrl => '服务器地址';
+
+  @override
+  String get testConnection => '测试';
+
+  @override
+  String get serverNameRequired => '请输入名称。';
+
+  @override
+  String get serverUrlInvalid => '请输入有效的 http(s) 地址。';
+
+  @override
+  String get serverUnreachable => '无法连接服务器。';
+
+  @override
+  String get noServers => '暂无服务器';
+
+  @override
+  String get deleteServer => '删除服务器？';
+
+  @override
+  String get deleteServerBody => '将移除已保存的服务器。';
+
+  @override
+  String get connectedServer => '已连接';
+
+  @override
   String get overview => '概览';
 
   @override

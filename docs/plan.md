@@ -899,7 +899,7 @@ abstract interface class PlayerEngine {
 | 里程碑 | 周期 | 目标 | 交付物 | 验收标准 |
 | --- | --- | --- | --- | --- |
 | **M0 基建与内核验证** | 1.5 周 | 工程可跑、内核 go/no-go | 从模板初始化 Sakuga；删除示例；改包名/图标/启动页；CI；日志/设置/l10n/主题；**media_kit fork 双端构建 spike**；SPM/native assets/macOS 13；Impeller 关闭基线；SR 首帧 spike；ATS/cleartext；全屏路由/方向；Linux 开发 runner | macOS arm64 与 Android arm64 debug 构建成功；Linux debug 构建与本地播放验证；SR 能在两端打开/关闭；Impeller 决策记录；局域网 http Jellyfin 10.10.7 可连 |
-| **M1 连接与浏览** | 1.5 周 | 能登录、能找到片 | 服务器发现/手动地址/登录/Quick Connect/多服务器；首页/媒体库/详情/搜索；图片；继续观看；错误/空态；版本路由 | 真机连 10.10.7 + 10.8/10.9；浏览 1000+ item 列表流畅；登录失败有明确提示 |
+| **M1 连接与浏览** | 1.5 周 | 能登录、能找到片 | 服务器配置入口（基础版已落地）/登录/Quick Connect/多服务器；首页/媒体库/详情/搜索；图片；继续观看；错误/空态；版本路由 | 真机连 10.10.7 + 10.8/10.9；浏览 1000+ item 列表流畅；登录失败有明确提示 |
 | **M2 播放 MVP** | 2 周 | 能稳定播 | media_kit 集成；PlaybackInfo + DeviceProfile；直连/转码/HLS；基础控制层；手势；字幕/音轨；进度上报；续播；全屏/横屏；错误降级；字幕字体 | 6 类样片（MP4/H.264、MKV/HEVC、AV1、ASS、PGS、HDR）可播；首帧/seek 达标；进度在服务器可见；Android 中文 ASS 不缺字 |
 | **M3 超分** | 1 周 | 超分可用可关 | shader 资源管线（版本戳）；四档 + 自动；运行时切换；Android vo/hwdec 策略；性能守卫；颜色验收；设置页；许可声明 | Mac M1 效率档生效且可切换（4K 输出 ≥30fps）；Android 旗舰效率档 ≥45fps；mediacodec_embed 下正确禁用；掉帧自动降级；ΔE<3 |
 | **M4 体验打磨** | 2 周 | “好用” | Trickplay 预览；章节；片头片尾；下一集预加载/倒计时；PiP/后台/媒体会话；键盘/触控板/菜单栏；HUD/动画/触觉；无障碍；诊断页；UI 文案审查 | 通过 20 条体验验收脚本（见 6.3）；无 P0/P1 交互缺陷；UI 无注释性文本；真机手感评审通过 |

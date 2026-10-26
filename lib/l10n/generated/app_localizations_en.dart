@@ -37,6 +37,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get emptyDownloads => 'No downloads';
 
   @override
+  String get servers => 'Servers';
+
+  @override
+  String get addServer => 'Add server';
+
+  @override
+  String get editServer => 'Edit server';
+
+  @override
+  String get serverName => 'Name';
+
+  @override
+  String get serverUrl => 'Server URL';
+
+  @override
+  String get testConnection => 'Test';
+
+  @override
+  String get serverNameRequired => 'Enter a name.';
+
+  @override
+  String get serverUrlInvalid => 'Enter a valid http(s) URL.';
+
+  @override
+  String get serverUnreachable => 'Could not reach the server.';
+
+  @override
+  String get noServers => 'No servers';
+
+  @override
+  String get deleteServer => 'Delete server?';
+
+  @override
+  String get deleteServerBody => 'This removes the saved server.';
+
+  @override
+  String get connectedServer => 'Connected';
+
+  @override
   String get overview => 'Overview';
 
   @override

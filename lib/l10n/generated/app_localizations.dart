@@ -152,6 +152,84 @@ abstract class AppLocalizations {
   /// **'No downloads'**
   String get emptyDownloads;
 
+  /// No description provided for @servers.
+  ///
+  /// In en, this message translates to:
+  /// **'Servers'**
+  String get servers;
+
+  /// No description provided for @addServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add server'**
+  String get addServer;
+
+  /// No description provided for @editServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit server'**
+  String get editServer;
+
+  /// No description provided for @serverName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get serverName;
+
+  /// No description provided for @serverUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Server URL'**
+  String get serverUrl;
+
+  /// No description provided for @testConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test'**
+  String get testConnection;
+
+  /// No description provided for @serverNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get serverNameRequired;
+
+  /// No description provided for @serverUrlInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid http(s) URL.'**
+  String get serverUrlInvalid;
+
+  /// No description provided for @serverUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach the server.'**
+  String get serverUnreachable;
+
+  /// No description provided for @noServers.
+  ///
+  /// In en, this message translates to:
+  /// **'No servers'**
+  String get noServers;
+
+  /// No description provided for @deleteServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete server?'**
+  String get deleteServer;
+
+  /// No description provided for @deleteServerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the saved server.'**
+  String get deleteServerBody;
+
+  /// No description provided for @connectedServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get connectedServer;
+
   /// No description provided for @overview.
   ///
   /// In en, this message translates to:

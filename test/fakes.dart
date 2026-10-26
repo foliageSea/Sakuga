@@ -5,6 +5,8 @@ import 'package:sakuga/core/logging/log_export_service.dart';
 import 'package:sakuga/core/logging/runtime_environment_report.dart';
 import 'package:sakuga/core/settings/settings.dart';
 import 'package:sakuga/core/window/desktop_window.dart';
+import 'package:sakuga/data/jellyfin/server_profile.dart';
+import 'package:sakuga/data/jellyfin/server_repository.dart';
 
 class FakeLogExporter implements LogExportService {
   LogExportResult result = LogExportResult.empty;
@@ -36,6 +38,20 @@ class MemorySettings implements SettingsRepository {
   Future<void> save(AppSettings settings) async {
     if (fail) throw const AppException(FailureKind.storage);
     value = settings;
+  }
+}
+
+class MemoryServerRepository implements ServerRepository {
+  List<ServerProfile> items = [];
+  bool fail = false;
+
+  @override
+  Future<List<ServerProfile>> load() async => List.of(items);
+
+  @override
+  Future<void> save(List<ServerProfile> servers) async {
+    if (fail) throw const AppException(FailureKind.storage);
+    items = List.of(servers);
   }
 }
 

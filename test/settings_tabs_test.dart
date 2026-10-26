@@ -89,8 +89,8 @@ void main() {
             findsOneWidget,
           );
 
-          await tester.ensureVisible(find.text('About this template'));
-          await tester.tap(find.text('About this template'));
+          await tester.ensureVisible(find.text('About Sakuga'));
+          await tester.tap(find.text('About Sakuga'));
           await settle(tester);
           expect(controller.page, closeTo(4, 0.001));
           await swipe(-1);
@@ -134,8 +134,8 @@ void main() {
     );
     await settle(tester);
     expect(position.pixels, greaterThan(0));
-    expect(find.text('About this template').hitTestable(), findsOneWidget);
-    await tester.tap(find.text('About this template'));
+    expect(find.text('About Sakuga').hitTestable(), findsOneWidget);
+    await tester.tap(find.text('About Sakuga'));
     await settle(tester);
     expect(
       find.byKey(const ValueKey('font-notice')).hitTestable(),

@@ -1,6 +1,7 @@
 import '../../shared/responsive_button.dart';
 
 import 'package:flutter/gestures.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:forui/forui.dart';
@@ -17,6 +18,7 @@ import '../../shared/localization.dart';
 import '../../shared/widgets.dart';
 import 'runtime_environment_section.dart';
 import 'live_logs_section.dart';
+import 'servers_section.dart';
 
 const _misansLicenseUrl = 'https://hyperos.mi.com/font/download';
 
@@ -35,6 +37,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _logExportFailed = false;
   LogExportResult? _logExportResult;
   int _settingsTab = 0;
+  bool _tabInitialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_tabInitialized) return;
+    _tabInitialized = true;
+    if (GoRouterState.of(context).uri.queryParameters['tab'] == 'servers') {
+      _settingsTab = 5;
+    }
+  }
 
   Future<void> _showFontNotice(BuildContext context) {
     final l = context.l10n;
@@ -491,6 +504,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ),
                   ),
                 ),
+              ),
+              FTabEntry(
+                label: Text(l.servers),
+                child: tab(const ServersSection()),
               ),
             ],
           ),
