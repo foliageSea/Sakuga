@@ -274,6 +274,42 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loading => '加载中…';
 
   @override
+  String get playbackError => '无法播放此视频。';
+
+  @override
+  String get superResolution => '视频超分';
+
+  @override
+  String get superResolutionOff => '关闭超分';
+
+  @override
+  String get superResolutionEfficiency => '效率模式';
+
+  @override
+  String get superResolutionQuality => '质量模式';
+
+  @override
+  String get superResolutionError => '无法切换视频超分模式。';
+
+  @override
+  String get subtitles => '字幕';
+
+  @override
+  String get subtitlesOff => '关闭字幕';
+
+  @override
+  String get subtitlesAutomatic => '自动选择';
+
+  @override
+  String get subtitleTrack => '字幕';
+
+  @override
+  String get externalSubtitle => '外挂字幕';
+
+  @override
+  String get subtitleError => '无法切换字幕。';
+
+  @override
   String get selected => '已选择';
 
   @override

@@ -626,6 +626,78 @@ abstract class AppLocalizations {
   /// **'Loading…'**
   String get loading;
 
+  /// No description provided for @playbackError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to play this video.'**
+  String get playbackError;
+
+  /// No description provided for @superResolution.
+  ///
+  /// In en, this message translates to:
+  /// **'Video super resolution'**
+  String get superResolution;
+
+  /// No description provided for @superResolutionOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Super resolution off'**
+  String get superResolutionOff;
+
+  /// No description provided for @superResolutionEfficiency.
+  ///
+  /// In en, this message translates to:
+  /// **'Efficiency'**
+  String get superResolutionEfficiency;
+
+  /// No description provided for @superResolutionQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality'**
+  String get superResolutionQuality;
+
+  /// No description provided for @superResolutionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not change super resolution mode.'**
+  String get superResolutionError;
+
+  /// No description provided for @subtitles.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitles'**
+  String get subtitles;
+
+  /// No description provided for @subtitlesOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitles off'**
+  String get subtitlesOff;
+
+  /// No description provided for @subtitlesAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get subtitlesAutomatic;
+
+  /// No description provided for @subtitleTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle'**
+  String get subtitleTrack;
+
+  /// No description provided for @externalSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'External subtitle'**
+  String get externalSubtitle;
+
+  /// No description provided for @subtitleError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not switch subtitles.'**
+  String get subtitleError;
+
   /// No description provided for @selected.
   ///
   /// In en, this message translates to:

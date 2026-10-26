@@ -276,6 +276,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loading => 'Loading…';
 
   @override
+  String get playbackError => 'Unable to play this video.';
+
+  @override
+  String get superResolution => 'Video super resolution';
+
+  @override
+  String get superResolutionOff => 'Super resolution off';
+
+  @override
+  String get superResolutionEfficiency => 'Efficiency';
+
+  @override
+  String get superResolutionQuality => 'Quality';
+
+  @override
+  String get superResolutionError => 'Could not change super resolution mode.';
+
+  @override
+  String get subtitles => 'Subtitles';
+
+  @override
+  String get subtitlesOff => 'Subtitles off';
+
+  @override
+  String get subtitlesAutomatic => 'Automatic';
+
+  @override
+  String get subtitleTrack => 'Subtitle';
+
+  @override
+  String get externalSubtitle => 'External subtitle';
+
+  @override
+  String get subtitleError => 'Could not switch subtitles.';
+
+  @override
   String get selected => 'Selected';
 
   @override

@@ -27,6 +27,100 @@ class JellyfinClient {
 
   Map<String, String> get authHeaders => _headers(server.apiKey);
 
+  /// Negotiates a playable stream for [itemId].
+  ///
+  /// mpv supports the common Jellyfin containers and codecs directly. The
+  /// server can still return a transcoding URL when the source is not suitable
+  /// for direct playback; that URL must be used as-is.
+  Future<JellyfinPlaybackSource> playbackSource(
+    String userId,
+    String itemId, {
+    int startTimeTicks = 0,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/Items/$itemId/PlaybackInfo',
+      queryParameters: {'userId': userId},
+      data: {
+        'UserId': userId,
+        'StartTimeTicks': startTimeTicks,
+        'MaxStreamingBitrate': 120000000,
+        'EnableDirectPlay': true,
+        'EnableDirectStream': true,
+        'EnableTranscoding': true,
+        'AllowVideoStreamCopy': true,
+        'AllowAudioStreamCopy': true,
+        'DeviceProfile': _mpvDeviceProfile,
+      },
+    );
+    final data = response.data ?? const <String, dynamic>{};
+    final errorCode = data['ErrorCode'] as String?;
+    if (errorCode != null && errorCode.isNotEmpty) {
+      throw AppException(FailureKind.server, errorCode);
+    }
+
+    final sources = (data['MediaSources'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    final source = _preferredSource(sources);
+    if (source == null) {
+      throw const AppException(FailureKind.invalidData, 'No playable source');
+    }
+
+    final mediaSourceId = source['Id'] as String? ?? '';
+    final playSessionId = data['PlaySessionId'] as String? ?? '';
+    final requiredHeaders = source['RequiredHttpHeaders'];
+    final headers = <String, String>{
+      ...authHeaders,
+      if (requiredHeaders is Map)
+        for (final entry in requiredHeaders.entries)
+          entry.key.toString(): entry.value.toString(),
+    };
+    final subtitles = _subtitleSources(source);
+
+    if (source['SupportsDirectPlay'] == true) {
+      return JellyfinPlaybackSource(
+        url: _url(
+          '/Videos/$itemId/stream',
+          queryParameters: {
+            'static': 'true',
+            if (mediaSourceId.isNotEmpty) 'mediaSourceId': mediaSourceId,
+            if (playSessionId.isNotEmpty) 'playSessionId': playSessionId,
+          },
+        ),
+        headers: headers,
+        startPosition: _durationFromTicks(startTimeTicks),
+        subtitles: subtitles,
+      );
+    }
+
+    final transcodingUrl = source['TranscodingUrl'] as String?;
+    if (transcodingUrl != null && transcodingUrl.isNotEmpty) {
+      return JellyfinPlaybackSource(
+        url: _absoluteUrl(transcodingUrl),
+        headers: headers,
+        subtitles: subtitles,
+      );
+    }
+
+    if (source['SupportsDirectStream'] == true) {
+      return JellyfinPlaybackSource(
+        url: _url(
+          '/Videos/$itemId/stream',
+          queryParameters: {
+            'static': 'false',
+            if (mediaSourceId.isNotEmpty) 'mediaSourceId': mediaSourceId,
+            if (playSessionId.isNotEmpty) 'playSessionId': playSessionId,
+          },
+        ),
+        headers: headers,
+        startPosition: _durationFromTicks(startTimeTicks),
+        subtitles: subtitles,
+      );
+    }
+
+    throw const AppException(FailureKind.invalidData, 'No playable source');
+  }
+
   static Map<String, String> _headers(String apiKey) => {
     'Authorization':
         'MediaBrowser Token="$apiKey", Client="Sakuga", Device="Sakuga", DeviceId="sakuga", Version="0.1.0"',
@@ -275,4 +369,107 @@ class JellyfinClient {
 
   String _imageUrl(String itemId, String tag, int width) =>
       '${server.baseUrl}/Items/$itemId/Images/Primary?maxWidth=$width&tag=$tag';
+
+  String _url(String path, {Map<String, String>? queryParameters}) =>
+      Uri.parse('${server.baseUrl.replaceFirst(RegExp(r'/$'), '')}$path')
+          .replace(queryParameters: queryParameters)
+          .toString();
+
+  String _absoluteUrl(String path) {
+    final uri = Uri.parse(path);
+    if (uri.hasScheme) return path;
+    return '${server.baseUrl.replaceFirst(RegExp(r'/$'), '')}'
+        '${path.startsWith('/') ? path : '/$path'}';
+  }
+
+  static Map<String, dynamic>? _preferredSource(
+    List<Map<String, dynamic>> sources,
+  ) {
+    for (final source in sources) {
+      if (source['SupportsDirectPlay'] == true) return source;
+    }
+    for (final source in sources) {
+      final url = source['TranscodingUrl'];
+      if (url is String && url.isNotEmpty) return source;
+    }
+    for (final source in sources) {
+      if (source['SupportsDirectStream'] == true) return source;
+    }
+    return null;
+  }
+
+  static Duration _durationFromTicks(int ticks) =>
+      Duration(microseconds: ticks ~/ 10);
+
+  List<JellyfinSubtitleSource> _subtitleSources(Map<String, dynamic> source) =>
+      (source['MediaStreams'] as List? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .where((stream) => stream['Type'] == 'Subtitle')
+          .map((stream) {
+            final deliveryUrl = stream['DeliveryUrl'] as String?;
+            if (deliveryUrl == null || deliveryUrl.isEmpty) return null;
+            return JellyfinSubtitleSource(
+              url: _absoluteUrl(deliveryUrl),
+              title: (stream['DisplayTitle'] ?? stream['Title']) as String?,
+              language: stream['Language'] as String?,
+            );
+          })
+          .whereType<JellyfinSubtitleSource>()
+          .toList();
+
+  static const _mpvDeviceProfile = <String, dynamic>{
+    'Name': 'Sakuga-mpv',
+    'MaxStreamingBitrate': 120000000,
+    'MaxStaticBitrate': 120000000,
+    'DirectPlayProfiles': [
+      {
+        'Container': 'mkv,webm,mp4,m4v,mov,ts,m2ts,avi,flv,3gp',
+        'Type': 'Video',
+        'VideoCodec': 'h264,hevc,av1,vp9,vp8,mpeg2video,mpeg4,vc1,msmpeg4',
+        'AudioCodec': 'aac,ac3,eac3,dts,flac,opus,vorbis,mp3,alac,pcm',
+      },
+    ],
+    'TranscodingProfiles': [
+      {
+        'Container': 'ts',
+        'Type': 'Video',
+        'VideoCodec': 'h264',
+        'AudioCodec': 'aac,ac3,eac3',
+        'Protocol': 'hls',
+        'Context': 'Streaming',
+        'MinSegments': 1,
+        'BreakOnNonKeyFrames': true,
+      },
+    ],
+    'SubtitleProfiles': [
+      {'Format': 'srt', 'Method': 'External'},
+      {'Format': 'ass', 'Method': 'External'},
+      {'Format': 'ssa', 'Method': 'External'},
+      {'Format': 'vtt', 'Method': 'External'},
+      {'Format': 'pgssub', 'Method': 'External'},
+      {'Format': 'dvdsub', 'Method': 'External'},
+    ],
+  };
+}
+
+class JellyfinPlaybackSource {
+  const JellyfinPlaybackSource({
+    required this.url,
+    required this.headers,
+    this.startPosition = Duration.zero,
+    this.subtitles = const [],
+  });
+
+  final String url;
+  final Map<String, String> headers;
+  final Duration startPosition;
+  final List<JellyfinSubtitleSource> subtitles;
+}
+
+class JellyfinSubtitleSource {
+  const JellyfinSubtitleSource({required this.url, this.title, this.language});
+
+  final String url;
+  final String? title;
+  final String? language;
 }
