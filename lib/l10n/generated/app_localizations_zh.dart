@@ -64,6 +64,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loadMore => '加载更多';
 
   @override
+  String get continueWatching => '继续观看';
+
+  @override
+  String get recentlyAdded => '最近添加';
+
+  @override
+  String get searchHint => '搜索影片或剧集';
+
+  @override
   String get synopsis => '简介';
 
   @override

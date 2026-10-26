@@ -3,10 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/jellyfin/jellyfin_client.dart';
+import '../../data/jellyfin/jellyfin_models.dart';
+import '../../data/jellyfin/server_profile.dart';
 import '../../data/jellyfin/server_repository.dart';
 import '../../shared/localization.dart';
+import '../../shared/media_widgets.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
+import '../library/library_providers.dart';
+import 'home_providers.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -31,34 +37,43 @@ class HomePage extends ConsumerWidget {
                 ),
               );
             }
-            final server = items.first;
-            return Surface(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    server.name,
-                    style: context.theme.typography.body.lg.copyWith(
-                      fontWeight: FontWeight.w600,
+            final library = ref.watch(libraryViewsProvider);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ServerSummary(server: items.first),
+                ...library.when(
+                  data: (data) => [
+                    _MediaSection(
+                      client: data.client,
+                      title: l.continueWatching,
+                      items: ref.watch(resumeItemsProvider),
+                      onRetry: () => ref.invalidate(resumeItemsProvider),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    server.baseUrl,
-                    style: context.theme.typography.body.sm.copyWith(
-                      color: context.theme.colors.mutedForeground,
+                    _MediaSection(
+                      client: data.client,
+                      title: l.recentlyAdded,
+                      items: ref.watch(latestItemsProvider),
+                      onRetry: () => ref.invalidate(latestItemsProvider),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  FButton(
-                    builder: responsiveButtonContent,
-                    mainAxisSize: MainAxisSize.min,
-                    variant: .outline,
-                    onPress: () => context.go('/settings?tab=servers'),
-                    child: Text(l.servers),
-                  ),
-                ],
-              ),
+                  ],
+                  loading: () => const [
+                    Padding(
+                      padding: EdgeInsets.only(top: 28),
+                      child: LoadingNotice(),
+                    ),
+                  ],
+                  error: (error, _) => [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 28),
+                      child: ErrorNotice(
+                        error,
+                        onRetry: () => ref.invalidate(libraryViewsProvider),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             );
           },
           loading: () => const LoadingNotice(),
@@ -68,6 +83,112 @@ class HomePage extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ServerSummary extends StatelessWidget {
+  const _ServerSummary({required this.server});
+
+  final ServerProfile server;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    return Surface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            server.name,
+            style: context.theme.typography.body.lg.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            server.baseUrl,
+            style: context.theme.typography.body.sm.copyWith(
+              color: context.theme.colors.mutedForeground,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FButton(
+            builder: responsiveButtonContent,
+            mainAxisSize: MainAxisSize.min,
+            variant: .outline,
+            onPress: () => context.go('/settings?tab=servers'),
+            child: Text(l.servers),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MediaSection extends StatelessWidget {
+  const _MediaSection({
+    required this.client,
+    required this.title,
+    required this.items,
+    required this.onRetry,
+  });
+
+  final JellyfinClient client;
+  final String title;
+  final AsyncValue<List<JellyfinItem>> items;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return items.when(
+      data: (values) {
+        if (values.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: context.theme.typography.body.lg.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 320,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: values.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final item = values[index];
+                    final percentage = item.playedPercentage;
+                    return SizedBox(
+                      width: 160,
+                      child: MediaPosterCard(
+                        client: client,
+                        item: item,
+                        progress: percentage == null ? null : percentage / 100,
+                        onTap: () => context.go('/library/${item.id}'),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.only(top: 28),
+        child: LoadingNotice(),
+      ),
+      error: (error, _) => Padding(
+        padding: const EdgeInsets.only(top: 28),
+        child: ErrorNotice(error, onRetry: onRetry),
+      ),
     );
   }
 }

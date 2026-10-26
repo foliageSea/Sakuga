@@ -64,6 +64,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loadMore => 'Load more';
 
   @override
+  String get continueWatching => 'Continue watching';
+
+  @override
+  String get recentlyAdded => 'Recently added';
+
+  @override
+  String get searchHint => 'Search movies and series';
+
+  @override
   String get synopsis => 'Synopsis';
 
   @override

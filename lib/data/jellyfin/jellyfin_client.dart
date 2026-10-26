@@ -147,6 +147,65 @@ class JellyfinClient {
     return JellyfinItem.fromJson(response.data ?? const {});
   }
 
+  /// Items the user has started but not finished, most recent first.
+  Future<List<JellyfinItem>> resume(String userId, {int limit = 12}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/Items',
+      queryParameters: {
+        'userId': userId,
+        'recursive': true,
+        'filters': 'IsResumable',
+        'includeItemTypes': 'Movie,Episode',
+        'sortBy': 'DatePlayed',
+        'sortOrder': 'Descending',
+        'fields': _itemFields,
+        'imageTypeLimit': 1,
+        'limit': limit,
+      },
+    );
+    return _parseItems(response.data);
+  }
+
+  /// Recently added media. The server answers with a plain array here.
+  Future<List<JellyfinItem>> latest(String userId, {int limit = 12}) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/Users/$userId/Items/Latest',
+      queryParameters: {
+        'limit': limit,
+        'fields': _itemFields,
+        'imageTypeLimit': 1,
+      },
+    );
+    return (response.data ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(JellyfinItem.fromJson)
+        .where((item) => item.id.isNotEmpty)
+        .toList();
+  }
+
+  /// Server-side search across movies, series and videos.
+  Future<List<JellyfinItem>> search(
+    String userId,
+    String term, {
+    int limit = 60,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/Items',
+      queryParameters: {
+        'userId': userId,
+        'recursive': true,
+        'searchTerm': term,
+        'includeItemTypes': 'Movie,Series,Video',
+        'sortBy': 'SortName',
+        'sortOrder': 'Ascending',
+        'fields': _itemFields,
+        'imageTypeLimit': 1,
+        'limit': limit,
+      },
+    );
+    return _parseItems(response.data);
+  }
+
   List<JellyfinView> _parseViews(Map<String, dynamic>? data) {
     final items = data?['Items'];
     if (items is! List) return const [];

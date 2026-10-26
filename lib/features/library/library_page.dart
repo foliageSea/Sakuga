@@ -206,7 +206,7 @@ class _PagedGrid extends ConsumerWidget {
                 if (column > 0) const SizedBox(width: 16),
                 Expanded(
                   child: start + column < end
-                      ? _PosterCard(
+                      ? MediaPosterCard(
                           client: client,
                           item: state.items[start + column],
                           onTap: () => onTap(state.items[start + column]),
@@ -274,58 +274,6 @@ class _PageFooter extends ConsumerWidget {
           onPress: () =>
               ref.read(libraryItemsProvider(query).notifier).loadMore(),
           child: Text(l.loadMore),
-        ),
-      ),
-    );
-  }
-}
-
-class _PosterCard extends StatelessWidget {
-  const _PosterCard({
-    required this.client,
-    required this.item,
-    required this.onTap,
-  });
-
-  final JellyfinClient client;
-  final JellyfinItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Surface(
-        padding: 10,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width =
-                (constraints.maxWidth * MediaQuery.devicePixelRatioOf(context))
-                    .round()
-                    .clamp(200, 1200);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AspectRatio(
-                  aspectRatio: 2 / 3,
-                  child: ClipRRect(
-                    borderRadius: context.theme.style.borderRadius.md,
-                    child: MediaImage(
-                      url: client.imageUrl(item, width: width),
-                      headers: client.authHeaders,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  item.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.theme.typography.body.sm,
-                ),
-              ],
-            );
-          },
         ),
       ),
     );

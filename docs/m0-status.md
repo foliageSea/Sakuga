@@ -108,7 +108,21 @@ Linux 运行依赖（WSL 最小镜像）：`libva2`、`libva-drm2`、`libva-x11-
   - `lib/features/detail/detail_providers.dart`
   - `lib/core/images/disk_image_cache.dart`
   - `lib/shared/media_widgets.dart`
-- 待办：搜索、播放、多服务器切换。
+- 待办：播放、多服务器切换。
+
+### 1.9 首页与搜索
+
+- 首页：`GET /Items?filters=IsResumable&sortBy=DatePlayed` 出“继续观看”（带 `PlayedPercentage` 进度条），`GET /Users/{userId}/Items/Latest` 出“最近添加”；横向滚动卡片，空结果自动隐藏该区。
+- 搜索：`GET /Items?searchTerm=`（`Movie,Series,Video`），输入 300ms 防抖，结果网格（`minWidth 160`、最多 6 列），含空态/错误/重试。
+- 卡片统一为 `MediaPosterCard`（媒体库/首页/搜索共用）：分集显示剧名 + `SxxExx · 集名`，支持进度条。
+- 实测（10.10.7）：继续观看 1 条（40.8%）、最近添加 6 条、搜索“向日葵”1 条、无匹配 0 条。
+- 相关文件：
+  - `lib/features/home/home_page.dart`
+  - `lib/features/home/home_providers.dart`
+  - `lib/features/search/search_page.dart`
+  - `lib/features/search/search_providers.dart`
+  - `lib/shared/media_widgets.dart`
+- 待办：搜索历史、播放、多服务器切换。
 
 ## 2. 待完成（M0 剩余）
 

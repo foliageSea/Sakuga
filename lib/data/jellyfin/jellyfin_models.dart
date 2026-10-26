@@ -119,6 +119,23 @@ class JellyfinItem {
   bool get isSeries => type == 'Series';
   bool get isEpisode => type == 'Episode';
 
+  /// Watched fraction (0–100) as reported by the server, for resume bars.
+  double? get playedPercentage {
+    final value = userData?['PlayedPercentage'];
+    return value is num ? value.toDouble() : null;
+  }
+
+  /// Title to show on a card: the series for episodes, the item itself
+  /// otherwise.
+  String get displayTitle => isEpisode ? (seriesName ?? name) : name;
+
+  /// Secondary card line: the episode itself for episodes.
+  String? get displaySubtitle {
+    if (!isEpisode) return null;
+    final code = episodeCode;
+    return code == null ? name : '$code · $name';
+  }
+
   /// `S01E03` when the season is known, `E03` otherwise.
   String? get episodeCode {
     final episode = indexNumber;

@@ -206,6 +206,24 @@ abstract class AppLocalizations {
   /// **'Load more'**
   String get loadMore;
 
+  /// No description provided for @continueWatching.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue watching'**
+  String get continueWatching;
+
+  /// No description provided for @recentlyAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently added'**
+  String get recentlyAdded;
+
+  /// No description provided for @searchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search movies and series'**
+  String get searchHint;
+
   /// No description provided for @synopsis.
   ///
   /// In en, this message translates to:

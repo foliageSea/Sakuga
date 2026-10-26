@@ -170,15 +170,21 @@ class Surface extends StatelessWidget {
 }
 
 class AdaptiveGrid extends StatelessWidget {
-  const AdaptiveGrid({required this.children, this.minWidth = 280, super.key});
+  const AdaptiveGrid({
+    required this.children,
+    this.minWidth = 280,
+    this.maxColumns = 4,
+    super.key,
+  });
   final List<Widget> children;
   final double minWidth;
+  final int maxColumns;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
       final columns = ((box.maxWidth + 16) / (minWidth + 16)).floor().clamp(
         1,
-        children.length.clamp(1, 4),
+        maxColumns,
       );
       final width = (box.maxWidth - (columns - 1) * 16) / columns;
       return AnimatedSize(
