@@ -15,20 +15,87 @@ import '../library/library_providers.dart';
 import '../player/player_route.dart';
 import 'detail_providers.dart';
 
+/// Seed data carried from a tapped poster card so the detail header and
+/// poster [Hero] render on the first frame while full metadata loads.
+class DetailRouteExtra {
+  const DetailRouteExtra({required this.item, this.posterUrl});
+
+  final JellyfinItem item;
+  final String? posterUrl;
+}
+
+/// Builds a fade page for [DetailPage] so the poster [Hero] flies smoothly on
+/// both push and pop without a competing slide or translate offset.
+CustomTransitionPage<void> buildDetailTransitionPage(GoRouterState state) {
+  final itemId = state.pathParameters['itemId'] ?? '';
+  final extra = state.extra is DetailRouteExtra
+      ? state.extra as DetailRouteExtra
+      : null;
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+        FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+          child: child,
+        ),
+    child: DetailPage(
+      itemId: itemId,
+      initialItem: extra?.item,
+      initialPosterUrl: extra?.posterUrl,
+    ),
+  );
+}
+
 class DetailPage extends ConsumerWidget {
-  const DetailPage({required this.itemId, super.key});
+  const DetailPage({
+    required this.itemId,
+    this.initialItem,
+    this.initialPosterUrl,
+    super.key,
+  });
 
   final String itemId;
+  final JellyfinItem? initialItem;
+  final String? initialPosterUrl;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final library = ref.watch(libraryViewsProvider);
+    final preview = initialItem?.id == itemId ? initialItem : null;
     return library.when(
-      data: (data) =>
-          _DetailBody(client: data.client, userId: data.userId, itemId: itemId),
-      loading: () => const _DetailScaffold(
-        slivers: [SliverToBoxAdapter(child: LoadingNotice())],
+      data: (data) => _DetailBody(
+        client: data.client,
+        userId: data.userId,
+        itemId: itemId,
+        initialItem: preview,
+        initialPosterUrl: initialPosterUrl,
       ),
+      loading: () {
+        final server = ref.watch(activeServerProvider);
+        if (server != null && preview != null) {
+          return _DetailScaffold(
+            slivers: [
+              SliverToBoxAdapter(
+                child: _Hero(
+                  client: JellyfinClient(server: server),
+                  item: preview,
+                  posterUrl: initialPosterUrl,
+                ),
+              ),
+              const SliverToBoxAdapter(child: LoadingNotice()),
+            ],
+          );
+        }
+        return const _DetailScaffold(
+          slivers: [SliverToBoxAdapter(child: LoadingNotice())],
+        );
+      },
       error: (error, _) => _DetailScaffold(
         slivers: [
           SliverToBoxAdapter(
@@ -48,36 +115,71 @@ class _DetailBody extends ConsumerWidget {
     required this.client,
     required this.userId,
     required this.itemId,
+    this.initialItem,
+    this.initialPosterUrl,
   });
 
   final JellyfinClient client;
   final String userId;
   final String itemId;
+  final JellyfinItem? initialItem;
+  final String? initialPosterUrl;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final query = (userId: userId, itemId: itemId);
     final item = ref.watch(libraryItemProvider(query));
+    final preview = initialItem;
     return item.when(
-      data: (value) => _DetailScaffold(
+      data: (value) {
+        final reusePosterUrl =
+            initialPosterUrl != null &&
+            value.imageTags['Primary'] == preview?.imageTags['Primary'];
+        return _DetailScaffold(
+          slivers: [
+            SliverToBoxAdapter(
+              child: _Hero(
+                client: client,
+                item: value,
+                posterUrl: reusePosterUrl ? initialPosterUrl : null,
+              ),
+            ),
+            SliverToBoxAdapter(child: _About(item: value)),
+            if (value.isSeries)
+              _Episodes(client: client, userId: userId, series: value),
+          ],
+        );
+      },
+      loading: () => _DetailScaffold(
         slivers: [
-          SliverToBoxAdapter(
-            child: _Hero(client: client, item: value),
-          ),
-          SliverToBoxAdapter(child: _About(item: value)),
-          if (value.isSeries)
-            _Episodes(client: client, userId: userId, series: value),
+          if (preview != null)
+            SliverToBoxAdapter(
+              child: _Hero(
+                client: client,
+                item: preview,
+                posterUrl: initialPosterUrl,
+              ),
+            ),
+          const SliverToBoxAdapter(child: LoadingNotice()),
         ],
-      ),
-      loading: () => const _DetailScaffold(
-        slivers: [SliverToBoxAdapter(child: LoadingNotice())],
       ),
       error: (error, _) => _DetailScaffold(
         slivers: [
+          if (preview != null)
+            SliverToBoxAdapter(
+              child: _Hero(
+                client: client,
+                item: preview,
+                posterUrl: initialPosterUrl,
+              ),
+            ),
           SliverToBoxAdapter(
-            child: ErrorNotice(
-              error,
-              onRetry: () => ref.invalidate(libraryItemProvider(query)),
+            child: Padding(
+              padding: EdgeInsets.only(top: preview == null ? 0 : 24),
+              child: ErrorNotice(
+                error,
+                onRetry: () => ref.invalidate(libraryItemProvider(query)),
+              ),
             ),
           ),
         ],
@@ -94,8 +196,11 @@ class _DetailScaffold extends StatelessWidget {
   final List<Widget> slivers;
 
   @override
-  Widget build(BuildContext context) =>
-      PageScrollView(header: const _BackBar(), slivers: slivers);
+  Widget build(BuildContext context) => PageScrollView(
+    header: const _BackBar(),
+    animate: false,
+    slivers: slivers,
+  );
 }
 
 class _BackBar extends StatelessWidget {
@@ -131,10 +236,11 @@ void _goBack(BuildContext context) {
 }
 
 class _Hero extends StatelessWidget {
-  const _Hero({required this.client, required this.item});
+  const _Hero({required this.client, required this.item, this.posterUrl});
 
   final JellyfinClient client;
   final JellyfinItem item;
+  final String? posterUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -145,15 +251,18 @@ class _Hero extends StatelessWidget {
         math.min(MediaQuery.sizeOf(context).width, 1440) -
         pagePadding(context) * 2;
     final posterWidth = mobile ? 96.0 : 132.0;
-    final poster = ClipRRect(
-      borderRadius: theme.style.borderRadius.md,
-      child: AspectRatio(
-        aspectRatio: 2 / 3,
+    final poster = AspectRatio(
+      aspectRatio: 2 / 3,
+      child: PosterHero(
+        tag: posterHeroTag(item.id),
+        borderRadius: theme.style.borderRadius.md,
         child: MediaImage(
-          url: client.imageUrl(
-            item,
-            width: (posterWidth * ratio * 2).round().clamp(200, 800),
-          ),
+          url:
+              posterUrl ??
+              client.imageUrl(
+                item,
+                width: (posterWidth * ratio * 2).round().clamp(200, 800),
+              ),
           headers: client.authHeaders,
         ),
       ),

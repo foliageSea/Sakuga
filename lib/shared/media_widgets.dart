@@ -53,6 +53,52 @@ class MediaPlaceholder extends StatelessWidget {
   );
 }
 
+/// Builds the [Hero] tag shared between a library poster card and the detail
+/// page's poster frame.
+Object posterHeroTag(String itemId) => ('library-poster', itemId);
+
+/// Wraps a poster frame so it flies between a library card and the detail
+/// page when pushing or popping the detail route.
+class PosterHero extends StatelessWidget {
+  const PosterHero({
+    required this.tag,
+    required this.borderRadius,
+    required this.child,
+    super.key,
+  });
+
+  final Object? tag;
+  final BorderRadius borderRadius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final tag = this.tag;
+    final framed = ClipRRect(
+      key: tag == null ? null : ValueKey(('poster-hero-frame', tag)),
+      borderRadius: borderRadius,
+      child: child,
+    );
+    if (tag == null) return framed;
+    return Hero(
+      tag: tag,
+      transitionOnUserGestures: true,
+      flightShuttleBuilder: _flightShuttle,
+      child: framed,
+    );
+  }
+
+  /// Keeps the departing hero's subtree in flight in both directions so the
+  /// poster already on screen animates without flashing a placeholder.
+  static Widget _flightShuttle(
+    BuildContext flightContext,
+    Animation<double> animation,
+    HeroFlightDirection flightDirection,
+    BuildContext fromHeroContext,
+    BuildContext toHeroContext,
+  ) => (fromHeroContext.widget as Hero).child;
+}
+
 /// A poster card with title, optional subtitle and watch progress.
 ///
 /// Defaults to a 2:3 poster frame; pass [aspectRatio] to use the scraped shape
@@ -61,15 +107,24 @@ class MediaPosterCard extends StatelessWidget {
   const MediaPosterCard({
     required this.client,
     required this.item,
-    required this.onTap,
+    this.onTap,
+    this.onPosterTap,
+    this.heroTag,
     this.progress,
     this.aspectRatio,
     super.key,
-  });
+  }) : assert(onTap != null || onPosterTap != null);
 
   final JellyfinClient client;
   final JellyfinItem item;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+
+  /// Invoked with the resolved poster URL when tapped, so a destination route
+  /// can reuse the exact cached artwork frame.
+  final ValueChanged<String?>? onPosterTap;
+
+  /// Optional [Hero] tag for shared-element transitions into a detail page.
+  final Object? heroTag;
 
   /// Watched fraction between 0 and 1, drawn as a thin bar under the poster.
   final double? progress;
@@ -80,8 +135,16 @@ class MediaPosterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    String? posterUrl;
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        final onPosterTap = this.onPosterTap;
+        if (onPosterTap != null) {
+          onPosterTap(posterUrl);
+        } else {
+          onTap?.call();
+        }
+      },
       child: Surface(
         padding: 10,
         child: LayoutBuilder(
@@ -90,6 +153,7 @@ class MediaPosterCard extends StatelessWidget {
                 (constraints.maxWidth * MediaQuery.devicePixelRatioOf(context))
                     .round()
                     .clamp(200, 1200);
+            posterUrl = client.imageUrl(item, width: width);
             final subtitle = item.displaySubtitle;
             final watched = progress;
             return Column(
@@ -97,10 +161,11 @@ class MediaPosterCard extends StatelessWidget {
               children: [
                 AspectRatio(
                   aspectRatio: aspectRatio ?? 2 / 3,
-                  child: ClipRRect(
+                  child: PosterHero(
+                    tag: heroTag,
                     borderRadius: theme.style.borderRadius.md,
                     child: MediaImage(
-                      url: client.imageUrl(item, width: width),
+                      url: posterUrl,
                       headers: client.authHeaders,
                     ),
                   ),

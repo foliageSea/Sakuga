@@ -12,6 +12,7 @@ import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
+import '../detail/detail_page.dart';
 import 'library_providers.dart';
 
 class LibraryPage extends ConsumerStatefulWidget {
@@ -146,11 +147,16 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       _PagedGrid(
         client: library.client,
         query: (userId: library.userId, viewId: viewId),
-        onTap: (item) => context.go('/library/${item.id}'),
+        onTap: (item, posterUrl) => context.go(
+          '/library/${item.id}',
+          extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
+        ),
       ),
     ];
   }
 }
+
+typedef _OpenLibraryItem = void Function(JellyfinItem item, String? posterUrl);
 
 class _PagedGrid extends ConsumerWidget {
   const _PagedGrid({
@@ -161,7 +167,7 @@ class _PagedGrid extends ConsumerWidget {
 
   final JellyfinClient client;
   final LibraryQuery query;
-  final ValueChanged<JellyfinItem> onTap;
+  final _OpenLibraryItem onTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -191,21 +197,18 @@ class _PagedGrid extends ConsumerWidget {
     if (state.items.isEmpty) {
       return SliverToBoxAdapter(child: EmptyNotice(context.l10n.noItems));
     }
+    final items = _uniqueItems(state.items);
     if (isMobileLayout(context)) {
       return SliverToBoxAdapter(
-        child: _MobileMasonryGrid(
-          client: client,
-          items: state.items,
-          onTap: onTap,
-        ),
+        child: _MobileMasonryGrid(client: client, items: items, onTap: onTap),
       );
     }
     final columns = _columns(context);
-    final rows = (state.items.length / columns).ceil();
+    final rows = (items.length / columns).ceil();
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, row) {
         final start = row * columns;
-        final end = math.min(start + columns, state.items.length);
+        final end = math.min(start + columns, items.length);
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: Row(
@@ -217,8 +220,10 @@ class _PagedGrid extends ConsumerWidget {
                   child: start + column < end
                       ? MediaPosterCard(
                           client: client,
-                          item: state.items[start + column],
-                          onTap: () => onTap(state.items[start + column]),
+                          item: items[start + column],
+                          heroTag: posterHeroTag(items[start + column].id),
+                          onPosterTap: (posterUrl) =>
+                              onTap(items[start + column], posterUrl),
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -228,6 +233,14 @@ class _PagedGrid extends ConsumerWidget {
         );
       }, childCount: rows),
     );
+  }
+
+  List<JellyfinItem> _uniqueItems(List<JellyfinItem> items) {
+    final seen = <String>{};
+    return [
+      for (final item in items)
+        if (seen.add(item.id)) item,
+    ];
   }
 
   int _columns(BuildContext context) {
@@ -250,7 +263,7 @@ class _MobileMasonryGrid extends StatelessWidget {
 
   final JellyfinClient client;
   final List<JellyfinItem> items;
-  final ValueChanged<JellyfinItem> onTap;
+  final _OpenLibraryItem onTap;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -286,7 +299,9 @@ class _MobileMasonryGrid extends StatelessWidget {
                       client: client,
                       item: columns[column][index],
                       aspectRatio: columns[column][index].posterAspectRatio,
-                      onTap: () => onTap(columns[column][index]),
+                      heroTag: posterHeroTag(columns[column][index].id),
+                      onPosterTap: (posterUrl) =>
+                          onTap(columns[column][index], posterUrl),
                     ),
                   ],
                 ],

@@ -118,9 +118,14 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
       final data = await ref.read(libraryViewsProvider.future);
       final page = await _fetch(data, startIndex: current.items.length);
       if (!ref.mounted) return;
+      final existingIds = {for (final item in current.items) item.id};
       state = AsyncData(
         LibraryItemsState(
-          items: [...current.items, ...page.items],
+          items: [
+            ...current.items,
+            for (final item in page.items)
+              if (existingIds.add(item.id)) item,
+          ],
           totalRecordCount: page.totalRecordCount,
         ),
       );

@@ -41,9 +41,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: ':itemId',
-                    builder: (_, state) => DetailPage(
-                      itemId: state.pathParameters['itemId'] ?? '',
-                    ),
+                    pageBuilder: (_, state) => buildDetailTransitionPage(state),
                   ),
                 ],
               ),

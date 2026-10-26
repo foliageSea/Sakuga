@@ -71,7 +71,12 @@ class PageContent extends StatelessWidget {
 /// A [PageContent] variant that lays its content out as slivers, so long lists
 /// can be built lazily.
 class PageScrollView extends StatelessWidget {
-  const PageScrollView({required this.slivers, this.header, super.key});
+  const PageScrollView({
+    required this.slivers,
+    this.header,
+    this.animate = true,
+    super.key,
+  });
 
   final List<Widget> slivers;
 
@@ -79,6 +84,11 @@ class PageScrollView extends StatelessWidget {
   /// app bar. It keeps its place while the content scrolls, so actions like a
   /// back button stay reachable.
   final Widget? header;
+
+  /// Whether to play the mount entrance animation. Disable when the enclosing
+  /// route drives its own page transition, so [Hero] targets are measured at
+  /// their resting position.
+  final bool animate;
 
   /// Gap between a fixed [header] and the top of the scrolling content.
   static const _headerGap = 16.0;
@@ -102,43 +112,46 @@ class PageScrollView extends StatelessWidget {
         ),
       ],
     );
+    final content = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1440),
+        child: header == null
+            ? scrollView
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      padding,
+                      padding,
+                      padding,
+                      _headerGap,
+                    ),
+                    child: header,
+                  ),
+                  Expanded(child: scrollView),
+                ],
+              ),
+      ),
+    );
     return ColoredBox(
       color: context.theme.colors.background,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-        builder: (context, value, child) => Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 10 * (1 - value)),
-            child: child,
-          ),
-        ),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1440),
-            child: header == null
-                ? scrollView
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          padding,
-                          padding,
-                          padding,
-                          _headerGap,
-                        ),
-                        child: header,
-                      ),
-                      Expanded(child: scrollView),
-                    ],
-                  ),
-          ),
-        ),
-      ),
+      child: animate
+          ? TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) => Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, 10 * (1 - value)),
+                  child: child,
+                ),
+              ),
+              child: content,
+            )
+          : content,
     );
   }
 }
