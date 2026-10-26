@@ -53,12 +53,44 @@ JellyfinItem _movie() => JellyfinItem(
   ],
 );
 
+JellyfinItem _series() => const JellyfinItem(
+  id: 'series-1',
+  name: 'A Series With Episodes',
+  type: 'Series',
+  imageTags: {},
+  overview: 'A short synopsis.',
+  genres: ['Animation'],
+  productionYear: 2026,
+);
+
+JellyfinItem _season() => const JellyfinItem(
+  id: 'season-1',
+  name: 'Season 1',
+  type: 'Season',
+  imageTags: {},
+);
+
+JellyfinItem _episode() => const JellyfinItem(
+  id: 'episode-1',
+  name: 'Pilot',
+  type: 'Episode',
+  imageTags: {},
+  seriesId: 'series-1',
+  seriesName: 'A Series With Episodes',
+  seasonId: 'season-1',
+  indexNumber: 1,
+  parentIndexNumber: 1,
+);
+
 /// Pumps the real detail route behind a router so the back button can pop.
 Future<GoRouter> pumpDetailPage(
   WidgetTester tester, {
   required FutureOr<JellyfinItem> Function() item,
   Size size = const Size(1280, 800),
   bool settle = true,
+  bool withPlayerRoute = false,
+  List<JellyfinItem>? seasons,
+  List<JellyfinItem>? episodes,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -79,12 +111,22 @@ Future<GoRouter> pumpDetailPage(
           ),
         ],
       ),
+      if (withPlayerRoute)
+        GoRoute(
+          path: '/player',
+          builder: (_, state) =>
+              Text('player:${state.uri.queryParameters['item']}'),
+        ),
     ],
   );
   addTearDown(router.dispose);
 
   final container = ProviderContainer(
     overrides: [
+      if (seasons != null)
+        seriesSeasonsProvider.overrideWith((ref, query) => seasons),
+      if (episodes != null)
+        seriesEpisodesProvider.overrideWith((ref, query) => episodes),
       libraryViewsProvider.overrideWith(
         (ref) async => LibraryData(
           client: JellyfinClient(server: _server),
@@ -139,7 +181,10 @@ ScrollPosition _pageScrollPosition(WidgetTester tester) {
 
 /// Scrolls the page by [dy] and checks that the back button kept its place
 /// while the page content moved.
-Future<void> expectBackButtonPinned(WidgetTester tester, {double dy = -320}) async {
+Future<void> expectBackButtonPinned(
+  WidgetTester tester, {
+  double dy = -320,
+}) async {
   expect(_backButton, findsOneWidget);
   final pinnedAt = tester.getTopLeft(_backButton);
   final titleBefore = tester.getTopLeft(find.text(_title)).dy;
@@ -211,5 +256,27 @@ void main() {
 
     expect(_backButton, findsOneWidget);
     expect(find.byType(ErrorNotice), findsOneWidget);
+  });
+
+  testWidgets('tapping an episode opens the player for that episode', (
+    tester,
+  ) async {
+    final episode = _episode();
+    await pumpDetailPage(
+      tester,
+      item: _series,
+      size: const Size(1280, 1000),
+      withPlayerRoute: true,
+      seasons: [_season()],
+      episodes: [episode],
+    );
+
+    await tester.ensureVisible(find.text(episode.name));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(episode.name));
+    await tester.pumpAndSettle();
+
+    expect(find.text('player:${episode.id}'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

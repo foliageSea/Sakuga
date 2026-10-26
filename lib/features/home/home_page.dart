@@ -12,6 +12,7 @@ import '../../shared/media_widgets.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import '../library/library_providers.dart';
+import '../player/player_route.dart';
 import 'home_providers.dart';
 
 class HomePage extends ConsumerWidget {
@@ -49,12 +50,14 @@ class HomePage extends ConsumerWidget {
                       title: l.continueWatching,
                       items: ref.watch(resumeItemsProvider),
                       onRetry: () => ref.invalidate(resumeItemsProvider),
+                      onTap: (item) => _resume(context, item),
                     ),
                     _MediaSection(
                       client: data.client,
                       title: l.recentlyAdded,
                       items: ref.watch(latestItemsProvider),
                       onRetry: () => ref.invalidate(latestItemsProvider),
+                      onTap: (item) => context.go('/library/${item.id}'),
                     ),
                   ],
                   loading: () => const [
@@ -84,6 +87,15 @@ class HomePage extends ConsumerWidget {
         ),
       ],
     );
+  }
+}
+
+/// Resumes playback where the user left off; series open their detail page.
+void _resume(BuildContext context, JellyfinItem item) {
+  if (item.isSeries) {
+    context.go('/library/${item.id}');
+  } else {
+    context.push(playerLocation(item.id));
   }
 }
 
@@ -132,12 +144,14 @@ class _MediaSection extends StatelessWidget {
     required this.title,
     required this.items,
     required this.onRetry,
+    required this.onTap,
   });
 
   final JellyfinClient client;
   final String title;
   final AsyncValue<List<JellyfinItem>> items;
   final VoidCallback onRetry;
+  final ValueChanged<JellyfinItem> onTap;
 
   /// Portrait cards need more room; an all-episode row uses 16:9 stills.
   static double _rowHeight(List<JellyfinItem> values) =>
@@ -179,7 +193,7 @@ class _MediaSection extends StatelessWidget {
                         aspectRatio: landscape
                             ? item.thumbnailAspectRatio
                             : null,
-                        onTap: () => context.go('/library/${item.id}'),
+                        onTap: () => onTap(item),
                       ),
                     );
                   },

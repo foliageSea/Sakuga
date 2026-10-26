@@ -12,6 +12,7 @@ import '../../shared/media_widgets.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import '../library/library_providers.dart';
+import '../player/player_route.dart';
 import 'detail_providers.dart';
 
 class DetailPage extends ConsumerWidget {
@@ -535,67 +536,71 @@ class _EpisodeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.theme;
     final code = item.episodeCode;
-    return Surface(
-      padding: 8,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 140,
-            child: AspectRatio(
-              aspectRatio: item.thumbnailAspectRatio,
-              child: ClipRRect(
-                borderRadius: theme.style.borderRadius.md,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final width =
-                        (constraints.maxWidth *
-                                MediaQuery.devicePixelRatioOf(context))
-                            .round()
-                            .clamp(200, 800);
-                    return MediaImage(
-                      url: client.imageUrl(item, width: width),
-                      headers: client.authHeaders,
-                    );
-                  },
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.push(playerLocation(item.id)),
+      child: Surface(
+        padding: 8,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 140,
+              child: AspectRatio(
+                aspectRatio: item.thumbnailAspectRatio,
+                child: ClipRRect(
+                  borderRadius: theme.style.borderRadius.md,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width =
+                          (constraints.maxWidth *
+                                  MediaQuery.devicePixelRatioOf(context))
+                              .round()
+                              .clamp(200, 800);
+                      return MediaImage(
+                        url: client.imageUrl(item, width: width),
+                        headers: client.authHeaders,
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.typography.body.md,
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    if (code != null)
-                      Text(
-                        code,
-                        style: theme.typography.body.sm.copyWith(
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.typography.body.md,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      if (code != null)
+                        Text(
+                          code,
+                          style: theme.typography.body.sm.copyWith(
+                            color: theme.colors.mutedForeground,
+                          ),
+                        ),
+                      if (code != null && item.played) const SizedBox(width: 8),
+                      if (item.played)
+                        Icon(
+                          FLucideIcons.check,
+                          size: 14,
                           color: theme.colors.mutedForeground,
                         ),
-                      ),
-                    if (code != null && item.played) const SizedBox(width: 8),
-                    if (item.played)
-                      Icon(
-                        FLucideIcons.check,
-                        size: 14,
-                        color: theme.colors.mutedForeground,
-                      ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

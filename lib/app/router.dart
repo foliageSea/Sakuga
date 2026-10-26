@@ -72,7 +72,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      GoRoute(path: '/player', builder: (_, _) => const PlayerPage()),
+      // A single route: the player must not stack a second player page under
+      // the one that carries the item, so the item travels as a query.
+      GoRoute(
+        path: '/player',
+        builder: (_, state) =>
+            PlayerPage(itemId: state.uri.queryParameters['item']),
+      ),
     ],
     errorBuilder: (context, _) => FScaffold(
       child: Center(
