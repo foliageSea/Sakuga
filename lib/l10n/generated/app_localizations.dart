@@ -698,6 +698,72 @@ abstract class AppLocalizations {
   /// **'Could not switch subtitles.'**
   String get subtitleError;
 
+  /// No description provided for @selectEpisode.
+  ///
+  /// In en, this message translates to:
+  /// **'Select episode'**
+  String get selectEpisode;
+
+  /// No description provided for @nextEpisode.
+  ///
+  /// In en, this message translates to:
+  /// **'Next episode'**
+  String get nextEpisode;
+
+  /// No description provided for @playPlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get playPlayback;
+
+  /// No description provided for @pausePlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get pausePlayback;
+
+  /// No description provided for @mute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get mute;
+
+  /// No description provided for @unmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get unmute;
+
+  /// No description provided for @enterFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter fullscreen'**
+  String get enterFullscreen;
+
+  /// No description provided for @exitFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit fullscreen'**
+  String get exitFullscreen;
+
+  /// No description provided for @playbackPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback position'**
+  String get playbackPosition;
+
+  /// No description provided for @subtitleStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle style'**
+  String get subtitleStyle;
+
+  /// No description provided for @subtitleBackgroundOpacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Background opacity'**
+  String get subtitleBackgroundOpacity;
+
   /// No description provided for @selected.
   ///
   /// In en, this message translates to:

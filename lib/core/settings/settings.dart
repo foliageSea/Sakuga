@@ -17,14 +17,20 @@ class AppSettings {
     this.themeColor = AppThemeColor.neutral,
     this.radiusScale = 1,
     this.fontScale = 1,
+    this.subtitleFontSize = 32,
+    this.subtitleBackgroundOpacity = 2 / 3,
   }) : assert(radiusScale >= 0 && radiusScale <= 2),
-       assert(fontScale >= 0.8 && fontScale <= 1.2);
+       assert(fontScale >= 0.8 && fontScale <= 1.2),
+       assert(subtitleFontSize >= 16 && subtitleFontSize <= 64),
+       assert(subtitleBackgroundOpacity >= 0 && subtitleBackgroundOpacity <= 1);
   final ThemeMode themeMode;
   final String language;
   final bool compactSidebar;
   final AppThemeColor themeColor;
   final double radiusScale;
   final double fontScale;
+  final double subtitleFontSize;
+  final double subtitleBackgroundOpacity;
   Locale? get locale => language == 'system' ? null : Locale(language);
   AppSettings copyWith({
     ThemeMode? themeMode,
@@ -33,6 +39,8 @@ class AppSettings {
     AppThemeColor? themeColor,
     double? radiusScale,
     double? fontScale,
+    double? subtitleFontSize,
+    double? subtitleBackgroundOpacity,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     language: language ?? this.language,
@@ -40,6 +48,9 @@ class AppSettings {
     themeColor: themeColor ?? this.themeColor,
     radiusScale: radiusScale ?? this.radiusScale,
     fontScale: fontScale ?? this.fontScale,
+    subtitleFontSize: subtitleFontSize ?? this.subtitleFontSize,
+    subtitleBackgroundOpacity:
+        subtitleBackgroundOpacity ?? this.subtitleBackgroundOpacity,
   );
   Map<String, Object> toJson() => {
     'theme': themeMode.name,
@@ -48,6 +59,8 @@ class AppSettings {
     'themeColor': themeColor.name,
     'radiusScale': radiusScale,
     'fontScale': fontScale,
+    'subtitleFontSize': subtitleFontSize,
+    'subtitleBackgroundOpacity': subtitleBackgroundOpacity,
   };
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
     themeMode: ThemeMode.values.firstWhere(
@@ -71,6 +84,16 @@ class AppSettings {
       num value when value.isFinite && value >= 0.8 && value <= 1.2 =>
         value.toDouble(),
       _ => 1,
+    },
+    subtitleFontSize: switch (json['subtitleFontSize']) {
+      num value when value.isFinite && value >= 16 && value <= 64 =>
+        value.toDouble(),
+      _ => 32,
+    },
+    subtitleBackgroundOpacity: switch (json['subtitleBackgroundOpacity']) {
+      num value when value.isFinite && value >= 0 && value <= 1 =>
+        value.toDouble(),
+      _ => 2 / 3,
     },
   );
 }

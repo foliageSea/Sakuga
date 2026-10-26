@@ -312,6 +312,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subtitleError => 'Could not switch subtitles.';
 
   @override
+  String get selectEpisode => 'Select episode';
+
+  @override
+  String get nextEpisode => 'Next episode';
+
+  @override
+  String get playPlayback => 'Play';
+
+  @override
+  String get pausePlayback => 'Pause';
+
+  @override
+  String get mute => 'Mute';
+
+  @override
+  String get unmute => 'Unmute';
+
+  @override
+  String get enterFullscreen => 'Enter fullscreen';
+
+  @override
+  String get exitFullscreen => 'Exit fullscreen';
+
+  @override
+  String get playbackPosition => 'Playback position';
+
+  @override
+  String get subtitleStyle => 'Subtitle style';
+
+  @override
+  String get subtitleBackgroundOpacity => 'Background opacity';
+
+  @override
   String get selected => 'Selected';
 
   @override

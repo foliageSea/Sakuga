@@ -17,6 +17,28 @@ import '../home/home_providers.dart';
 import '../library/library_providers.dart';
 import 'player_assets.dart';
 import 'playback_progress_repository.dart';
+import 'player_controls.dart';
+import 'player_controls_controller.dart';
+import 'player_exit.dart';
+import 'player_subtitles.dart';
+
+// This provider outlives the route so pending saves can refresh the library
+// after the player is disposed, while still respecting container disposal.
+final _refreshPlaybackProvider = Provider((ref) {
+  return (String? userId, String? itemId, String? seriesId) {
+    if (!ref.mounted) return;
+    ref.invalidate(resumeItemsProvider);
+    ref.invalidate(libraryItemsProvider);
+    ref.invalidate(seriesEpisodesProvider);
+    ref.invalidate(seriesSeasonsProvider);
+    if (userId != null && itemId != null) {
+      ref.invalidate(libraryItemProvider((userId: userId, itemId: itemId)));
+    }
+    if (userId != null && seriesId != null && seriesId.isNotEmpty) {
+      ref.invalidate(libraryItemProvider((userId: userId, itemId: seriesId)));
+    }
+  };
+});
 
 /// Full-screen Jellyfin player.
 class PlayerPage extends ConsumerStatefulWidget {
@@ -39,6 +61,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   late final Player _player;
   late final VideoController _controller;
+  late final MediaKitControlsController _controlsController;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   bool _loading = true;
   Object? _error;
@@ -69,7 +92,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   bool _tracking = false;
   bool _stopped = false;
   bool _exiting = false;
-  bool _allowPop = false;
   bool _backgroundCheckpointed = false;
   int _lastLocalSaveTicks = -1;
   int _lastReportedTicks = -1;
@@ -78,14 +100,18 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   Future<void> _syncTail = Future.value();
   int _progressRevision = 0;
   late final PlaybackProgressRepository _progressRepository;
+  late final ValueNotifier<String?> _currentItemId;
+  final _switchingEpisode = ValueNotifier(false);
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _currentItemId = ValueNotifier(widget.itemId);
     _progressRepository = ref.read(playbackProgressRepositoryProvider);
     _player = Player();
     _controller = VideoController(_player);
+    _controlsController = MediaKitControlsController(_player);
     _tracks = _player.state.tracks;
     _track = _player.state.track;
     _subscriptions.add(
@@ -210,10 +236,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   Future<void> _openMedia() async {
+    if (_exiting || !mounted) return;
     if (_tracking) {
       await _stopTracking(failed: _error != null)
           .timeout(_exitSyncTimeout, onTimeout: () {});
     }
+    if (_exiting || !mounted) return;
     final generation = ++_openGeneration;
     if (mounted) {
       setState(() {
@@ -229,18 +257,21 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       await platform.setProperty('sub-fonts-dir', assets.fontsDirectory.path);
       await platform.setProperty('sub-font', 'MiSans');
       await _applySuperResolution(_superResolutionMode);
+      if (!mounted || generation != _openGeneration) return;
 
       if (_devMediaUrl.isNotEmpty) {
         await _player.open(Media(_devMediaUrl), play: true);
         return;
       }
 
-      final itemId = widget.itemId;
+      final itemId = _currentItemId.value;
       if (itemId == null || itemId.isEmpty) {
         throw const FormatException('Missing media item');
       }
       final library = await ref.read(libraryViewsProvider.future);
+      if (!mounted || generation != _openGeneration) return;
       final item = await library.client.item(library.userId, itemId);
+      if (!mounted || generation != _openGeneration) return;
       final serverTicks = item.playbackPositionTicks ?? 0;
       final localTicks = await _loadLocalProgress(
         serverId: library.client.server.id,
@@ -248,6 +279,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         itemId: itemId,
       );
       final ticks = localTicks ?? serverTicks;
+      if (!mounted || generation != _openGeneration) return;
       final source = await library.client.playbackSource(
         library.userId,
         itemId,
@@ -468,31 +500,38 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     await stopping;
   }
 
-  Future<void> _exitPlayer() async {
+  Future<void> _exitPlayer({bool navigate = true}) async {
     if (_exiting) return;
     _exiting = true;
-    await _stopTracking(failed: _error != null)
-        .timeout(_exitSyncTimeout, onTimeout: () {});
+    _openGeneration++;
+    final stopping = _stopTracking(failed: _error != null);
     if (!mounted) return;
-    ref.invalidate(resumeItemsProvider);
-    ref.invalidate(libraryItemsProvider);
-    ref.invalidate(seriesEpisodesProvider);
-    ref.invalidate(seriesSeasonsProvider);
+    final refreshLibrary = ref.read(_refreshPlaybackProvider);
     final userId = _userId;
     final itemId = _progressItemId;
     final seriesId = _seriesId;
-    if (userId != null && itemId != null) {
-      ref.invalidate(libraryItemProvider((userId: userId, itemId: itemId)));
+    void refresh() {
+      refreshLibrary(userId, itemId, seriesId);
     }
-    if (userId != null && seriesId != null && seriesId.isNotEmpty) {
-      ref.invalidate(libraryItemProvider((userId: userId, itemId: seriesId)));
-    }
-    setState(() => _allowPop = true);
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go('/home');
-    }
+
+    unawaited(
+      _player.pause().catchError((Object error, StackTrace stackTrace) {
+        debugPrint('PLAYER_PAUSE_ON_EXIT_ERROR $error\n$stackTrace');
+      }),
+    );
+    leavePlayer(
+      localSave: _localTail,
+      serverSync: stopping,
+      refresh: refresh,
+      navigate: () {
+        if (!navigate) return;
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/home');
+        }
+      },
+    );
   }
 
   @override
@@ -549,6 +588,38 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     }
   }
 
+  Future<void> _selectEpisode(JellyfinItem episode) async {
+    if (_switchingEpisode.value ||
+        _exiting ||
+        episode.id == _currentItemId.value) {
+      return;
+    }
+    _switchingEpisode.value = true;
+    try {
+      await _player.pause();
+      await _stopTracking(failed: _error != null)
+          .timeout(_exitSyncTimeout, onTimeout: () {});
+      if (!mounted || _exiting) return;
+      final userId = _userId;
+      final previousId = _currentItemId.value;
+      if (userId != null && previousId != null) {
+        ref.invalidate(
+          libraryItemProvider((userId: userId, itemId: previousId)),
+        );
+      }
+      ref.invalidate(resumeItemsProvider);
+      ref.invalidate(seriesEpisodesProvider);
+      _currentItemId.value = episode.id;
+      setState(() {});
+      await _openMedia();
+    } catch (error, stackTrace) {
+      debugPrint('PLAYER_EPISODE_ERROR $error\n$stackTrace');
+      if (mounted) notifyUser(context, failureMessage(context, error));
+    } finally {
+      if (mounted) _switchingEpisode.value = false;
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -560,7 +631,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }
-    _player.dispose();
+    _controlsController.dispose();
+    unawaited(_player.dispose());
+    _currentItemId.dispose();
+    _switchingEpisode.dispose();
     super.dispose();
   }
 
@@ -568,15 +642,40 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   Widget build(BuildContext context) {
     final item = _item;
     return PopScope<void>(
-      canPop: _allowPop,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) unawaited(_exitPlayer());
+        if (didPop) unawaited(_exitPlayer(navigate: false));
       },
       child: ColoredBox(
         color: const Color(0xff000000),
         child: Stack(
           children: [
-            Positioned.fill(child: Video(controller: _controller)),
+            Positioned.fill(
+              child: Video(
+                controller: _controller,
+                subtitleViewConfiguration: const SubtitleViewConfiguration(
+                  visible: false,
+                ),
+                controls: (state) => Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    PlayerSubtitles(player: _player),
+                    PlayerControls(
+                      controller: _controlsController,
+                      onToggleFullscreen: state.toggleFullscreen,
+                      onExitFullscreen: state.exitFullscreen,
+                      fullscreen: state.isFullscreen(),
+                      header: _buildHeader(item, () async {
+                        if (state.isFullscreen()) await state.exitFullscreen();
+                        await _exitPlayer();
+                      }),
+                      itemId: _currentItemId,
+                      switching: _switchingEpisode,
+                      onSelectEpisode: _selectEpisode,
+                    ),
+                  ],
+                ),
+              ),
+            ),
             if (_loading)
               const Positioned.fill(child: Center(child: FCircularProgress())),
             if (_error != null)
@@ -615,66 +714,64 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                   ),
                 ),
               ),
-            Positioned(
-              left: 12,
-              top: 12,
-              right: 12,
-              child: SafeArea(
-                child: Row(
-                  children: [
-                    FButton.icon(
-                      key: const ValueKey('player-back'),
-                      variant: .ghost,
-                      onPress: _exitPlayer,
-                      semanticsLabel: context.l10n.back,
-                      child: const Icon(
-                        FLucideIcons.arrowLeft,
-                        color: Color(0xFFFFFFFF),
-                      ),
-                    ),
-                    if (item != null) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _title(item),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.theme.typography.body.md.copyWith(
-                            color: const Color(0xFFFFFFFF),
-                          ),
-                        ),
-                      ),
-                    ] else
-                      const Spacer(),
-                    const SizedBox(width: 8),
-                    _SuperResolutionMenu(
-                      mode: _superResolutionMode,
-                      onChanged: _setSuperResolution,
-                    ),
-                    const SizedBox(width: 8),
-                    _SubtitleMenu(
-                      tracks: _tracks.subtitle,
-                      selected: _track.subtitle,
-                      onChanged: _setSubtitle,
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildHeader(JellyfinItem? item, VoidCallback onBack) {
+    return Row(
+      children: [
+        FButton.icon(
+          key: const ValueKey('player-back'),
+          variant: .ghost,
+          size: .sm,
+          onPress: onBack,
+          semanticsLabel: context.l10n.back,
+          child: const Icon(
+            FLucideIcons.arrowLeft,
+            size: 18,
+            color: Color(0xFFFFFFFF),
+          ),
+        ),
+        if (item != null) ...[
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _title(item),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.theme.typography.body.md.copyWith(
+                color: const Color(0xFFFFFFFF),
+              ),
+            ),
+          ),
+        ] else
+          const Spacer(),
+        const SizedBox(width: 8),
+        _SuperResolutionMenu(
+          mode: _superResolutionMode,
+          onChanged: _setSuperResolution,
+        ),
+        const SizedBox(width: 8),
+        _SubtitleMenu(
+          tracks: _tracks.subtitle,
+          selected: _track.subtitle,
+          onChanged: _setSubtitle,
+        ),
+      ],
+    );
+  }
+
   /// The item the route asked for, once the library session is available.
   JellyfinItem? get _item {
-    final itemId = widget.itemId;
-    if (itemId == null || itemId.isEmpty) return null;
+    final currentItemId = _currentItemId.value;
+    if (currentItemId == null || currentItemId.isEmpty) return null;
     final userId = ref.watch(libraryViewsProvider).value?.userId;
     if (userId == null) return null;
     return ref
-        .watch(libraryItemProvider((userId: userId, itemId: itemId)))
+        .watch(libraryItemProvider((userId: userId, itemId: currentItemId)))
         .value;
   }
 
@@ -716,10 +813,12 @@ class _SuperResolutionMenu extends StatelessWidget {
     builder: (context, controller, _) => FButton.icon(
       key: const ValueKey('super-resolution-menu'),
       variant: .ghost,
+      size: .sm,
       onPress: controller.toggle,
       semanticsLabel: context.l10n.superResolution,
       child: Icon(
         FLucideIcons.sparkles,
+        size: 18,
         color: mode == SuperResolutionMode.off
             ? const Color(0xFFFFFFFF)
             : context.theme.colors.primary,
@@ -777,16 +876,31 @@ class _SubtitleMenu extends StatelessWidget {
               ),
           ],
         ),
+        FItemGroup(
+          children: [
+            FItem(
+              key: const ValueKey('subtitle-style'),
+              title: Text(context.l10n.subtitleStyle),
+              prefix: const Icon(FLucideIcons.slidersHorizontal, size: 16),
+              onPress: () {
+                controller.hide();
+                unawaited(showSubtitleStyleDialog(context));
+              },
+            ),
+          ],
+        ),
       ],
       builder: (context, controller, _) => FButton.icon(
         key: const ValueKey('subtitle-menu'),
         variant: .ghost,
+        size: .sm,
         onPress: controller.toggle,
         semanticsLabel: context.l10n.subtitles,
         child: Icon(
           selected.id == 'no'
               ? FLucideIcons.captionsOff
               : FLucideIcons.captions,
+          size: 18,
           color: const Color(0xFFFFFFFF),
         ),
       ),

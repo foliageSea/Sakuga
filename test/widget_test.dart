@@ -85,7 +85,9 @@ void main() {
 
   testWidgets('desktop shell renders five branches', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final container = appContainer(
       window: FakeWindow(available: true, macOS: true),
     );

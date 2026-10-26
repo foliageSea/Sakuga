@@ -310,6 +310,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get subtitleError => '无法切换字幕。';
 
   @override
+  String get selectEpisode => '选集';
+
+  @override
+  String get nextEpisode => '下一集';
+
+  @override
+  String get playPlayback => '播放';
+
+  @override
+  String get pausePlayback => '暂停';
+
+  @override
+  String get mute => '静音';
+
+  @override
+  String get unmute => '取消静音';
+
+  @override
+  String get enterFullscreen => '进入全屏';
+
+  @override
+  String get exitFullscreen => '退出全屏';
+
+  @override
+  String get playbackPosition => '播放进度';
+
+  @override
+  String get subtitleStyle => '字幕样式';
+
+  @override
+  String get subtitleBackgroundOpacity => '遮罩不透明度';
+
+  @override
   String get selected => '已选择';
 
   @override

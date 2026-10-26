@@ -58,6 +58,7 @@ class AppShell extends ConsumerWidget {
       builder: (context, constraints) {
         final mobile = constraints.maxWidth < mobileBreakpoint;
         final compact = constraints.maxWidth < 1024 || settings.compactSidebar;
+        final sidebarWidth = mobile ? 0.0 : (compact ? 76.0 : 200.0);
         final theme = context.theme;
         final colors = theme.colors;
         final dark = colors.brightness == Brightness.dark;
@@ -127,11 +128,7 @@ class AppShell extends ConsumerWidget {
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 220),
                               curve: Curves.easeOutCubic,
-                              width: mobile
-                                  ? 0
-                                  : compact
-                                  ? 76
-                                  : 240,
+                              width: sidebarWidth,
                               child: mobile
                                   ? null
                                   : FSidebar(
@@ -160,7 +157,7 @@ class AppShell extends ConsumerWidget {
                                           ),
                                         ),
                                         constraints: BoxConstraints.tightFor(
-                                          width: compact ? 76 : 240,
+                                          width: sidebarWidth,
                                         ),
                                       ),
                                       header: SizedBox(
