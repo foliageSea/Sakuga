@@ -25,12 +25,16 @@ class DetailPage extends ConsumerWidget {
     return library.when(
       data: (data) =>
           _DetailBody(client: data.client, userId: data.userId, itemId: itemId),
-      loading: () => const PageContent(children: [LoadingNotice()]),
-      error: (error, _) => PageContent(
-        children: [
-          ErrorNotice(
-            error,
-            onRetry: () => ref.invalidate(libraryViewsProvider),
+      loading: () => const _DetailScaffold(
+        slivers: [SliverToBoxAdapter(child: LoadingNotice())],
+      ),
+      error: (error, _) => _DetailScaffold(
+        slivers: [
+          SliverToBoxAdapter(
+            child: ErrorNotice(
+              error,
+              onRetry: () => ref.invalidate(libraryViewsProvider),
+            ),
           ),
         ],
       ),
@@ -54,9 +58,8 @@ class _DetailBody extends ConsumerWidget {
     final query = (userId: userId, itemId: itemId);
     final item = ref.watch(libraryItemProvider(query));
     return item.when(
-      data: (value) => PageScrollView(
+      data: (value) => _DetailScaffold(
         slivers: [
-          const SliverToBoxAdapter(child: _BackBar()),
           SliverToBoxAdapter(
             child: _Hero(client: client, item: value),
           ),
@@ -65,17 +68,33 @@ class _DetailBody extends ConsumerWidget {
             _Episodes(client: client, userId: userId, series: value),
         ],
       ),
-      loading: () => const PageContent(children: [LoadingNotice()]),
-      error: (error, _) => PageContent(
-        children: [
-          ErrorNotice(
-            error,
-            onRetry: () => ref.invalidate(libraryItemProvider(query)),
+      loading: () => const _DetailScaffold(
+        slivers: [SliverToBoxAdapter(child: LoadingNotice())],
+      ),
+      error: (error, _) => _DetailScaffold(
+        slivers: [
+          SliverToBoxAdapter(
+            child: ErrorNotice(
+              error,
+              onRetry: () => ref.invalidate(libraryItemProvider(query)),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+/// The detail page shell: the back bar is pinned above the scrolling content
+/// so it stays reachable in every state, including loading and errors.
+class _DetailScaffold extends StatelessWidget {
+  const _DetailScaffold({required this.slivers});
+
+  final List<Widget> slivers;
+
+  @override
+  Widget build(BuildContext context) =>
+      PageScrollView(header: const _BackBar(), slivers: slivers);
 }
 
 class _BackBar extends StatelessWidget {
@@ -84,27 +103,29 @@ class _BackBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          FButton.icon(
-            variant: .outline,
-            size: .sm,
-            semanticsLabel: l.back,
-            onPress: () {
-              final router = GoRouter.of(context);
-              if (router.canPop()) {
-                router.pop();
-              } else {
-                router.go('/library');
-              }
-            },
-            child: const Icon(FLucideIcons.arrowLeft),
-          ),
-        ],
-      ),
+    return Row(
+      children: [
+        FButton.icon(
+          key: const ValueKey('detail-back'),
+          variant: .outline,
+          size: .sm,
+          semanticsLabel: l.back,
+          onPress: () => _goBack(context),
+          child: const Icon(FLucideIcons.arrowLeft),
+        ),
+      ],
     );
+  }
+}
+
+/// Pops the detail route, falling back to the library when the page was opened
+/// directly, e.g. from a deep link.
+void _goBack(BuildContext context) {
+  final router = GoRouter.of(context);
+  if (router.canPop()) {
+    router.pop();
+  } else {
+    router.go('/library');
   }
 }
 

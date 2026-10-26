@@ -71,13 +71,37 @@ class PageContent extends StatelessWidget {
 /// A [PageContent] variant that lays its content out as slivers, so long lists
 /// can be built lazily.
 class PageScrollView extends StatelessWidget {
-  const PageScrollView({required this.slivers, super.key});
+  const PageScrollView({required this.slivers, this.header, super.key});
 
   final List<Widget> slivers;
+
+  /// Fixed content laid out above the scrolling [slivers], such as a page-level
+  /// app bar. It keeps its place while the content scrolls, so actions like a
+  /// back button stay reachable.
+  final Widget? header;
+
+  /// Gap between a fixed [header] and the top of the scrolling content.
+  static const _headerGap = 16.0;
 
   @override
   Widget build(BuildContext context) {
     final padding = pagePadding(context);
+    final header = this.header;
+    final scrollView = CustomScrollView(
+      slivers: [
+        SliverPadding(
+          // A fixed header supplies the page's top padding and the gap above
+          // the content, so the content itself needs neither.
+          padding: EdgeInsets.fromLTRB(
+            padding,
+            header == null ? padding : 0,
+            padding,
+            padding,
+          ),
+          sliver: SliverMainAxisGroup(slivers: slivers),
+        ),
+      ],
+    );
     return ColoredBox(
       color: context.theme.colors.background,
       child: TweenAnimationBuilder<double>(
@@ -95,14 +119,23 @@ class PageScrollView extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1440),
-            child: CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: EdgeInsets.all(padding),
-                  sliver: SliverMainAxisGroup(slivers: slivers),
-                ),
-              ],
-            ),
+            child: header == null
+                ? scrollView
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          padding,
+                          padding,
+                          padding,
+                          _headerGap,
+                        ),
+                        child: header,
+                      ),
+                      Expanded(child: scrollView),
+                    ],
+                  ),
           ),
         ),
       ),
