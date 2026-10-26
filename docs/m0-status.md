@@ -88,6 +88,21 @@ Linux 运行依赖（WSL 最小镜像）：`libva2`、`libva-drm2`、`libva-x11-
   - `lib/features/settings/servers_section.dart`
 - 待办：登录（`/Users/AuthenticateByName`）、API 密钥/Token 安全存储、服务器切换、连接状态。
 
+### 1.8 媒体库内容
+
+- 媒体库页不再只是占位：配置服务器 + API 密钥后自动加载。
+- 调用链：`GET /Users` → `GET /UserViews?userId=`（10.8 回退 `/Users/{userId}/Views`）→ `GET /Items?parentId=`。
+- UI：媒体库切换按钮、海报网格、下拉/刷新按钮、加载/空态/错误重试。
+- 配置变化会刷新：`libraryViewsProvider` 监听当前服务器，新增/编辑服务器后重新请求；页面也有手动刷新。
+- 海报通过 `Image.network(headers: Authorization)` 加载，避免把 API 密钥放进图片 URL。
+- 实测（10.10.7）：`LIB_VIEWS 1`、`LIB_ITEMS 57`，页面无异常。
+- 相关文件：
+  - `lib/data/jellyfin/jellyfin_client.dart`
+  - `lib/data/jellyfin/jellyfin_models.dart`
+  - `lib/features/library/library_providers.dart`
+  - `lib/features/library/library_page.dart`
+- 待办：详情页、搜索、播放、分页/滚动加载、多服务器切换。
+
 ## 2. 待完成（M0 剩余）
 
 1. **macOS arm64**：已把 `MACOSX_DEPLOYMENT_TARGET` 改为 13.0、补 ATS/本地网络说明；在 Mac/CI 上执行 `fvm flutter build macos --arch arm64`，验证：

@@ -55,6 +55,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get apiKey => 'API 密钥';
 
   @override
+  String get noApiKey => '请先为该服务器配置 API 密钥。';
+
+  @override
+  String get refresh => '刷新';
+
+  @override
+  String get noItems => '暂无内容';
+
+  @override
   String get testConnection => '测试';
 
   @override

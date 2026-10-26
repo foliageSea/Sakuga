@@ -15,10 +15,11 @@ M0（工程基建与内核验证）进行中。当前已完成：
 - Jellyfin 10.10.7 测试服联调通过（认证、UserViews、Items、PlaybackInfo 直连）。
 - Linux 本地开发 runner 已加回；debug 构建与本地播放验证通过（WSLg 需 X11 + 软件 GL）。
 - 设置页新增 **服务器** 配置入口：名称/URL/API 密钥、测试连接、编辑/删除；首页显示已保存服务器。
+- 媒体库页面已接入：`/Users` → `/UserViews` → `/Items`，支持媒体库切换、刷新与海报网格；配置服务器后会自动重新加载。
 
 待完成：
 
-- 服务器登录（用户名密码）、API 密钥安全存储（Keychain/Keystore）、服务器切换（下一步 M1）。
+- 服务器登录（用户名密码）、API 密钥安全存储（Keychain/Keystore）、服务器切换、详情/搜索/播放（下一步 M1/M2）。
 - macOS arm64 构建与本地包（需 Mac/CI）。
 - 测试在 Linux 上受 media_kit native assets 编译问题阻塞（见 `docs/m0-status.md`）。
 - Android 真机运行验证（当前环境无设备/模拟器）。

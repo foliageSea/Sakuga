@@ -188,6 +188,24 @@ abstract class AppLocalizations {
   /// **'API key'**
   String get apiKey;
 
+  /// No description provided for @noApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an API key for this server.'**
+  String get noApiKey;
+
+  /// No description provided for @refresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get refresh;
+
+  /// No description provided for @noItems.
+  ///
+  /// In en, this message translates to:
+  /// **'No items'**
+  String get noItems;
+
   /// No description provided for @testConnection.
   ///
   /// In en, this message translates to:

@@ -55,6 +55,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get apiKey => 'API key';
 
   @override
+  String get noApiKey => 'Add an API key for this server.';
+
+  @override
+  String get refresh => 'Refresh';
+
+  @override
+  String get noItems => 'No items';
+
+  @override
   String get testConnection => 'Test';
 
   @override

@@ -49,9 +49,24 @@ final serversProvider =
     );
 
 class ServersNotifier extends AsyncNotifier<List<ServerProfile>> {
+  static const _devUrl = String.fromEnvironment('DEV_SERVER_URL');
+  static const _devApiKey = String.fromEnvironment('DEV_SERVER_API_KEY');
+
   @override
-  Future<List<ServerProfile>> build() =>
-      ref.watch(serverRepositoryProvider).load();
+  Future<List<ServerProfile>> build() async {
+    final stored = await ref.watch(serverRepositoryProvider).load();
+    if (stored.isEmpty && _devUrl.isNotEmpty) {
+      return [
+        ServerProfile(
+          id: 'dev',
+          name: 'Dev',
+          baseUrl: _devUrl,
+          apiKey: _devApiKey,
+        ),
+      ];
+    }
+    return stored;
+  }
 
   Future<void> add(ServerProfile server) async {
     final current = state.value ?? await future;
