@@ -23,7 +23,22 @@ class LibraryPage extends ConsumerStatefulWidget {
 }
 
 class _LibraryPageState extends ConsumerState<LibraryPage> {
+  final _scrollController = ScrollController();
   String? _selectedViewId;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _selectView(String id) {
+    if (_selectedViewId == id) return;
+    setState(() => _selectedViewId = id);
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,12 +78,24 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     }
 
     final data = ref.watch(libraryViewsProvider);
+    final views = data.hasError ? null : data.value?.views;
+    final hasViews = views != null && views.isNotEmpty;
+    final activeViewId = hasViews
+        ? (views.any((view) => view.id == _selectedViewId)
+              ? _selectedViewId!
+              : views.first.id)
+        : null;
+
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
       child: PageScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: PageHeading(
+        controller: _scrollController,
+        headerGap: hasViews ? 20 : 0,
+        header: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PageHeading(
               l.library,
               hideTitleOnMobile: true,
               action: FButton.icon(
@@ -79,25 +106,41 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 child: const Icon(FLucideIcons.refreshCw),
               ),
             ),
-          ),
-          ...data.when(
-            data: (library) => _librarySlivers(context, library),
-            loading: () => [const SliverToBoxAdapter(child: LoadingNotice())],
-            error: (error, _) => [
-              SliverToBoxAdapter(
-                child: ErrorNotice(
-                  error,
-                  onRetry: () => ref.invalidate(libraryViewsProvider),
-                ),
+            if (hasViews)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final view in views)
+                    FButton(
+                      builder: responsiveButtonContent,
+                      mainAxisSize: MainAxisSize.min,
+                      variant: view.id == activeViewId ? .primary : .outline,
+                      onPress: () => _selectView(view.id),
+                      child: Text(view.name),
+                    ),
+                ],
               ),
-            ],
-          ),
-        ],
+          ],
+        ),
+        slivers: data.when(
+          data: (library) => _librarySlivers(context, library, activeViewId),
+          loading: () => const [SliverToBoxAdapter(child: LoadingNotice())],
+          error: (error, _) => [
+            SliverToBoxAdapter(
+              child: ErrorNotice(
+                error,
+                onRetry: () => ref.invalidate(libraryViewsProvider),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   bool _onScroll(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
     if (notification.metrics.extentAfter > 480) return false;
     final library = ref.read(libraryViewsProvider).value;
     if (library == null || library.views.isEmpty) return false;
@@ -115,35 +158,17 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     return false;
   }
 
-  List<Widget> _librarySlivers(BuildContext context, LibraryData library) {
-    if (library.views.isEmpty) {
+  List<Widget> _librarySlivers(
+    BuildContext context,
+    LibraryData library,
+    String? viewId,
+  ) {
+    if (library.views.isEmpty || viewId == null) {
       return [
         SliverToBoxAdapter(child: EmptyNotice(context.l10n.emptyLibrary)),
       ];
     }
-    final viewId = library.views.any((view) => view.id == _selectedViewId)
-        ? _selectedViewId!
-        : library.views.first.id;
     return [
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 20),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final view in library.views)
-                FButton(
-                  builder: responsiveButtonContent,
-                  mainAxisSize: MainAxisSize.min,
-                  variant: view.id == viewId ? .primary : .outline,
-                  onPress: () => setState(() => _selectedViewId = view.id),
-                  child: Text(view.name),
-                ),
-            ],
-          ),
-        ),
-      ),
       _PagedGrid(
         client: library.client,
         query: (userId: library.userId, viewId: viewId),

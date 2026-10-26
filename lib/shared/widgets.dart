@@ -79,6 +79,8 @@ class PageScrollView extends StatelessWidget {
   const PageScrollView({
     required this.slivers,
     this.header,
+    this.headerGap = _defaultHeaderGap,
+    this.controller,
     this.animate = true,
     this.transparent = false,
     super.key,
@@ -91,6 +93,12 @@ class PageScrollView extends StatelessWidget {
   /// back button stay reachable.
   final Widget? header;
 
+  /// Vertical gap between a fixed [header] and the top of the scrolling area.
+  final double headerGap;
+
+  /// Optional controller attached to the underlying [CustomScrollView].
+  final ScrollController? controller;
+
   /// Whether to play the mount entrance animation. Disable when the enclosing
   /// route drives its own page transition, so [Hero] targets are measured at
   /// their resting position.
@@ -100,14 +108,14 @@ class PageScrollView extends StatelessWidget {
   /// the page remains visible.
   final bool transparent;
 
-  /// Gap between a fixed [header] and the top of the scrolling content.
-  static const _headerGap = 16.0;
+  static const _defaultHeaderGap = 16.0;
 
   @override
   Widget build(BuildContext context) {
     final padding = pagePadding(context);
     final header = this.header;
     final scrollView = CustomScrollView(
+      controller: controller,
       slivers: [
         SliverPadding(
           // A fixed header supplies the page's top padding and the gap above
@@ -136,7 +144,7 @@ class PageScrollView extends StatelessWidget {
                       padding,
                       padding,
                       padding,
-                      _headerGap,
+                      headerGap,
                     ),
                     child: header,
                   ),

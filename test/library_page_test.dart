@@ -160,6 +160,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'library scrolls inside the grid while keeping heading and view chips pinned',
+    (tester) async {
+      await _pumpLibrary(tester, const Size(1000, 560));
+
+      final headingFinder = find.text('Library');
+      final viewChipFinder = find.text('Shows');
+      final refreshButton = find.ancestor(
+        of: find.byIcon(FLucideIcons.refreshCw),
+        matching: find.byType(FButton),
+      );
+      final firstCard = find.byKey(const ValueKey('library-desktop-card-a'));
+      final scrollView = find.byType(CustomScrollView);
+
+      final headingTopLeft = tester.getTopLeft(headingFinder);
+      final viewChipRect = tester.getRect(viewChipFinder);
+      final refreshTopLeft = tester.getTopLeft(refreshButton);
+      final cardTopBefore = tester.getTopLeft(firstCard).dy;
+      final scrollRect = tester.getRect(scrollView);
+
+      expect(
+        scrollRect.top,
+        greaterThanOrEqualTo(viewChipRect.bottom),
+        reason: 'the scroll viewport should sit below the pinned view chips',
+      );
+
+      await tester.drag(scrollView, const Offset(0, -180));
+      await tester.pumpAndSettle();
+
+      expect(tester.getTopLeft(firstCard).dy, lessThan(cardTopBefore));
+      expect(tester.getTopLeft(headingFinder), headingTopLeft);
+      expect(tester.getRect(viewChipFinder), viewChipRect);
+      expect(tester.getTopLeft(refreshButton), refreshTopLeft);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('resizing the library keeps poster URLs stable for cache hits', (
     tester,
   ) async {
