@@ -26,7 +26,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       StatefulShellRoute(
         navigatorContainerBuilder: animatedBranchContainer,
-        builder: (context, state, shell) => AppShell(shell: shell),
+        builder: (context, state, shell) => AppShell(
+          shell: shell,
+          isHomeRoute: state.fullPath == '/home',
+          detailBackgroundSpec: _detailBackgroundSpec(state),
+        ),
         branches: [
           StatefulShellBranch(
             routes: [
@@ -37,7 +41,22 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/library',
-                builder: (_, _) => const LibraryPage(),
+                pageBuilder: (_, state) => CustomTransitionPage<void>(
+                  key: state.pageKey,
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) =>
+                          FadeTransition(
+                            opacity: ReverseAnimation(
+                              CurvedAnimation(
+                                parent: secondaryAnimation,
+                                curve: Curves.easeOutCubic,
+                                reverseCurve: Curves.easeInCubic,
+                              ),
+                            ),
+                            child: child,
+                          ),
+                  child: const LibraryPage(),
+                ),
                 routes: [
                   GoRoute(
                     path: ':itemId',
@@ -91,3 +110,17 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(router.dispose);
   return router;
 });
+
+DetailBackgroundSpec? _detailBackgroundSpec(GoRouterState state) {
+  if (state.fullPath != '/library/:itemId') return null;
+  final itemId = state.pathParameters['itemId'];
+  if (itemId == null || itemId.isEmpty) return null;
+  final extra = state.extra is DetailRouteExtra
+      ? state.extra as DetailRouteExtra
+      : null;
+  return (
+    itemId: itemId,
+    initialItem: extra?.item,
+    initialPosterUrl: extra?.posterUrl,
+  );
+}

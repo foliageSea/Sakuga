@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/jellyfin/jellyfin_models.dart';
+import '../../data/jellyfin/server_repository.dart';
+import '../../shared/poster_background.dart';
 import '../library/library_providers.dart';
 import '../player/playback_progress_repository.dart';
 
@@ -43,3 +45,46 @@ final latestItemsProvider = FutureProvider.autoDispose<List<JellyfinItem>>((
   final library = await ref.watch(libraryViewsProvider.future);
   return library.client.latest(library.userId);
 });
+
+final randomItemsProvider = FutureProvider.autoDispose<List<JellyfinItem>>((
+  ref,
+) async {
+  final library = await ref.watch(libraryViewsProvider.future);
+  final items = await library.client.randomItems(library.userId);
+  final withPosters = items
+      .where((item) => library.client.imageUrl(item) != null)
+      .toList();
+  return withPosters.isNotEmpty ? withPosters : items;
+});
+
+class HomeCarouselIndex extends Notifier<int> {
+  @override
+  int build() {
+    ref.watch(randomItemsProvider);
+    return 0;
+  }
+
+  void set(int index) {
+    if (state != index) state = index;
+  }
+}
+
+final homeCarouselIndexProvider =
+    NotifierProvider.autoDispose<HomeCarouselIndex, int>(HomeCarouselIndex.new);
+
+/// Resolves the active home carousel slide's poster for the global window
+/// background when viewing the home branch.
+PosterBackground? watchHomePosterBackground(WidgetRef ref) {
+  final servers = ref.watch(serversProvider).value;
+  if (servers == null || servers.isEmpty || servers.first.apiKey.isEmpty) {
+    return null;
+  }
+  final library = ref.watch(libraryViewsProvider).value;
+  if (library == null) return null;
+  final items = ref.watch(randomItemsProvider).value;
+  if (items == null || items.isEmpty) return null;
+  final index = ref.watch(homeCarouselIndexProvider).clamp(0, items.length - 1);
+  final url = library.client.imageUrl(items[index]);
+  if (url == null) return null;
+  return PosterBackground(url: url, headers: library.client.authHeaders);
+}

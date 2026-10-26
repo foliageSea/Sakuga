@@ -1,4 +1,16 @@
+import 'package:flutter/painting.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+
+/// Sizes the in-memory decoded [ImageCache] so several pages of posters stay
+/// resident across scrolling and responsive column reflows without re-decoding
+/// from disk.
+void configureArtworkImageCache() {
+  final cache = PaintingBinding.instance.imageCache;
+  const targetBytes = 256 << 20; // 256 MiB
+  if (cache.maximumSizeBytes < targetBytes) {
+    cache.maximumSizeBytes = targetBytes;
+  }
+}
 
 /// Disk cache for remote artwork.
 ///

@@ -4,12 +4,14 @@ import 'package:logging/logging.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'app/app.dart';
+import 'core/images/artwork_cache.dart';
 import 'core/logging.dart';
 import 'core/settings/settings.dart';
 import 'core/window/desktop_window.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  configureArtworkImageCache();
   MediaKit.ensureInitialized();
   await initializeLogging();
   final log = Logger('main');

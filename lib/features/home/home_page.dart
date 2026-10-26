@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
@@ -5,12 +8,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/jellyfin/jellyfin_client.dart';
 import '../../data/jellyfin/jellyfin_models.dart';
-import '../../data/jellyfin/server_profile.dart';
 import '../../data/jellyfin/server_repository.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
+import '../../shared/poster_background.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
+import '../detail/detail_page.dart';
 import '../library/library_providers.dart';
 import '../player/player_route.dart';
 import 'home_providers.dart';
@@ -22,7 +26,8 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     final servers = ref.watch(serversProvider);
-    return PageContent(
+    final content = PageContent(
+      transparent: true,
       children: [
         PageHeading(l.home, hideTitleOnMobile: true),
         servers.when(
@@ -38,45 +43,46 @@ class HomePage extends ConsumerWidget {
                 ),
               );
             }
-            final library = ref.watch(libraryViewsProvider);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _ServerSummary(server: items.first),
-                ...library.when(
-                  data: (data) => [
-                    _MediaSection(
-                      client: data.client,
-                      title: l.continueWatching,
-                      items: ref.watch(resumeItemsProvider),
-                      onRetry: () => ref.invalidate(resumeItemsProvider),
-                      onTap: (item) => _resume(context, item),
-                    ),
-                    _MediaSection(
-                      client: data.client,
-                      title: l.recentlyAdded,
-                      items: ref.watch(latestItemsProvider),
-                      onRetry: () => ref.invalidate(latestItemsProvider),
-                      onTap: (item) => context.go('/library/${item.id}'),
-                    ),
-                  ],
-                  loading: () => const [
-                    Padding(
-                      padding: EdgeInsets.only(top: 28),
-                      child: LoadingNotice(),
-                    ),
-                  ],
-                  error: (error, _) => [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 28),
-                      child: ErrorNotice(
-                        error,
-                        onRetry: () => ref.invalidate(libraryViewsProvider),
-                      ),
-                    ),
-                  ],
+            if (items.first.apiKey.isEmpty) {
+              return EmptyNotice(
+                l.noApiKey,
+                child: FButton(
+                  builder: responsiveButtonContent,
+                  mainAxisSize: MainAxisSize.min,
+                  onPress: () => context.go('/settings?tab=servers'),
+                  child: Text(l.servers),
                 ),
-              ],
+              );
+            }
+            final library = ref.watch(libraryViewsProvider);
+            return library.when(
+              data: (data) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _PosterCarouselSection(client: data.client),
+                  _MediaSection(
+                    client: data.client,
+                    title: l.continueWatching,
+                    items: ref.watch(resumeItemsProvider),
+                    onRetry: () => ref.invalidate(resumeItemsProvider),
+                    onTap: (item, posterUrl) =>
+                        _resume(context, item, posterUrl),
+                  ),
+                  _MediaSection(
+                    client: data.client,
+                    title: l.recentlyAdded,
+                    items: ref.watch(latestItemsProvider),
+                    onRetry: () => ref.invalidate(latestItemsProvider),
+                    onTap: (item, posterUrl) =>
+                        _openDetail(context, item, posterUrl),
+                  ),
+                ],
+              ),
+              loading: () => const LoadingNotice(),
+              error: (error, _) => ErrorNotice(
+                error,
+                onRetry: () => ref.invalidate(libraryViewsProvider),
+              ),
             );
           },
           loading: () => const LoadingNotice(),
@@ -87,55 +93,519 @@ class HomePage extends ConsumerWidget {
         ),
       ],
     );
+    if (WindowPosterBackgroundScope.hasHost(context)) return content;
+    final background = watchHomePosterBackground(ref);
+    return WindowPosterBackgroundScope(
+      active: background != null,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          PosterWindowBackground(background: background),
+          content,
+        ],
+      ),
+    );
   }
 }
 
 /// Resumes playback where the user left off; series open their detail page.
-void _resume(BuildContext context, JellyfinItem item) {
+void _resume(BuildContext context, JellyfinItem item, String? posterUrl) {
   if (item.isSeries) {
-    context.go('/library/${item.id}');
+    _openDetail(context, item, posterUrl);
   } else {
     context.push(playerLocation(item.id));
   }
 }
 
-class _ServerSummary extends StatelessWidget {
-  const _ServerSummary({required this.server});
+void _openDetail(BuildContext context, JellyfinItem item, String? posterUrl) {
+  if (item.isEpisode) {
+    context.push(playerLocation(item.id));
+    return;
+  }
+  context.go(
+    '/library/${item.id}',
+    extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
+  );
+}
 
-  final ServerProfile server;
+class _PosterCarouselSection extends ConsumerWidget {
+  const _PosterCarouselSection({required this.client});
+
+  final JellyfinClient client;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(randomItemsProvider);
+    final height = isMobileLayout(context) ? 216.0 : 320.0;
+    return items.when(
+      data: (values) => values.isEmpty
+          ? const SizedBox.shrink()
+          : _PosterCarousel(client: client, items: values, height: height),
+      loading: () => SizedBox(
+        height: height,
+        child: const Surface(child: Center(child: FCircularProgress())),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _PosterCarousel extends ConsumerStatefulWidget {
+  const _PosterCarousel({
+    required this.client,
+    required this.items,
+    required this.height,
+  });
+
+  static const autoPlayInterval = Duration(seconds: 6);
+  static const _slideDuration = Duration(milliseconds: 420);
+
+  final JellyfinClient client;
+  final List<JellyfinItem> items;
+  final double height;
+
+  @override
+  ConsumerState<_PosterCarousel> createState() => _PosterCarouselState();
+}
+
+class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
+  late PageController _pageController;
+  Timer? _autoPlayTimer;
+  bool _hovered = false;
+  bool _tickerEnabled = true;
+  bool _reduceMotion = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = ref
+        .read(homeCarouselIndexProvider)
+        .clamp(0, widget.items.length - 1);
+    _pageController = PageController(initialPage: initial);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    _reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    _syncAutoPlay();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PosterCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.items.length != oldWidget.items.length) {
+      final clamped = ref
+          .read(homeCarouselIndexProvider)
+          .clamp(0, widget.items.length - 1);
+      if (_pageController.hasClients &&
+          _pageController.page?.round() != clamped) {
+        _pageController.jumpToPage(clamped);
+      }
+      _syncAutoPlay();
+    }
+  }
+
+  @override
+  void dispose() {
+    _autoPlayTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _syncAutoPlay() {
+    _autoPlayTimer?.cancel();
+    _autoPlayTimer = null;
+    if (!mounted ||
+        widget.items.length <= 1 ||
+        !_tickerEnabled ||
+        _reduceMotion ||
+        _hovered) {
+      return;
+    }
+    _autoPlayTimer = Timer.periodic(_PosterCarousel.autoPlayInterval, (_) {
+      if (!mounted || !_pageController.hasClients || widget.items.length <= 1) {
+        return;
+      }
+      final current = ref
+          .read(homeCarouselIndexProvider)
+          .clamp(0, widget.items.length - 1);
+      final next = (current + 1) % widget.items.length;
+      _goToPage(next);
+    });
+  }
+
+  void _setHovered(bool value) {
+    if (_hovered == value) return;
+    _hovered = value;
+    _syncAutoPlay();
+  }
+
+  void _goToPage(int index) {
+    final target = index.clamp(0, widget.items.length - 1);
+    ref.read(homeCarouselIndexProvider.notifier).set(target);
+    if (_pageController.hasClients) {
+      if (_reduceMotion) {
+        _pageController.jumpToPage(target);
+      } else {
+        unawaited(
+          _pageController.animateToPage(
+            target,
+            duration: _PosterCarousel._slideDuration,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+      }
+    }
+    _syncAutoPlay();
+  }
+
+  void _handlePageChanged(int index) {
+    ref.read(homeCarouselIndexProvider.notifier).set(index);
+    _syncAutoPlay();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final l = context.l10n;
-    return Surface(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            server.name,
-            style: context.theme.typography.body.lg.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+    final theme = context.theme;
+    final mobile = isMobileLayout(context);
+    final length = widget.items.length;
+    final activeIndex = ref
+        .watch(homeCarouselIndexProvider)
+        .clamp(0, length - 1);
+    final radius = theme.style.borderRadius.lg;
+
+    return MouseRegion(
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      child: SizedBox(
+        key: const ValueKey('home-poster-carousel'),
+        height: widget.height,
+        child: ClipRRect(
+          borderRadius: radius,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  dragDevices: const {
+                    PointerDeviceKind.touch,
+                    PointerDeviceKind.mouse,
+                    PointerDeviceKind.trackpad,
+                  },
+                ),
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: length,
+                  onPageChanged: _handlePageChanged,
+                  itemBuilder: (context, index) => _CarouselSlide(
+                    client: widget.client,
+                    item: widget.items[index],
+                    mobile: mobile,
+                    hasMultiple: length > 1,
+                  ),
+                ),
+              ),
+              if (length > 1) ...[
+                Positioned(
+                  top: mobile ? 10 : 16,
+                  right: mobile ? 10 : 16,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _CarouselArrowButton(
+                        key: const ValueKey('home-carousel-prev'),
+                        icon: FLucideIcons.chevronLeft,
+                        onTap: () =>
+                            _goToPage((activeIndex - 1 + length) % length),
+                      ),
+                      const SizedBox(width: 8),
+                      _CarouselArrowButton(
+                        key: const ValueKey('home-carousel-next'),
+                        icon: FLucideIcons.chevronRight,
+                        onTap: () => _goToPage((activeIndex + 1) % length),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  right: mobile ? 14 : 24,
+                  bottom: mobile ? 12 : 20,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var i = 0; i < length; i++)
+                        GestureDetector(
+                          key: ValueKey('home-carousel-dot-$i'),
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _goToPage(i),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 3,
+                              vertical: 4,
+                            ),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              width: i == activeIndex ? 18 : 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: i == activeIndex
+                                    ? const Color(0xFFFFFFFF)
+                                    : const Color(0x66FFFFFF),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+              IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: radius,
+                    border: Border.all(
+                      color: const Color(0x24FFFFFF),
+                      width: theme.style.borderWidth,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            server.baseUrl,
-            style: context.theme.typography.body.sm.copyWith(
-              color: context.theme.colors.mutedForeground,
-            ),
-          ),
-          const SizedBox(height: 16),
-          FButton(
-            builder: responsiveButtonContent,
-            mainAxisSize: MainAxisSize.min,
-            variant: .outline,
-            onPress: () => context.go('/settings?tab=servers'),
-            child: Text(l.servers),
-          ),
-        ],
+        ),
       ),
     );
   }
+}
+
+class _CarouselArrowButton extends StatelessWidget {
+  const _CarouselArrowButton({
+    required this.icon,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: SystemMouseCursors.click,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: const Color(0x59000000),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0x2EFFFFFF)),
+        ),
+        child: Icon(icon, size: 16, color: const Color(0xFFFFFFFF)),
+      ),
+    ),
+  );
+}
+
+class _CarouselSlide extends StatelessWidget {
+  const _CarouselSlide({
+    required this.client,
+    required this.item,
+    required this.mobile,
+    required this.hasMultiple,
+  });
+
+  final JellyfinClient client;
+  final JellyfinItem item;
+  final bool mobile;
+  final bool hasMultiple;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    final posterUrl = client.imageUrl(item);
+    final backdropUrl = client.backdropUrl(item);
+    final overview = item.overview?.trim() ?? '';
+    final pad = mobile ? 14.0 : 24.0;
+    final posterWidth = mobile ? 80.0 : 120.0;
+    final tags = <String>[
+      if (item.productionYear != null) '${item.productionYear}',
+      if (item.officialRating != null && item.officialRating!.isNotEmpty)
+        item.officialRating!,
+      ...item.genres.take(3),
+    ];
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        key: ValueKey('home-carousel-slide-${item.id}'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openDetail(context, item, posterUrl),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (backdropUrl != null)
+              MediaImage(url: backdropUrl, headers: client.authHeaders)
+            else if (posterUrl != null)
+              ClipRect(
+                child: ImageFiltered(
+                  imageFilter: ImageFilter.blur(
+                    sigmaX: 24,
+                    sigmaY: 24,
+                    tileMode: TileMode.clamp,
+                  ),
+                  child: Transform.scale(
+                    scale: 1.15,
+                    child: MediaImage(
+                      url: posterUrl,
+                      headers: client.authHeaders,
+                    ),
+                  ),
+                ),
+              )
+            else
+              const MediaPlaceholder(),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x1F000000),
+                    Color(0x73000000),
+                    Color(0xE6000000),
+                  ],
+                  stops: [0.0, 0.48, 1.0],
+                ),
+              ),
+            ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [Color(0x8C000000), Color(0x00000000)],
+                  stops: [0.0, 0.65],
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                pad,
+                pad,
+                hasMultiple && !mobile ? pad + 112 : pad,
+                hasMultiple && mobile ? pad + 18 : pad,
+              ),
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    SizedBox(
+                      width: posterWidth,
+                      child: AspectRatio(
+                        aspectRatio: 2 / 3,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: theme.style.borderRadius.md,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x66000000),
+                                blurRadius: 16,
+                                offset: Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: theme.style.borderRadius.md,
+                            child: MediaImage(
+                              url: posterUrl,
+                              headers: client.authHeaders,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: mobile ? 12 : 20),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.displayTitle,
+                            maxLines: mobile ? 1 : 2,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                (mobile
+                                        ? theme.typography.display.md
+                                        : theme.typography.display.xl)
+                                    .copyWith(
+                                      color: const Color(0xFFFFFFFF),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                          ),
+                          if (tags.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                for (final tag in tags) _CarouselTag(text: tag),
+                              ],
+                            ),
+                          ],
+                          if (!mobile && overview.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Flexible(
+                              child: Text(
+                                overview,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.typography.body.sm.copyWith(
+                                  color: const Color(0xCCFFFFFF),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CarouselTag extends StatelessWidget {
+  const _CarouselTag({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: const Color(0x33FFFFFF),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      text,
+      style: context.theme.typography.body.xs.copyWith(
+        color: const Color(0xEBFFFFFF),
+      ),
+    ),
+  );
 }
 
 class _MediaSection extends StatelessWidget {
@@ -151,10 +621,11 @@ class _MediaSection extends StatelessWidget {
   final String title;
   final AsyncValue<List<JellyfinItem>> items;
   final VoidCallback onRetry;
-  final ValueChanged<JellyfinItem> onTap;
+  final void Function(JellyfinItem item, String? posterUrl) onTap;
 
   @override
   Widget build(BuildContext context) {
+    final ambient = WindowPosterBackgroundScope.isActive(context);
     return items.when(
       data: (values) {
         if (values.isEmpty) return const SizedBox.shrink();
@@ -186,11 +657,13 @@ class _MediaSection extends StatelessWidget {
                             child: MediaPosterCard(
                               client: client,
                               item: item,
+                              translucent: ambient,
                               progress: item.progressFraction,
                               aspectRatio: landscape
                                   ? item.thumbnailAspectRatio
                                   : null,
-                              onTap: () => onTap(item),
+                              onPosterTap: (posterUrl) =>
+                                  onTap(item, posterUrl),
                             ),
                           );
                         },

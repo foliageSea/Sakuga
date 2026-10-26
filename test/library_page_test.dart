@@ -145,6 +145,74 @@ void main() {
     await _pumpLibrary(tester, const Size(1280, 900));
 
     expect(find.byKey(const ValueKey('library-mobile-masonry')), findsNothing);
+    final headingRect = tester.getRect(find.text('Library'));
+    final refreshButton = find.ancestor(
+      of: find.byIcon(FLucideIcons.refreshCw),
+      matching: find.byType(FButton),
+    );
+    final refreshRect = tester.getRect(refreshButton);
+    final fourthCardRect = tester.getRect(
+      find.byKey(const ValueKey('library-desktop-card-d')),
+    );
+
+    expect(refreshRect.center.dy, closeTo(headingRect.center.dy, 1.0));
+    expect(refreshRect.right, closeTo(fourthCardRect.right, 1.0));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('resizing the library keeps poster URLs stable for cache hits', (
+    tester,
+  ) async {
+    const client = ServerProfile(
+      id: 'server',
+      name: 'Test server',
+      baseUrl: 'http://127.0.0.1:8096',
+      apiKey: 'test-key',
+    );
+    const taggedItem = JellyfinItem(
+      id: 'tagged-1',
+      name: 'Tagged Series',
+      type: 'Series',
+      imageTags: {'Primary': 'tag-123'},
+    );
+    final jellyfin = JellyfinClient(server: client);
+    String? capturedUrl;
+
+    for (final width in [1440.0, 1265.0, 980.0, 390.0]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            ...FLocalizations.localizationsDelegates,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => FTheme(
+            data: createAppTheme(
+              const AppSettings(language: 'en'),
+              brightness: Brightness.light,
+              touch: width < 600,
+            ),
+            child: child!,
+          ),
+          home: Center(
+            child: SizedBox(
+              width: width / 4,
+              child: MediaPosterCard(
+                client: jellyfin,
+                item: taggedItem,
+                onPosterTap: (url) => capturedUrl = url,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Tagged Series'));
+      expect(
+        capturedUrl,
+        'http://127.0.0.1:8096/Items/tagged-1/Images/Primary?maxWidth=600&tag=tag-123',
+      );
+    }
     expect(tester.takeException(), isNull);
   });
 
@@ -306,6 +374,7 @@ void main() {
           settingsRepositoryProvider.overrideWithValue(MemorySettings()),
           desktopWindowProvider.overrideWithValue(FakeWindow()),
           serverRepositoryProvider.overrideWithValue(servers),
+          randomItemsProvider.overrideWith((ref) async => const []),
           resumeItemsProvider.overrideWith((ref) async => const []),
           latestItemsProvider.overrideWith((ref) async => const []),
           libraryViewsProvider.overrideWith(

@@ -7,18 +7,34 @@ import 'package:forui/forui.dart';
 
 import '../core/settings/settings.dart';
 import '../core/window/desktop_window.dart';
+import '../features/detail/detail_page.dart';
+import '../features/home/home_providers.dart';
 import '../shared/language_options.dart';
 import '../shared/localization.dart';
+import '../shared/poster_background.dart';
 import '../shared/widgets.dart';
 
 class AppShell extends ConsumerWidget {
-  const AppShell({required this.shell, this.backLocation, super.key});
+  const AppShell({
+    required this.shell,
+    this.backLocation,
+    this.isHomeRoute = false,
+    this.detailBackgroundSpec,
+    super.key,
+  });
   final StatefulNavigationShell shell;
   final String? backLocation;
+  final bool isHomeRoute;
+  final DetailBackgroundSpec? detailBackgroundSpec;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final window = ref.watch(desktopWindowProvider);
     final settings = ref.watch(settingsProvider);
+    final posterBackground = detailBackgroundSpec != null
+        ? watchDetailPosterBackground(ref, detailBackgroundSpec)
+        : isHomeRoute
+        ? watchHomePosterBackground(ref)
+        : null;
     final l = context.l10n;
     final labels = [l.home, l.library, l.search, l.downloads, l.settings];
     const icons = [
@@ -32,179 +48,257 @@ class AppShell extends ConsumerWidget {
       builder: (context, constraints) {
         final mobile = constraints.maxWidth < mobileBreakpoint;
         final compact = constraints.maxWidth < 1024 || settings.compactSidebar;
+        final theme = context.theme;
+        final colors = theme.colors;
+        final dark = colors.brightness == Brightness.dark;
+        final dividerColor = dark
+            ? colors.border
+            : colors.foreground.withValues(alpha: 0.09);
+        final sidebarActiveFill = colors.foreground.withValues(
+          alpha: dark ? 0.115 : 0.045,
+        );
         return ListenableBuilder(
           listenable: window,
-          builder: (context, _) => ColoredBox(
-            color: context.theme.colors.background,
-            child: SafeArea(
-              top: !window.available,
-              child: Column(
-                children: [
-                  if (window.available && !window.fullScreen)
-                    DesktopTitleBar(
-                      controller: window,
-                      compactSidebar: settings.compactSidebar,
-                      onToggleCompactSidebar: () async {
-                        try {
-                          await ref
-                              .read(settingsProvider.notifier)
-                              .update(
-                                (value) => value.copyWith(
-                                  compactSidebar: !value.compactSidebar,
-                                ),
-                              );
-                        } catch (error) {
-                          if (context.mounted) {
-                            notifyUser(context, failureMessage(context, error));
-                          }
-                        }
-                      },
-                      language: settings.language,
-                      onLanguageChanged: (language) => _update(
-                        context,
-                        ref,
-                        (value) => value.copyWith(language: language),
-                      ),
-                      onToggleTheme: () => _update(
-                        context,
-                        ref,
-                        (value) => value.copyWith(
-                          themeMode:
-                              context.theme.colors.brightness == Brightness.dark
-                              ? ThemeMode.light
-                              : ThemeMode.dark,
-                        ),
-                      ),
-                    ),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          width: mobile
-                              ? 0
-                              : compact
-                              ? 76
-                              : 240,
-                          child: mobile
-                              ? null
-                              : FSidebar(
-                                  style: .delta(
-                                    constraints: BoxConstraints.tightFor(
-                                      width: compact ? 76 : 240,
+          builder: (context, _) => WindowPosterBackgroundScope(
+            active: posterBackground != null,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                PosterWindowBackground(background: posterBackground),
+                SafeArea(
+                  top: !window.available,
+                  child: Column(
+                    children: [
+                      if (window.available && !window.fullScreen)
+                        DesktopTitleBar(
+                          controller: window,
+                          borderColor: dividerColor,
+                          compactSidebar: settings.compactSidebar,
+                          onToggleCompactSidebar: () async {
+                            try {
+                              await ref
+                                  .read(settingsProvider.notifier)
+                                  .update(
+                                    (value) => value.copyWith(
+                                      compactSidebar: !value.compactSidebar,
                                     ),
-                                  ),
-                                  header: SizedBox(
-                                    width: double.infinity,
-                                    child: Padding(
-                                      padding: EdgeInsets.fromLTRB(
-                                        compact ? 16 : 24,
-                                        20,
-                                        compact ? 16 : 24,
-                                        24,
-                                      ),
-                                      child: Align(
-                                        alignment: compact
-                                            ? Alignment.center
-                                            : Alignment.centerLeft,
-                                        child: compact
-                                            ? const Icon(
-                                                FLucideIcons.film,
-                                                size: 26,
-                                              )
-                                            : Text(
-                                                'SAKUGA',
-                                                key: const ValueKey(
-                                                  'sidebar-logo',
-                                                ),
-                                                style: context
-                                                    .theme
-                                                    .typography
-                                                    .display
-                                                    .md
-                                                    .copyWith(
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      letterSpacing: 3,
-                                                    ),
-                                              ),
-                                      ),
-                                    ),
-                                  ),
-                                  children: [
-                                    FSidebarGroup(
-                                      children: [
-                                        for (var i = 0; i < labels.length; i++)
-                                          FSidebarItem(
-                                            icon: Icon(
-                                              icons[i],
-                                              semanticLabel: compact
-                                                  ? labels[i]
-                                                  : null,
-                                            ),
-                                            label: compact
-                                                ? null
-                                                : Text(labels[i]),
-                                            selected: shell.currentIndex == i,
-                                            onPress: () => shell.goBranch(i),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                        ),
-                        Expanded(
-                          child: FScaffold(
-                            childPad: false,
-                            header: backLocation != null
-                                ? FHeader.nested(
-                                    title: Text(labels[shell.currentIndex]),
-                                    titleAlignment:
-                                        AlignmentDirectional.centerStart,
-                                    prefixes: [
-                                      FHeaderAction.back(
-                                        key: const ValueKey('appbar-back'),
-                                        semanticsLabel: l.back,
-                                        semanticsTooltip: l.back,
-                                        onPress: () {
-                                          if (context.canPop()) {
-                                            context.pop();
-                                          } else {
-                                            context.go(backLocation!);
-                                          }
-                                        },
-                                      ),
-                                    ],
-                                  )
-                                : mobile
-                                ? FHeader(
-                                    title: _HeaderTitle(
-                                      labels[shell.currentIndex],
-                                    ),
-                                  )
-                                : null,
-                            footer: mobile
-                                ? FBottomNavigationBar(
-                                    index: shell.currentIndex,
-                                    onChange: shell.goBranch,
-                                    children: [
-                                      for (var i = 0; i < labels.length; i++)
-                                        FBottomNavigationBarItem(
-                                          icon: Icon(icons[i]),
-                                          label: Text(labels[i]),
-                                        ),
-                                    ],
-                                  )
-                                : null,
-                            child: shell,
+                                  );
+                            } catch (error) {
+                              if (context.mounted) {
+                                notifyUser(
+                                  context,
+                                  failureMessage(context, error),
+                                );
+                              }
+                            }
+                          },
+                          language: settings.language,
+                          onLanguageChanged: (language) => _update(
+                            context,
+                            ref,
+                            (value) => value.copyWith(language: language),
+                          ),
+                          onToggleTheme: () => _update(
+                            context,
+                            ref,
+                            (value) => value.copyWith(
+                              themeMode:
+                                  context.theme.colors.brightness ==
+                                      Brightness.dark
+                                  ? ThemeMode.light
+                                  : ThemeMode.dark,
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              width: mobile
+                                  ? 0
+                                  : compact
+                                  ? 76
+                                  : 240,
+                              child: mobile
+                                  ? null
+                                  : FSidebar(
+                                      style: .delta(
+                                        decoration: .boxDelta(
+                                          color: null,
+                                          border: BorderDirectional(
+                                            end: BorderSide(
+                                              color: dividerColor,
+                                              width: theme.style.borderWidth,
+                                            ),
+                                          ),
+                                        ),
+                                        groupStyle: .delta(
+                                          itemStyle: .delta(
+                                            backgroundColor: FVariants(
+                                              const Color(0x00000000),
+                                              variants: {
+                                                [.selected, .hovered, .pressed]:
+                                                    sidebarActiveFill,
+                                                [.disabled]: const Color(
+                                                  0x00000000,
+                                                ),
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                        constraints: BoxConstraints.tightFor(
+                                          width: compact ? 76 : 240,
+                                        ),
+                                      ),
+                                      header: SizedBox(
+                                        width: double.infinity,
+                                        child: Padding(
+                                          padding: EdgeInsets.fromLTRB(
+                                            compact ? 16 : 24,
+                                            20,
+                                            compact ? 16 : 24,
+                                            24,
+                                          ),
+                                          child: Align(
+                                            alignment: compact
+                                                ? Alignment.center
+                                                : Alignment.centerLeft,
+                                            child: compact
+                                                ? const Icon(
+                                                    FLucideIcons.film,
+                                                    size: 26,
+                                                  )
+                                                : Text(
+                                                    'SAKUGA',
+                                                    key: const ValueKey(
+                                                      'sidebar-logo',
+                                                    ),
+                                                    style: context
+                                                        .theme
+                                                        .typography
+                                                        .display
+                                                        .md
+                                                        .copyWith(
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          letterSpacing: 3,
+                                                        ),
+                                                  ),
+                                          ),
+                                        ),
+                                      ),
+                                      children: [
+                                        FSidebarGroup(
+                                          children: [
+                                            for (
+                                              var i = 0;
+                                              i < labels.length;
+                                              i++
+                                            )
+                                              FSidebarItem(
+                                                icon: Icon(
+                                                  icons[i],
+                                                  semanticLabel: compact
+                                                      ? labels[i]
+                                                      : null,
+                                                ),
+                                                label: compact
+                                                    ? null
+                                                    : Text(labels[i]),
+                                                selected:
+                                                    shell.currentIndex == i,
+                                                onPress: () =>
+                                                    shell.goBranch(i),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                            Expanded(
+                              child: FScaffold(
+                                scaffoldStyle: .delta(
+                                  backgroundColor: const Color(0x00000000),
+                                  sidebarBackgroundColor: const Color(
+                                    0x00000000,
+                                  ),
+                                  footerDecoration: .boxDelta(
+                                    border: Border(
+                                      top: BorderSide(
+                                        color: dividerColor,
+                                        width: theme.style.borderWidth,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                childPad: false,
+                                header: backLocation != null
+                                    ? FHeader.nested(
+                                        title: Text(labels[shell.currentIndex]),
+                                        titleAlignment:
+                                            AlignmentDirectional.centerStart,
+                                        prefixes: [
+                                          FHeaderAction.back(
+                                            key: const ValueKey('appbar-back'),
+                                            semanticsLabel: l.back,
+                                            semanticsTooltip: l.back,
+                                            onPress: () {
+                                              if (context.canPop()) {
+                                                context.pop();
+                                              } else {
+                                                context.go(backLocation!);
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      )
+                                    : mobile
+                                    ? FHeader(
+                                        title: _HeaderTitle(
+                                          labels[shell.currentIndex],
+                                        ),
+                                      )
+                                    : null,
+                                footer: mobile
+                                    ? FBottomNavigationBar(
+                                        style: .delta(
+                                          decoration: .boxDelta(
+                                            color: null,
+                                            border: Border(
+                                              top: BorderSide(
+                                                color: dividerColor,
+                                                width: theme.style.borderWidth,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        index: shell.currentIndex,
+                                        onChange: shell.goBranch,
+                                        children: [
+                                          for (
+                                            var i = 0;
+                                            i < labels.length;
+                                            i++
+                                          )
+                                            FBottomNavigationBarItem(
+                                              icon: Icon(icons[i]),
+                                              label: Text(labels[i]),
+                                            ),
+                                        ],
+                                      )
+                                    : null,
+                                child: shell,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -247,6 +341,7 @@ class _HeaderTitle extends StatelessWidget {
 class DesktopTitleBar extends StatelessWidget {
   const DesktopTitleBar({
     required this.controller,
+    this.borderColor,
     this.compactSidebar = false,
     this.onToggleCompactSidebar,
     this.language = 'system',
@@ -255,6 +350,7 @@ class DesktopTitleBar extends StatelessWidget {
     super.key,
   });
   final DesktopWindowController controller;
+  final Color? borderColor;
   final bool compactSidebar;
   final Future<void> Function()? onToggleCompactSidebar;
   final String language;
@@ -266,7 +362,9 @@ class DesktopTitleBar extends StatelessWidget {
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: context.theme.colors.border)),
+        border: Border(
+          bottom: BorderSide(color: borderColor ?? context.theme.colors.border),
+        ),
       ),
       child: Row(
         children: [

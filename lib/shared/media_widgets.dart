@@ -31,6 +31,7 @@ class MediaImage extends StatelessWidget {
       httpHeaders: headers,
       cacheManager: ArtworkCacheManager.instance,
       fit: fit,
+      useOldImageOnUrlChange: true,
       fadeInDuration: const Duration(milliseconds: 200),
       fadeOutDuration: Duration.zero,
       placeholder: (_, _) => MediaPlaceholder(icon: icon),
@@ -112,6 +113,7 @@ class MediaPosterCard extends StatelessWidget {
     this.heroTag,
     this.progress,
     this.aspectRatio,
+    this.translucent = false,
     super.key,
   }) : assert(onTap != null || onPosterTap != null);
 
@@ -132,10 +134,15 @@ class MediaPosterCard extends StatelessWidget {
   /// Frame shape; defaults to 2:3.
   final double? aspectRatio;
 
+  /// Whether the card surface is semi-transparent over an ambient background.
+  final bool translucent;
+
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    String? posterUrl;
+    final posterUrl = client.imageUrl(item);
+    final subtitle = item.displaySubtitle;
+    final watched = progress;
     return GestureDetector(
       onTap: () {
         final onPosterTap = this.onPosterTap;
@@ -147,54 +154,41 @@ class MediaPosterCard extends StatelessWidget {
       },
       child: Surface(
         padding: 10,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width =
-                (constraints.maxWidth * MediaQuery.devicePixelRatioOf(context))
-                    .round()
-                    .clamp(200, 1200);
-            posterUrl = client.imageUrl(item, width: width);
-            final subtitle = item.displaySubtitle;
-            final watched = progress;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AspectRatio(
-                  aspectRatio: aspectRatio ?? 2 / 3,
-                  child: PosterHero(
-                    tag: heroTag,
-                    borderRadius: theme.style.borderRadius.md,
-                    child: MediaImage(
-                      url: posterUrl,
-                      headers: client.authHeaders,
-                    ),
-                  ),
+        translucent: translucent,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: aspectRatio ?? 2 / 3,
+              child: PosterHero(
+                tag: heroTag,
+                borderRadius: theme.style.borderRadius.md,
+                child: MediaImage(url: posterUrl, headers: client.authHeaders),
+              ),
+            ),
+            if (watched != null && watched > 0) ...[
+              const SizedBox(height: 6),
+              MediaProgressBar(value: watched),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              item.displayTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.typography.body.sm,
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.typography.body.xs.copyWith(
+                  color: theme.colors.mutedForeground,
                 ),
-                if (watched != null && watched > 0) ...[
-                  const SizedBox(height: 6),
-                  MediaProgressBar(value: watched),
-                ],
-                const SizedBox(height: 8),
-                Text(
-                  item.displayTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.typography.body.sm,
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.typography.body.xs.copyWith(
-                      color: theme.colors.mutedForeground,
-                    ),
-                  ),
-                ],
-              ],
-            );
-          },
+              ),
+            ],
+          ],
         ),
       ),
     );

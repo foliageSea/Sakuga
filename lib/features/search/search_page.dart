@@ -10,6 +10,7 @@ import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
+import '../detail/detail_page.dart';
 import '../library/library_providers.dart';
 import 'search_providers.dart';
 
@@ -135,7 +136,10 @@ class _SearchResults extends ConsumerWidget {
                     client: client,
                     item: item,
                     progress: item.progressFraction,
-                    onTap: () => context.go('/library/${item.id}'),
+                    onPosterTap: (posterUrl) => context.go(
+                      '/library/${item.id}',
+                      extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
+                    ),
                   ),
               ],
             ),

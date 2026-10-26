@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
@@ -9,6 +7,7 @@ import '../../data/jellyfin/jellyfin_client.dart';
 import '../../data/jellyfin/jellyfin_models.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
+import '../../shared/poster_background.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import '../library/library_providers.dart';
@@ -52,6 +51,62 @@ CustomTransitionPage<void> buildDetailTransitionPage(GoRouterState state) {
   );
 }
 
+/// Route inputs needed to resolve the detail page's ambient poster background.
+typedef DetailBackgroundSpec = ({
+  String itemId,
+  JellyfinItem? initialItem,
+  String? initialPosterUrl,
+});
+
+/// Resolves the poster URL and auth headers for [spec], reusing the tapped
+/// card's cached poster URL immediately before full metadata arrives.
+PosterBackground? watchDetailPosterBackground(
+  WidgetRef ref,
+  DetailBackgroundSpec? spec,
+) {
+  if (spec == null || spec.itemId.isEmpty) return null;
+  final preview = spec.initialItem?.id == spec.itemId ? spec.initialItem : null;
+  final library = ref.watch(libraryViewsProvider);
+  return library.when(
+    data: (data) {
+      final client = data.client;
+      final item = ref.watch(
+        libraryItemProvider((userId: data.userId, itemId: spec.itemId)),
+      );
+      final url = item.when(
+        data: (value) {
+          final reusePosterUrl =
+              spec.initialPosterUrl != null &&
+              value.imageTags['Primary'] == preview?.imageTags['Primary'];
+          return (reusePosterUrl ? spec.initialPosterUrl : null) ??
+              client.imageUrl(value);
+        },
+        loading: () =>
+            spec.initialPosterUrl ??
+            (preview == null ? null : client.imageUrl(preview)),
+        error: (_, _) =>
+            spec.initialPosterUrl ??
+            (preview == null ? null : client.imageUrl(preview)),
+      );
+      return url == null
+          ? null
+          : PosterBackground(url: url, headers: client.authHeaders);
+    },
+    loading: () {
+      final server = ref.watch(activeServerProvider);
+      if (server == null) return null;
+      final client = JellyfinClient(server: server);
+      final url =
+          spec.initialPosterUrl ??
+          (preview == null ? null : client.imageUrl(preview));
+      return url == null
+          ? null
+          : PosterBackground(url: url, headers: client.authHeaders);
+    },
+    error: (_, _) => null,
+  );
+}
+
 class DetailPage extends ConsumerWidget {
   const DetailPage({
     required this.itemId,
@@ -68,7 +123,7 @@ class DetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final library = ref.watch(libraryViewsProvider);
     final preview = initialItem?.id == itemId ? initialItem : null;
-    return library.when(
+    final content = library.when(
       data: (data) => _DetailBody(
         client: data.client,
         userId: data.userId,
@@ -104,6 +159,22 @@ class DetailPage extends ConsumerWidget {
               onRetry: () => ref.invalidate(libraryViewsProvider),
             ),
           ),
+        ],
+      ),
+    );
+    if (WindowPosterBackgroundScope.hasHost(context)) return content;
+    final background = watchDetailPosterBackground(ref, (
+      itemId: itemId,
+      initialItem: initialItem,
+      initialPosterUrl: initialPosterUrl,
+    ));
+    return WindowPosterBackgroundScope(
+      active: background != null,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          PosterWindowBackground(background: background),
+          content,
         ],
       ),
     );
@@ -199,7 +270,39 @@ class _DetailScaffold extends StatelessWidget {
   Widget build(BuildContext context) => PageScrollView(
     header: const _BackBar(),
     animate: false,
+    transparent: true,
     slivers: slivers,
+  );
+}
+
+FButtonStyleDelta _detailOutlineButtonStyle(BuildContext context) {
+  if (!WindowPosterBackgroundScope.isActive(context)) {
+    return const .context();
+  }
+  final theme = context.theme;
+  final colors = theme.colors;
+  final dark = colors.brightness == Brightness.dark;
+  final fill = colors.card.withValues(alpha: dark ? 0.56 : 0.64);
+  final hoverFill = colors.card.withValues(alpha: dark ? 0.72 : 0.80);
+  final borderColor = dark
+      ? colors.border
+      : colors.foreground.withValues(alpha: 0.09);
+  return .delta(
+    decoration: .delta([
+      .base(
+        .shapeDelta(
+          color: fill,
+          shape: RoundedSuperellipseBorder(
+            side: BorderSide(
+              color: borderColor,
+              width: theme.style.borderWidth,
+            ),
+            borderRadius: theme.style.borderRadius.md,
+          ),
+        ),
+      ),
+      .exact({.hovered, .pressed, .selected}, .shapeDelta(color: hoverFill)),
+    ]),
   );
 }
 
@@ -215,6 +318,7 @@ class _BackBar extends StatelessWidget {
           key: const ValueKey('detail-back'),
           variant: .outline,
           size: .sm,
+          style: _detailOutlineButtonStyle(context),
           semanticsLabel: l.back,
           onPress: () => _goBack(context),
           child: const Icon(FLucideIcons.arrowLeft),
@@ -245,11 +349,7 @@ class _Hero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final ratio = MediaQuery.devicePixelRatioOf(context);
     final mobile = isMobileLayout(context);
-    final available =
-        math.min(MediaQuery.sizeOf(context).width, 1440) -
-        pagePadding(context) * 2;
     final posterWidth = mobile ? 96.0 : 132.0;
     final poster = AspectRatio(
       aspectRatio: 2 / 3,
@@ -257,21 +357,13 @@ class _Hero extends StatelessWidget {
         tag: posterHeroTag(item.id),
         borderRadius: theme.style.borderRadius.md,
         child: MediaImage(
-          url:
-              posterUrl ??
-              client.imageUrl(
-                item,
-                width: (posterWidth * ratio * 2).round().clamp(200, 800),
-              ),
+          url: posterUrl ?? client.imageUrl(item),
           headers: client.authHeaders,
         ),
       ),
     );
     final backdrop = MediaImage(
-      url: client.backdropUrl(
-        item,
-        width: (available * ratio).round().clamp(320, 2400),
-      ),
+      url: client.backdropUrl(item),
       headers: client.authHeaders,
     );
     if (mobile) {
@@ -484,10 +576,23 @@ class _PersonChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final colors = theme.colors;
+    final ambient = WindowPosterBackgroundScope.isActive(context);
+    final dark = colors.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.colors.muted,
+        color: ambient
+            ? colors.card.withValues(alpha: dark ? 0.52 : 0.60)
+            : colors.muted,
+        border: ambient
+            ? Border.all(
+                color: dark
+                    ? colors.border
+                    : colors.foreground.withValues(alpha: 0.08),
+                width: theme.style.borderWidth,
+              )
+            : null,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -499,7 +604,7 @@ class _PersonChip extends StatelessWidget {
             Text(
               person.role,
               style: theme.typography.body.xs.copyWith(
-                color: theme.colors.mutedForeground,
+                color: colors.mutedForeground,
               ),
             ),
           ],
@@ -610,6 +715,7 @@ class _EpisodesState extends ConsumerState<_Episodes> {
     builder: responsiveButtonContent,
     mainAxisSize: MainAxisSize.min,
     variant: selected ? .primary : .outline,
+    style: selected ? const .context() : _detailOutlineButtonStyle(context),
     onPress: onPress,
     child: Text(label),
   );
@@ -618,15 +724,24 @@ class _EpisodesState extends ConsumerState<_Episodes> {
     BuildContext context,
     List<JellyfinItem> episodes,
   ) {
+    final ambient = WindowPosterBackgroundScope.isActive(context);
     if (episodes.isEmpty) {
-      return [SliverToBoxAdapter(child: EmptyNotice(context.l10n.noItems))];
+      return [
+        SliverToBoxAdapter(
+          child: EmptyNotice(context.l10n.noItems, translucent: ambient),
+        ),
+      ];
     }
     return [
       SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: _EpisodeTile(client: widget.client, item: episodes[index]),
+            child: _EpisodeTile(
+              client: widget.client,
+              item: episodes[index],
+              translucent: ambient,
+            ),
           ),
           childCount: episodes.length,
         ),
@@ -636,10 +751,15 @@ class _EpisodesState extends ConsumerState<_Episodes> {
 }
 
 class _EpisodeTile extends StatelessWidget {
-  const _EpisodeTile({required this.client, required this.item});
+  const _EpisodeTile({
+    required this.client,
+    required this.item,
+    this.translucent = false,
+  });
 
   final JellyfinClient client;
   final JellyfinItem item;
+  final bool translucent;
 
   @override
   Widget build(BuildContext context) {
@@ -651,6 +771,7 @@ class _EpisodeTile extends StatelessWidget {
       onTap: () => context.push(playerLocation(item.id)),
       child: Surface(
         padding: 8,
+        translucent: translucent,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -664,18 +785,9 @@ class _EpisodeTile extends StatelessWidget {
                     aspectRatio: item.thumbnailAspectRatio,
                     child: ClipRRect(
                       borderRadius: theme.style.borderRadius.md,
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final width =
-                              (constraints.maxWidth *
-                                      MediaQuery.devicePixelRatioOf(context))
-                                  .round()
-                                  .clamp(200, 800);
-                          return MediaImage(
-                            url: client.imageUrl(item, width: width),
-                            headers: client.authHeaders,
-                          );
-                        },
+                      child: MediaImage(
+                        url: client.imageUrl(item),
+                        headers: client.authHeaders,
                       ),
                     ),
                   ),

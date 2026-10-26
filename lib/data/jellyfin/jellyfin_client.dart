@@ -428,6 +428,26 @@ class JellyfinClient {
         .toList();
   }
 
+  /// Random movies and series with hero metadata for the home carousel.
+  Future<List<JellyfinItem>> randomItems(String userId, {int limit = 8}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/Items',
+      queryParameters: {
+        'userId': userId,
+        'recursive': true,
+        'includeItemTypes': 'Movie,Series',
+        'sortBy': 'Random',
+        'fields':
+            'Overview,Genres,OfficialRating,PremiereDate,'
+            'BackdropImageTags,PrimaryImageAspectRatio,ImageTags,UserData,'
+            'RunTimeTicks',
+        'imageTypeLimit': 1,
+        'limit': limit,
+      },
+    );
+    return _parseItems(response.data);
+  }
+
   /// Server-side search across movies, series and videos.
   Future<List<JellyfinItem>> search(
     String userId,
@@ -482,10 +502,14 @@ class JellyfinClient {
 
   /// The scraped primary image for [item].
   ///
+  /// Uses a stable canonical [width] by default so responsive layout changes
+  /// and window resizes keep hitting the memory and disk caches instead of
+  /// requesting a new `maxWidth` variant per pixel.
+  ///
   /// Episodes rarely have a primary image of their own; the server then exposes
   /// the owning season/series image through `ParentPrimaryImageTag` or
   /// `SeriesPrimaryImageTag`, which is used as a fallback here.
-  String? imageUrl(JellyfinItem item, {int width = 400}) {
+  String? imageUrl(JellyfinItem item, {int width = 600}) {
     final primary = item.imageTags['Primary'];
     if (primary != null && primary.isNotEmpty) {
       return _imageUrl(item.id, primary, width);
@@ -510,7 +534,10 @@ class JellyfinClient {
   }
 
   /// The first scraped backdrop, when the item has one.
-  String? backdropUrl(JellyfinItem item, {int width = 1600}) {
+  ///
+  /// Defaults to a stable canonical [width] so resizing the detail window does
+  /// not invalidate the cached backdrop.
+  String? backdropUrl(JellyfinItem item, {int width = 1920}) {
     if (item.backdropImageTags.isEmpty) return null;
     final tag = item.backdropImageTags.first;
     if (tag.isEmpty) return null;

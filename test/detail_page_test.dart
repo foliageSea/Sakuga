@@ -1,23 +1,33 @@
 import 'dart:async';
+import 'dart:ui';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart' show MaterialApp;
+import 'package:sakuga/app/app.dart';
+import 'package:sakuga/app/router.dart';
+import 'package:sakuga/app/shell.dart';
 import 'package:sakuga/app/theme.dart';
 import 'package:sakuga/core/app_exception.dart';
 import 'package:sakuga/core/settings/settings.dart';
+import 'package:sakuga/core/window/desktop_window.dart';
 import 'package:sakuga/data/jellyfin/jellyfin_client.dart';
 import 'package:sakuga/data/jellyfin/jellyfin_models.dart';
 import 'package:sakuga/data/jellyfin/server_profile.dart';
+import 'package:sakuga/data/jellyfin/server_repository.dart';
 import 'package:sakuga/features/detail/detail_page.dart';
 import 'package:sakuga/features/detail/detail_providers.dart';
+import 'package:sakuga/features/home/home_providers.dart';
 import 'package:sakuga/features/library/library_providers.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
 import 'package:sakuga/shared/media_widgets.dart';
 import 'package:sakuga/shared/widgets.dart';
+
+import 'fakes.dart';
 
 const _server = ServerProfile(
   id: 'server',
@@ -320,4 +330,161 @@ void main() {
     expect(bar.value, closeTo(0.45, 0.001));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'detail page uses series poster as global window background with Gaussian blur mask',
+    (tester) async {
+      const windowSize = Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = windowSize;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      const taggedSeries = JellyfinItem(
+        id: 'series-bg',
+        name: 'Circus Troupe',
+        type: 'Series',
+        imageTags: {'Primary': 'poster-tag-1'},
+        overview: 'A travelling circus story.',
+        genres: ['Animation'],
+        productionYear: 2026,
+      );
+      final detailCompleter = Completer<JellyfinItem>();
+      final servers = MemoryServerRepository()..items = [_server];
+      final container = ProviderContainer(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(
+            const AppSettings(language: 'en'),
+          ),
+          settingsRepositoryProvider.overrideWithValue(MemorySettings()),
+          desktopWindowProvider.overrideWithValue(
+            FakeWindow(available: true, macOS: true),
+          ),
+          serverRepositoryProvider.overrideWithValue(servers),
+          randomItemsProvider.overrideWith((ref) async => const []),
+          resumeItemsProvider.overrideWith((ref) async => const []),
+          latestItemsProvider.overrideWith((ref) async => const []),
+          libraryViewsProvider.overrideWith(
+            (ref) async => LibraryData(
+              client: JellyfinClient(server: _server),
+              userId: 'user-1',
+              views: const [
+                JellyfinView(
+                  id: 'view',
+                  name: 'Shows',
+                  collectionType: 'tvshows',
+                ),
+              ],
+            ),
+          ),
+          libraryItemsProvider.overrideWith2(_TaggedLibraryItems.new),
+          libraryItemProvider.overrideWith(
+            (ref, query) => detailCompleter.future,
+          ),
+          seriesSeasonsProvider.overrideWith((ref, query) async => const []),
+          seriesEpisodesProvider.overrideWith((ref, query) async => const []),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      Future<void> pumpFrames([int count = 6]) async {
+        for (var i = 0; i < count; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      }
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const SakugaApp(),
+        ),
+      );
+      await pumpFrames();
+
+      final bgFinder = find.byKey(const ValueKey('window-poster-background'));
+      final blurMaskFinder = find.byKey(
+        const ValueKey('window-poster-blur-mask'),
+      );
+
+      // Home branch has no blur mask active.
+      expect(bgFinder, findsOneWidget);
+      expect(blurMaskFinder, findsNothing);
+
+      container.read(routerProvider).go('/library');
+      await pumpFrames();
+      expect(blurMaskFinder, findsNothing);
+
+      // Tapping the series card immediately mounts the global blurred poster
+      // background across the full window (title bar + sidebar + content)
+      // even before full detail metadata resolves.
+      await tester.tap(find.text('Circus Troupe'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
+
+      expect(tester.getRect(bgFinder), Offset.zero & windowSize);
+      expect(tester.getRect(find.byType(DesktopTitleBar)).top, 0);
+      expect(tester.getRect(find.byType(FSidebar)).left, 0);
+      expect(blurMaskFinder, findsOneWidget);
+
+      final blur = tester.widget<BackdropFilter>(blurMaskFinder);
+      expect(
+        blur.filter,
+        ImageFilter.blur(sigmaX: 64, sigmaY: 64, tileMode: TileMode.clamp),
+      );
+
+      final bgImage = tester.widget<CachedNetworkImage>(
+        find.descendant(
+          of: bgFinder,
+          matching: find.byType(CachedNetworkImage),
+        ),
+      );
+      expect(
+        bgImage.imageUrl,
+        'http://127.0.0.1:8096/Items/series-bg/Images/Primary?maxWidth=600&tag=poster-tag-1',
+      );
+
+      // Resolving full metadata keeps the global blurred poster background.
+      detailCompleter.complete(taggedSeries);
+      await pumpFrames();
+      expect(blurMaskFinder, findsOneWidget);
+
+      // Toggling dark mode updates the mask cleanly without errors.
+      await tester.tap(find.byKey(const ValueKey('toggle-theme')));
+      await pumpFrames(3);
+      expect(blurMaskFinder, findsOneWidget);
+
+      // Switching to another sidebar branch fades out and removes the blur mask.
+      container.read(routerProvider).go('/home');
+      await pumpFrames();
+      expect(blurMaskFinder, findsNothing);
+
+      // Returning to the detail route restores the global blurred background,
+      // and popping back to the library removes it again.
+      container.read(routerProvider).go('/library/series-bg');
+      await pumpFrames();
+      expect(blurMaskFinder, findsOneWidget);
+
+      await tester.tap(_backButton);
+      await pumpFrames();
+      expect(blurMaskFinder, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+class _TaggedLibraryItems extends LibraryItemsController {
+  _TaggedLibraryItems(super.query);
+
+  @override
+  Future<LibraryItemsState> build() async => const LibraryItemsState(
+    items: [
+      JellyfinItem(
+        id: 'series-bg',
+        name: 'Circus Troupe',
+        type: 'Series',
+        imageTags: {'Primary': 'poster-tag-1'},
+      ),
+    ],
+    totalRecordCount: 1,
+  );
 }

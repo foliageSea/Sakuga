@@ -1,15 +1,23 @@
+import 'dart:ui';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart' show MaterialApp;
+import 'package:sakuga/app/app.dart';
+import 'package:sakuga/app/router.dart';
+import 'package:sakuga/app/shell.dart';
 import 'package:sakuga/app/theme.dart';
 import 'package:sakuga/core/settings/settings.dart';
+import 'package:sakuga/core/window/desktop_window.dart';
 import 'package:sakuga/data/jellyfin/jellyfin_client.dart';
 import 'package:sakuga/data/jellyfin/jellyfin_models.dart';
 import 'package:sakuga/data/jellyfin/server_profile.dart';
 import 'package:sakuga/data/jellyfin/server_repository.dart';
+import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/home/home_page.dart';
 import 'package:sakuga/features/home/home_providers.dart';
 import 'package:sakuga/features/library/library_providers.dart';
@@ -49,6 +57,7 @@ JellyfinItem _series() => const JellyfinItem(
 /// the test only checks where a card tap navigates.
 Future<void> pumpHome(
   WidgetTester tester, {
+  List<JellyfinItem>? carousel,
   List<JellyfinItem>? resume,
   List<JellyfinItem>? latest,
   Size size = const Size(1280, 1200),
@@ -85,6 +94,9 @@ Future<void> pumpHome(
           userId: 'user-1',
           views: const [],
         ),
+      ),
+      randomItemsProvider.overrideWith(
+        (ref) async => carousel ?? const <JellyfinItem>[],
       ),
       resumeItemsProvider.overrideWith(
         (ref) async => resume ?? [_resumableEpisode()],
@@ -191,4 +203,163 @@ void main() {
     }
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'home random poster carousel rotates and updates global window blurred background',
+    (tester) async {
+      const windowSize = Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = windowSize;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      const carouselItems = [
+        JellyfinItem(
+          id: 'featured-1',
+          name: 'Sunflower Circus',
+          type: 'Series',
+          imageTags: {'Primary': 'poster-a'},
+          backdropImageTags: ['backdrop-a'],
+          overview: 'A troupe of performers travelling across Japan.',
+          genres: ['Animation', 'Drama'],
+          productionYear: 2026,
+          officialRating: 'PG-13',
+        ),
+        JellyfinItem(
+          id: 'featured-2',
+          name: 'Starlight Sonata',
+          type: 'Movie',
+          imageTags: {'Primary': 'poster-b'},
+          overview: 'An orchestral fantasy film.',
+          genres: ['Fantasy'],
+          productionYear: 2025,
+        ),
+      ];
+
+      final servers = MemoryServerRepository()..items = [_server];
+      final container = ProviderContainer(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(
+            const AppSettings(language: 'en'),
+          ),
+          settingsRepositoryProvider.overrideWithValue(MemorySettings()),
+          desktopWindowProvider.overrideWithValue(
+            FakeWindow(available: true, macOS: true),
+          ),
+          serverRepositoryProvider.overrideWithValue(servers),
+          libraryViewsProvider.overrideWith(
+            (ref) async => LibraryData(
+              client: JellyfinClient(server: _server),
+              userId: 'user-1',
+              views: const [],
+            ),
+          ),
+          randomItemsProvider.overrideWith((ref) async => carouselItems),
+          resumeItemsProvider.overrideWith((ref) async => const []),
+          latestItemsProvider.overrideWith((ref) async => const []),
+          libraryItemProvider.overrideWith(
+            (ref, query) async => carouselItems.firstWhere(
+              (item) => item.id == query.itemId,
+              orElse: () => carouselItems.first,
+            ),
+          ),
+          seriesSeasonsProvider.overrideWith((ref, query) async => const []),
+          seriesEpisodesProvider.overrideWith((ref, query) async => const []),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      Future<void> pumpFrames([int count = 6]) async {
+        for (var i = 0; i < count; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      }
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const SakugaApp(),
+        ),
+      );
+      await pumpFrames();
+
+      final carouselFinder = find.byKey(const ValueKey('home-poster-carousel'));
+      final bgFinder = find.byKey(const ValueKey('window-poster-background'));
+      final blurMaskFinder = find.byKey(
+        const ValueKey('window-poster-blur-mask'),
+      );
+
+      // Server summary is replaced by the random poster carousel, and the
+      // global window blurred background spans the entire window.
+      expect(find.text('Test server'), findsNothing);
+      expect(carouselFinder, findsOneWidget);
+      expect(find.text('Sunflower Circus'), findsOneWidget);
+      expect(tester.getRect(bgFinder), Offset.zero & windowSize);
+      expect(tester.getRect(find.byType(DesktopTitleBar)).top, 0);
+      expect(tester.getRect(find.byType(FSidebar)).left, 0);
+      expect(blurMaskFinder, findsOneWidget);
+      expect(
+        tester.widget<BackdropFilter>(blurMaskFinder).filter,
+        ImageFilter.blur(sigmaX: 64, sigmaY: 64, tileMode: TileMode.clamp),
+      );
+
+      Iterable<String> activeBackgroundUrls() => tester
+          .widgetList<CachedNetworkImage>(
+            find.descendant(
+              of: bgFinder,
+              matching: find.byType(CachedNetworkImage),
+            ),
+          )
+          .map((img) => img.imageUrl);
+
+      expect(
+        activeBackgroundUrls(),
+        contains(
+          'http://127.0.0.1:8096/Items/featured-1/Images/Primary?maxWidth=600&tag=poster-a',
+        ),
+      );
+
+      // Auto-play after 6s advances to the second slide and crossfades the
+      // global window poster background to poster-b.
+      await tester.pump(const Duration(seconds: 6));
+      await pumpFrames();
+      expect(find.text('Starlight Sonata'), findsOneWidget);
+      expect(
+        activeBackgroundUrls(),
+        contains(
+          'http://127.0.0.1:8096/Items/featured-2/Images/Primary?maxWidth=600&tag=poster-b',
+        ),
+      );
+
+      // Clicking the previous arrow returns to the first slide.
+      await tester.tap(find.byKey(const ValueKey('home-carousel-prev')));
+      await pumpFrames();
+      expect(find.text('Sunflower Circus'), findsOneWidget);
+      expect(
+        activeBackgroundUrls(),
+        contains(
+          'http://127.0.0.1:8096/Items/featured-1/Images/Primary?maxWidth=600&tag=poster-a',
+        ),
+      );
+
+      // Switching away to search hides the global blurred poster background.
+      container.read(routerProvider).go('/search');
+      await pumpFrames();
+      expect(blurMaskFinder, findsNothing);
+
+      // Returning to home restores it, and tapping the slide opens its detail
+      // page while keeping the global blurred poster background active.
+      container.read(routerProvider).go('/home');
+      await pumpFrames();
+      expect(blurMaskFinder, findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('home-carousel-slide-featured-1')),
+      );
+      await pumpFrames();
+      expect(find.byKey(const ValueKey('detail-back')), findsOneWidget);
+      expect(blurMaskFinder, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

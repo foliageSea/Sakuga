@@ -219,6 +219,9 @@ class _PagedGrid extends ConsumerWidget {
                 Expanded(
                   child: start + column < end
                       ? MediaPosterCard(
+                          key: ValueKey(
+                            'library-desktop-card-${items[start + column].id}',
+                          ),
                           client: client,
                           item: items[start + column],
                           progress: items[start + column].progressFraction,

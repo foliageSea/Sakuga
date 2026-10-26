@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_exception.dart';
 import 'localization.dart';
+import 'poster_background.dart';
 
 /// The width below which the application switches to its mobile layout.
 const mobileBreakpoint = 600.0;
@@ -26,45 +27,49 @@ double pagePadding(BuildContext context) {
 }
 
 class PageContent extends StatelessWidget {
-  const PageContent({required this.children, this.fill = false, super.key});
+  const PageContent({
+    required this.children,
+    this.fill = false,
+    this.transparent = false,
+    super.key,
+  });
   final List<Widget> children;
   final bool fill;
+  final bool transparent;
   @override
   Widget build(BuildContext context) {
     final padding = pagePadding(context);
-    return ColoredBox(
-      color: context.theme.colors.background,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-        builder: (context, value, child) => Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 10 * (1 - value)),
-            child: child,
-          ),
+    final body = TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 10 * (1 - value)),
+          child: child,
         ),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1440),
-            child: fill
-                ? Padding(
-                    padding: EdgeInsets.all(padding),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: children,
-                    ),
-                  )
-                : ListView(
-                    padding: EdgeInsets.all(padding),
+      ),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1440),
+          child: fill
+              ? Padding(
+                  padding: EdgeInsets.all(padding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: children,
                   ),
-          ),
+                )
+              : ListView(padding: EdgeInsets.all(padding), children: children),
         ),
       ),
     );
+    if (transparent || WindowPosterBackgroundScope.hasHost(context)) {
+      return body;
+    }
+    return ColoredBox(color: context.theme.colors.background, child: body);
   }
 }
 
@@ -75,6 +80,7 @@ class PageScrollView extends StatelessWidget {
     required this.slivers,
     this.header,
     this.animate = true,
+    this.transparent = false,
     super.key,
   });
 
@@ -89,6 +95,10 @@ class PageScrollView extends StatelessWidget {
   /// route drives its own page transition, so [Hero] targets are measured at
   /// their resting position.
   final bool animate;
+
+  /// Whether to omit the opaque page background so an ambient background behind
+  /// the page remains visible.
+  final bool transparent;
 
   /// Gap between a fixed [header] and the top of the scrolling content.
   static const _headerGap = 16.0;
@@ -135,24 +145,25 @@ class PageScrollView extends StatelessWidget {
               ),
       ),
     );
-    return ColoredBox(
-      color: context.theme.colors.background,
-      child: animate
-          ? TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: 1),
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, child) => Opacity(
-                opacity: value,
-                child: Transform.translate(
-                  offset: Offset(0, 10 * (1 - value)),
-                  child: child,
-                ),
+    final body = animate
+        ? TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) => Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, 10 * (1 - value)),
+                child: child,
               ),
-              child: content,
-            )
-          : content,
-    );
+            ),
+            child: content,
+          )
+        : content;
+    if (transparent || WindowPosterBackgroundScope.hasHost(context)) {
+      return body;
+    }
+    return ColoredBox(color: context.theme.colors.background, child: body);
   }
 }
 
@@ -176,18 +187,21 @@ class PageHeading extends StatelessWidget {
     if (hideTitle && action == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
           if (!hideTitle)
-            Text(
-              title,
-              style: context.theme.typography.display.lg.copyWith(
-                fontWeight: FontWeight.w600,
+            Expanded(
+              child: Text(
+                title,
+                style: context.theme.typography.display.lg.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
+            )
+          else
+            const Spacer(),
           if (action != null) ...[
-            if (!hideTitle) const SizedBox(height: 16),
+            if (!hideTitle) const SizedBox(width: 16),
             action!,
           ],
         ],
@@ -201,14 +215,35 @@ class Surface extends StatelessWidget {
     required this.child,
     this.padding = 24,
     this.expand = false,
+    this.translucent = false,
     super.key,
   });
   final Widget child;
   final double padding;
   final bool expand;
+  final bool translucent;
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colors = theme.colors;
+    final dark = colors.brightness == Brightness.dark;
     final card = FCard(
+      style: translucent
+          ? .delta(
+              decoration: .shapeDelta(
+                color: colors.card.withValues(alpha: dark ? 0.56 : 0.64),
+                shape: RoundedSuperellipseBorder(
+                  side: BorderSide(
+                    color: dark
+                        ? colors.border
+                        : colors.foreground.withValues(alpha: 0.09),
+                    width: theme.style.borderWidth,
+                  ),
+                  borderRadius: theme.style.borderRadius.lg,
+                ),
+              ),
+            )
+          : const .context(),
       child: Padding(padding: EdgeInsets.all(padding), child: child),
     );
     return expand ? SizedBox.expand(child: card) : card;
@@ -304,11 +339,18 @@ class LoadingNotice extends StatelessWidget {
 }
 
 class EmptyNotice extends StatelessWidget {
-  const EmptyNotice(this.message, {this.child, super.key});
+  const EmptyNotice(
+    this.message, {
+    this.child,
+    this.translucent = false,
+    super.key,
+  });
   final String message;
   final Widget? child;
+  final bool translucent;
   @override
   Widget build(BuildContext context) => Surface(
+    translucent: translucent,
     child: Column(
       children: [
         Icon(
