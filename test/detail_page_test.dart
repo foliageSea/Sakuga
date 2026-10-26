@@ -16,6 +16,7 @@ import 'package:sakuga/features/detail/detail_page.dart';
 import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/library/library_providers.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
+import 'package:sakuga/shared/media_widgets.dart';
 import 'package:sakuga/shared/widgets.dart';
 
 const _server = ServerProfile(
@@ -277,6 +278,46 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('player:${episode.id}'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('episode tiles echo watch progress bar for resumed episodes', (
+    tester,
+  ) async {
+    const partialEpisode = JellyfinItem(
+      id: 'episode-1',
+      name: 'Pilot',
+      type: 'Episode',
+      imageTags: {},
+      seriesId: 'series-1',
+      seriesName: 'A Series With Episodes',
+      seasonId: 'season-1',
+      indexNumber: 1,
+      parentIndexNumber: 1,
+      runTimeTicks: 1000000000,
+      userData: {'PlaybackPositionTicks': 450000000},
+    );
+    await pumpDetailPage(
+      tester,
+      item: _series,
+      size: const Size(1280, 1000),
+      seasons: [_season()],
+      episodes: [
+        partialEpisode,
+        const JellyfinItem(
+          id: 'episode-2',
+          name: 'Second',
+          type: 'Episode',
+          imageTags: {},
+          seriesId: 'series-1',
+          indexNumber: 2,
+          parentIndexNumber: 1,
+        ),
+      ],
+    );
+
+    final bar = tester.widget<MediaProgressBar>(find.byType(MediaProgressBar));
+    expect(bar.value, closeTo(0.45, 0.001));
     expect(tester.takeException(), isNull);
   });
 }

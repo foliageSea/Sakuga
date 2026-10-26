@@ -645,6 +645,7 @@ class _EpisodeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.theme;
     final code = item.episodeCode;
+    final progress = item.progressFraction;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => context.push(playerLocation(item.id)),
@@ -655,24 +656,34 @@ class _EpisodeTile extends StatelessWidget {
           children: [
             SizedBox(
               width: 140,
-              child: AspectRatio(
-                aspectRatio: item.thumbnailAspectRatio,
-                child: ClipRRect(
-                  borderRadius: theme.style.borderRadius.md,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final width =
-                          (constraints.maxWidth *
-                                  MediaQuery.devicePixelRatioOf(context))
-                              .round()
-                              .clamp(200, 800);
-                      return MediaImage(
-                        url: client.imageUrl(item, width: width),
-                        headers: client.authHeaders,
-                      );
-                    },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AspectRatio(
+                    aspectRatio: item.thumbnailAspectRatio,
+                    child: ClipRRect(
+                      borderRadius: theme.style.borderRadius.md,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final width =
+                              (constraints.maxWidth *
+                                      MediaQuery.devicePixelRatioOf(context))
+                                  .round()
+                                  .clamp(200, 800);
+                          return MediaImage(
+                            url: client.imageUrl(item, width: width),
+                            headers: client.authHeaders,
+                          );
+                        },
+                      ),
+                    ),
                   ),
-                ),
+                  if (progress != null) ...[
+                    const SizedBox(height: 6),
+                    MediaProgressBar(value: progress),
+                  ],
+                ],
               ),
             ),
             const SizedBox(width: 12),

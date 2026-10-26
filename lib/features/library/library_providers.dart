@@ -7,6 +7,7 @@ import '../../data/jellyfin/jellyfin_client.dart';
 import '../../data/jellyfin/jellyfin_models.dart';
 import '../../data/jellyfin/server_profile.dart';
 import '../../data/jellyfin/server_repository.dart';
+import '../player/playback_progress_repository.dart';
 
 typedef LibraryQuery = ({String userId, String viewId});
 
@@ -141,14 +142,25 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
   Future<JellyfinItemsPage> _fetch(
     LibraryData data, {
     required int startIndex,
-  }) {
+  }) async {
     final view = data.viewById(query.viewId);
-    return data.client.items(
+    final page = await data.client.items(
       query.userId,
       query.viewId,
       startIndex: startIndex,
       limit: pageSize,
       includeItemTypes: _includeItemTypes(view),
+    );
+    final items = await ref
+        .read(playbackProgressRepositoryProvider)
+        .overlayItems(
+          page.items,
+          serverId: data.client.server.id,
+          userId: query.userId,
+        );
+    return JellyfinItemsPage(
+      items: items,
+      totalRecordCount: page.totalRecordCount,
     );
   }
 

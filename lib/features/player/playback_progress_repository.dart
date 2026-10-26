@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/settings/settings.dart';
+import '../../data/jellyfin/jellyfin_models.dart';
 
 abstract interface class PlaybackProgressRepository {
   Future<int?> load({
@@ -92,3 +93,58 @@ final playbackProgressRepositoryProvider = Provider<PlaybackProgressRepository>(
   (ref) =>
       PreferencesPlaybackProgressRepository(ref.watch(preferencesProvider)),
 );
+
+extension PlaybackProgressOverlay on PlaybackProgressRepository {
+  Future<int?> tryLoad({
+    required String serverId,
+    required String userId,
+    required String itemId,
+  }) async {
+    try {
+      return await load(serverId: serverId, userId: userId, itemId: itemId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, int>> tryLoadAll({
+    required String serverId,
+    required String userId,
+  }) async {
+    try {
+      return await loadAll(serverId: serverId, userId: userId);
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<JellyfinItem> overlayItem(
+    JellyfinItem item, {
+    required String serverId,
+    required String userId,
+  }) async {
+    final ticks = await tryLoad(
+      serverId: serverId,
+      userId: userId,
+      itemId: item.id,
+    );
+    return ticks == null ? item : item.withPlaybackPosition(ticks);
+  }
+
+  Future<List<JellyfinItem>> overlayItems(
+    List<JellyfinItem> items, {
+    required String serverId,
+    required String userId,
+  }) async {
+    if (items.isEmpty) return items;
+    final pending = await tryLoadAll(serverId: serverId, userId: userId);
+    if (pending.isEmpty) return items;
+    return [
+      for (final item in items)
+        if (pending[item.id] case final ticks?)
+          item.withPlaybackPosition(ticks)
+        else
+          item,
+    ];
+  }
+}

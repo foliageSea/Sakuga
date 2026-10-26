@@ -85,7 +85,7 @@ void main() {
       'https://media.example/jellyfin/Videos/item-1/master.m3u8'
       '?MediaSourceId=source&token=value&StartTimeTicks=150000000',
     );
-    expect(source.startPosition, Duration.zero);
+    expect(source.startPosition, const Duration(seconds: 15));
     expect(source.initialPosition, const Duration(seconds: 15));
     expect(source.positionOffset, Duration.zero);
     expect(source.session.playMethod, JellyfinPlayMethod.transcode);
@@ -190,6 +190,32 @@ void main() {
       );
     },
   );
+
+  test(
+    'falls back to legacy user data endpoint on 404 and forwards played state',
+    () async {
+      final adapter = _PlaybackAdapter(
+        const {},
+        notFoundPaths: {'/UserItems/item-1/UserData'},
+      );
+      final client = JellyfinClient(server: server, dio: _dio(adapter));
+
+      await client.updatePlaybackPosition(
+        'user-1',
+        'item-1',
+        positionTicks: 0,
+        played: true,
+      );
+
+      expect(adapter.requests.map((request) => request.path), [
+        '/UserItems/item-1/UserData',
+        '/Users/user-1/Items/item-1/UserData',
+      ]);
+      final legacy = adapter.requests.last.data as Map<String, dynamic>;
+      expect(legacy['PlaybackPositionTicks'], 0);
+      expect(legacy['Played'], isTrue);
+    },
+  );
 }
 
 Dio _dio(HttpClientAdapter adapter) => Dio(
@@ -204,9 +230,10 @@ Dio _dio(HttpClientAdapter adapter) => Dio(
 )..httpClientAdapter = adapter;
 
 class _PlaybackAdapter implements HttpClientAdapter {
-  _PlaybackAdapter(this.response);
+  _PlaybackAdapter(this.response, {this.notFoundPaths = const {}});
 
   final Map<String, dynamic> response;
+  final Set<String> notFoundPaths;
   String? lastPath;
   Map<String, dynamic> lastQuery = const {};
   Map<String, dynamic> lastBody = const {};
@@ -223,6 +250,9 @@ class _PlaybackAdapter implements HttpClientAdapter {
     lastQuery = options.queryParameters;
     final body = options.data;
     lastBody = body is Map<String, dynamic> ? body : const {};
+    if (notFoundPaths.contains(options.path)) {
+      return ResponseBody.fromString('', 404);
+    }
     final playbackInfo = options.path.endsWith('/PlaybackInfo');
     return ResponseBody.fromString(
       playbackInfo ? jsonEncode(response) : '',

@@ -170,9 +170,9 @@ class MediaPosterCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (watched != null) ...[
+                if (watched != null && watched > 0) ...[
                   const SizedBox(height: 6),
-                  _ProgressBar(value: watched),
+                  MediaProgressBar(value: watched),
                 ],
                 const SizedBox(height: 8),
                 Text(
@@ -201,8 +201,9 @@ class MediaPosterCard extends StatelessWidget {
   }
 }
 
-class _ProgressBar extends StatelessWidget {
-  const _ProgressBar({required this.value});
+/// A thin pill-shaped progress bar indicating watched fraction (`0.0..1.0`).
+class MediaProgressBar extends StatelessWidget {
+  const MediaProgressBar({required this.value, super.key});
 
   final double value;
 

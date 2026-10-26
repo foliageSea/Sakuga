@@ -11,11 +11,15 @@ final resumeItemsProvider = FutureProvider.autoDispose<List<JellyfinItem>>((
   final serverItems = await library.client.resume(library.userId);
   final pending = await ref
       .watch(playbackProgressRepositoryProvider)
-      .loadAll(serverId: library.client.server.id, userId: library.userId);
+      .tryLoadAll(serverId: library.client.server.id, userId: library.userId);
   if (pending.isEmpty) return serverItems;
 
   final byId = {for (final item in serverItems) item.id: item};
   for (final entry in pending.entries) {
+    if (entry.value <= 0) {
+      byId.remove(entry.key);
+      continue;
+    }
     final item = byId[entry.key];
     if (item != null) {
       byId[entry.key] = item.withPlaybackPosition(entry.value);

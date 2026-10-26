@@ -134,6 +134,7 @@ class _SearchResults extends ConsumerWidget {
                   MediaPosterCard(
                     client: client,
                     item: item,
+                    progress: item.progressFraction,
                     onTap: () => context.go('/library/${item.id}'),
                   ),
               ],

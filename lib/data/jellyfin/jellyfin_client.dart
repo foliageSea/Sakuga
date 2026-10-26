@@ -111,14 +111,18 @@ class JellyfinClient {
 
     final transcodingUrl = source['TranscodingUrl'] as String?;
     if (transcodingUrl != null && transcodingUrl.isNotEmpty) {
+      final isHls =
+          source['TranscodingSubProtocol']?.toString().toLowerCase() == 'hls';
       final transcodeOffset =
-          source['TranscodingSubProtocol']?.toString().toLowerCase() == 'hls' ||
-              _queryFlag(transcodingUrl, 'CopyTimestamps')
+          isHls || _queryFlag(transcodingUrl, 'CopyTimestamps')
           ? Duration.zero
           : _durationFromTicks(startTimeTicks);
       return JellyfinPlaybackSource(
         url: _absoluteUrl(transcodingUrl),
         headers: headers,
+        startPosition: isHls
+            ? _durationFromTicks(startTimeTicks)
+            : Duration.zero,
         initialPosition: _durationFromTicks(startTimeTicks),
         positionOffset: transcodeOffset,
         subtitles: subtitles,
@@ -192,14 +196,27 @@ class JellyfinClient {
     String userId,
     String itemId, {
     required int positionTicks,
-  }) => _postPlaybackUpdate(
-    '/UserItems/$itemId/UserData',
-    queryParameters: {'userId': userId},
-    data: {
+    bool? played,
+  }) async {
+    final payload = {
       'PlaybackPositionTicks': positionTicks,
       'LastPlayedDate': DateTime.now().toUtc().toIso8601String(),
-    },
-  );
+      'Played': ?played,
+    };
+    try {
+      await _postPlaybackUpdate(
+        '/UserItems/$itemId/UserData',
+        queryParameters: {'userId': userId},
+        data: payload,
+      );
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 404) rethrow;
+      await _postPlaybackUpdate(
+        '/Users/$userId/Items/$itemId/UserData',
+        data: payload,
+      );
+    }
+  }
 
   Future<void> _postPlaybackUpdate(
     String path, {

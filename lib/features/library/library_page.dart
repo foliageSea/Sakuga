@@ -221,6 +221,7 @@ class _PagedGrid extends ConsumerWidget {
                       ? MediaPosterCard(
                           client: client,
                           item: items[start + column],
+                          progress: items[start + column].progressFraction,
                           heroTag: posterHeroTag(items[start + column].id),
                           onPosterTap: (posterUrl) =>
                               onTap(items[start + column], posterUrl),
@@ -298,6 +299,7 @@ class _MobileMasonryGrid extends StatelessWidget {
                       ),
                       client: client,
                       item: columns[column][index],
+                      progress: columns[column][index].progressFraction,
                       aspectRatio: columns[column][index].posterAspectRatio,
                       heroTag: posterHeroTag(columns[column][index].id),
                       onPosterTap: (posterUrl) =>

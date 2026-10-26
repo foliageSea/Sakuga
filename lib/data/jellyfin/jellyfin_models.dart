@@ -121,20 +121,45 @@ class JellyfinItem {
   bool get isSeries => type == 'Series';
   bool get isEpisode => type == 'Episode';
 
+  /// Saved resume position in 100ns ticks, when present.
+  int? get playbackPositionTicks {
+    final value = userData?['PlaybackPositionTicks'];
+    return value is num ? value.toInt() : null;
+  }
+
   /// Watched fraction (0–100) as reported by the server, for resume bars.
   double? get playedPercentage {
     final value = userData?['PlayedPercentage'];
-    return value is num ? value.toDouble() : null;
+    if (value is num) return value.toDouble();
+    final ticks = playbackPositionTicks;
+    final runtime = runTimeTicks;
+    if (ticks != null && ticks > 0 && runtime != null && runtime > 0) {
+      return (ticks * 100 / runtime).clamp(0.0, 100.0);
+    }
+    return null;
   }
 
-  JellyfinItem withPlaybackPosition(int positionTicks) {
+  /// Active watch progress in `0.0..1.0`, or null when unwatched or finished.
+  double? get progressFraction {
+    if (isSeries && played) return null;
+    final percentage = playedPercentage;
+    if (percentage == null || percentage <= 0) return null;
+    return (percentage / 100).clamp(0.0, 1.0);
+  }
+
+  JellyfinItem withPlaybackPosition(int positionTicks, {bool? played}) {
+    final completed = played == true || positionTicks <= 0;
+    final normalizedTicks = completed ? 0 : positionTicks;
     final data = <String, dynamic>{
       ...?userData,
-      'PlaybackPositionTicks': positionTicks,
+      'PlaybackPositionTicks': normalizedTicks,
+      if (played != null) 'Played': played else if (completed) 'Played': true,
     };
     final runtime = runTimeTicks;
-    if (runtime != null && runtime > 0) {
-      data['PlayedPercentage'] = (positionTicks * 100 / runtime).clamp(
+    if (completed) {
+      data.remove('PlayedPercentage');
+    } else if (runtime != null && runtime > 0) {
+      data['PlayedPercentage'] = (normalizedTicks * 100 / runtime).clamp(
         0.0,
         100.0,
       );

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'package:sakuga/data/jellyfin/jellyfin_models.dart';
 import 'package:sakuga/features/player/playback_progress_repository.dart';
 
 void main() {
@@ -102,5 +103,57 @@ void main() {
       ),
       456000000,
     );
+  });
+
+  test('overlays pending partial and completed progress onto items', () async {
+    final repository = PreferencesPlaybackProgressRepository(
+      SharedPreferencesAsync(),
+    );
+    await repository.save(
+      serverId: 'server-1',
+      userId: 'user-1',
+      itemId: 'ep-partial',
+      positionTicks: 300000000,
+    );
+    await repository.save(
+      serverId: 'server-1',
+      userId: 'user-1',
+      itemId: 'ep-done',
+      positionTicks: 0,
+    );
+
+    final overlaid = await repository.overlayItems(
+      const [
+        JellyfinItem(
+          id: 'ep-partial',
+          name: 'Ep 1',
+          type: 'Episode',
+          imageTags: {},
+          runTimeTicks: 600000000,
+        ),
+        JellyfinItem(
+          id: 'ep-done',
+          name: 'Ep 2',
+          type: 'Episode',
+          imageTags: {},
+          runTimeTicks: 600000000,
+          userData: {
+            'PlaybackPositionTicks': 500000000,
+            'PlayedPercentage': 83.3,
+            'Played': false,
+          },
+        ),
+      ],
+      serverId: 'server-1',
+      userId: 'user-1',
+    );
+
+    expect(overlaid[0].playbackPositionTicks, 300000000);
+    expect(overlaid[0].progressFraction, closeTo(0.5, 0.001));
+    expect(overlaid[0].played, isFalse);
+
+    expect(overlaid[1].playbackPositionTicks, 0);
+    expect(overlaid[1].progressFraction, isNull);
+    expect(overlaid[1].played, isTrue);
   });
 }

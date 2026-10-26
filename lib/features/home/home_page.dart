@@ -180,16 +180,13 @@ class _MediaSection extends StatelessWidget {
                       Builder(
                         builder: (context) {
                           final item = values[index];
-                          final percentage = item.playedPercentage;
                           final landscape = item.isEpisode;
                           return SizedBox(
                             width: landscape ? 260 : 160,
                             child: MediaPosterCard(
                               client: client,
                               item: item,
-                              progress: percentage == null
-                                  ? null
-                                  : percentage / 100,
+                              progress: item.progressFraction,
                               aspectRatio: landscape
                                   ? item.thumbnailAspectRatio
                                   : null,

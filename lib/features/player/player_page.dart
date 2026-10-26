@@ -52,10 +52,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   String? _serverId;
   String? _userId;
   String? _progressItemId;
+  String? _seriesId;
+  int? _runtimeTicks;
   Duration _position = Duration.zero;
   Duration _initialPosition = Duration.zero;
   Duration _positionOffset = Duration.zero;
+  Duration? _pendingStartPosition;
+  bool _fallbackStartSeekIssued = false;
+  DateTime? _fileLoadedAt;
+  List<JellyfinSubtitleSource> _pendingSubtitles = const [];
+  String _externalSubtitleLabel = '';
+  bool _subtitlesAttached = false;
   bool _receivedPlayerPosition = false;
+  bool _completed = false;
   bool _playing = false;
   bool _tracking = false;
   bool _stopped = false;
@@ -63,6 +72,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   bool _allowPop = false;
   bool _backgroundCheckpointed = false;
   int _lastLocalSaveTicks = -1;
+  int _lastReportedTicks = -1;
   Timer? _progressTimer;
   Future<void> _localTail = Future.value();
   Future<void> _syncTail = Future.value();
@@ -88,17 +98,54 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     );
     _subscriptions.add(
       _player.stream.position.listen((position) {
-        _position = position;
-        if (_position + _positionOffset > Duration.zero ||
-            _initialPosition == Duration.zero) {
-          _receivedPlayerPosition = true;
+        final pending = _pendingStartPosition;
+        if (pending != null) {
+          final threshold = _resumeThreshold(pending);
+          final loadedAt = _fileLoadedAt;
+          final settleExpired =
+              loadedAt != null &&
+              DateTime.now().difference(loadedAt) >= const Duration(seconds: 3);
+          if (position >= threshold || settleExpired) {
+            _pendingStartPosition = null;
+            _position = position;
+            _receivedPlayerPosition = true;
+          }
+        } else {
+          _position = position;
+          if (position > Duration.zero && _completed) {
+            _completed = false;
+          }
+          if (_position + _positionOffset > Duration.zero ||
+              _initialPosition == Duration.zero) {
+            _receivedPlayerPosition = true;
+          }
         }
-        if (_tracking &&
-            (_positionTicks - _lastLocalSaveTicks).abs() >=
-                _durationToTicks(_localSaveInterval)) {
-          _lastLocalSaveTicks = _positionTicks;
-          unawaited(_checkpoint());
+        if (_tracking) {
+          final currentTicks = _positionTicks;
+          if ((currentTicks - _lastReportedTicks).abs() >=
+              _durationToTicks(const Duration(seconds: 15))) {
+            _lastLocalSaveTicks = currentTicks;
+            unawaited(_checkpoint(report: true));
+          } else if ((currentTicks - _lastLocalSaveTicks).abs() >=
+              _durationToTicks(_localSaveInterval)) {
+            _lastLocalSaveTicks = currentTicks;
+            unawaited(_checkpoint());
+          }
         }
+      }),
+    );
+    _subscriptions.add(
+      _player.stream.duration.listen((duration) {
+        if (duration <= Duration.zero) return;
+        _fileLoadedAt ??= DateTime.now();
+        unawaited(_onMediaLoaded(duration, _openGeneration));
+      }),
+    );
+    _subscriptions.add(
+      _player.stream.completed.listen((completed) {
+        if (!completed) return;
+        _completed = true;
+        if (_tracking) unawaited(_checkpoint(report: true));
       }),
     );
     _subscriptions.add(
@@ -123,6 +170,43 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       }),
     );
     unawaited(_openMedia());
+  }
+
+  static Duration _resumeThreshold(Duration target) =>
+      target > const Duration(seconds: 2)
+      ? target - const Duration(seconds: 2)
+      : Duration(microseconds: target.inMicroseconds ~/ 2);
+
+  Future<void> _onMediaLoaded(Duration duration, int generation) async {
+    if (!mounted || generation != _openGeneration) return;
+    if (!_subtitlesAttached && _pendingSubtitles.isNotEmpty) {
+      _subtitlesAttached = true;
+      for (final subtitle in _pendingSubtitles) {
+        if (!mounted || generation != _openGeneration) return;
+        try {
+          await _nativePlayer.command([
+            'sub-add',
+            subtitle.url,
+            'auto',
+            subtitle.title ?? _externalSubtitleLabel,
+            subtitle.language ?? 'und',
+          ]);
+        } catch (error, stackTrace) {
+          debugPrint('PLAYER_SUBTITLE_ADD_ERROR $error\n$stackTrace');
+        }
+      }
+    }
+    final pending = _pendingStartPosition;
+    if (pending == null) return;
+    if (pending >= duration) {
+      _pendingStartPosition = null;
+      return;
+    }
+    if (!_fallbackStartSeekIssued &&
+        _player.state.position < _resumeThreshold(pending)) {
+      _fallbackStartSeekIssued = true;
+      await _player.seek(pending);
+    }
   }
 
   Future<void> _openMedia() async {
@@ -157,8 +241,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       }
       final library = await ref.read(libraryViewsProvider.future);
       final item = await library.client.item(library.userId, itemId);
-      final serverTicks =
-          (item.userData?['PlaybackPositionTicks'] as num?)?.toInt() ?? 0;
+      final serverTicks = item.playbackPositionTicks ?? 0;
       final localTicks = await _loadLocalProgress(
         serverId: library.client.server.id,
         userId: library.userId,
@@ -176,28 +259,35 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       _serverId = library.client.server.id;
       _userId = library.userId;
       _progressItemId = itemId;
+      _seriesId = item.seriesId;
+      _runtimeTicks = item.runTimeTicks;
       _position = source.initialPosition;
       _initialPosition = source.initialPosition;
       _positionOffset = source.positionOffset;
+      _pendingStartPosition = source.startPosition > Duration.zero
+          ? source.startPosition
+          : null;
+      _fallbackStartSeekIssued = false;
+      _fileLoadedAt = null;
+      _completed = false;
+      _pendingSubtitles = source.subtitles;
+      _externalSubtitleLabel = context.l10n.externalSubtitle;
+      _subtitlesAttached = false;
       _receivedPlayerPosition = false;
       await _player.open(
-        Media(source.url, httpHeaders: source.headers),
+        Media(
+          source.url,
+          httpHeaders: source.headers,
+          start: _pendingStartPosition,
+        ),
         play: true,
       );
-      if (source.startPosition > Duration.zero) {
-        await _player.seek(source.startPosition);
+      if (!mounted || generation != _openGeneration) return;
+      if (_player.state.duration > Duration.zero) {
+        _fileLoadedAt ??= DateTime.now();
+        await _onMediaLoaded(_player.state.duration, generation);
       }
       if (!mounted || generation != _openGeneration) return;
-      final externalSubtitleLabel = context.l10n.externalSubtitle;
-      for (final subtitle in source.subtitles) {
-        await platform.command([
-          'sub-add',
-          subtitle.url,
-          'auto',
-          subtitle.title ?? externalSubtitleLabel,
-          subtitle.language ?? 'und',
-        ]);
-      }
       await _startTracking();
     } catch (error, stackTrace) {
       debugPrint('PLAYER_OPEN_ERROR $error\n$stackTrace');
@@ -214,23 +304,17 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     required String serverId,
     required String userId,
     required String itemId,
-  }) async {
-    try {
-      return await _progressRepository.load(
-        serverId: serverId,
-        userId: userId,
-        itemId: itemId,
-      );
-    } catch (error, stackTrace) {
-      debugPrint('PLAYER_LOCAL_PROGRESS_READ_ERROR $error\n$stackTrace');
-      return null;
-    }
-  }
+  }) => _progressRepository.tryLoad(
+    serverId: serverId,
+    userId: userId,
+    itemId: itemId,
+  );
 
   Future<void> _startTracking() async {
     _tracking = true;
     _stopped = false;
     _lastLocalSaveTicks = _positionTicks;
+    _lastReportedTicks = _positionTicks;
     await _checkpoint(started: true);
     if (!_tracking || _stopped || !mounted) return;
     _progressTimer?.cancel();
@@ -260,7 +344,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       return Future.value();
     }
 
-    final positionTicks = _positionTicks;
+    final rawTicks = _positionTicks;
+    final runtime = _runtimeTicks ?? _durationToTicks(_player.state.duration);
+    final finished =
+        !failed &&
+        (_completed || (runtime > 0 && rawTicks >= (runtime * 0.98).round()));
+    final persistedTicks = finished ? 0 : rawTicks;
+    final sessionTicks = finished && runtime > 0 ? runtime : rawTicks;
     final isPaused = !_playing;
     final volume = _player.state.volume;
     final revision = ++_progressRevision;
@@ -270,7 +360,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           serverId: serverId,
           userId: userId,
           itemId: itemId,
-          positionTicks: positionTicks,
+          positionTicks: persistedTicks,
         );
       } catch (error, stackTrace) {
         debugPrint('PLAYER_LOCAL_PROGRESS_WRITE_ERROR $error\n$stackTrace');
@@ -278,6 +368,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     });
 
     if (!started && !report && !stopped) return localSave;
+    _lastReportedTicks = rawTicks;
     return _serializeSync(() async {
       await localSave;
       // On exit, discard queued periodic/pause reports and send only the
@@ -288,21 +379,21 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           if (stopped) {
             await client.reportPlaybackStopped(
               session,
-              positionTicks: positionTicks,
+              positionTicks: sessionTicks,
               failed: failed,
               volume: volume,
             );
           } else if (started) {
             await client.reportPlaybackStarted(
               session,
-              positionTicks: positionTicks,
+              positionTicks: sessionTicks,
               isPaused: isPaused,
               volume: volume,
             );
           } else {
             await client.reportPlaybackProgress(
               session,
-              positionTicks: positionTicks,
+              positionTicks: sessionTicks,
               isPaused: isPaused,
               volume: volume,
             );
@@ -313,14 +404,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         await client.updatePlaybackPosition(
           userId,
           itemId,
-          positionTicks: positionTicks,
+          positionTicks: persistedTicks,
+          played: finished ? true : null,
         );
         await _clearLocalIfCurrent(
           revision: revision,
           serverId: serverId,
           userId: userId,
           itemId: itemId,
-          positionTicks: positionTicks,
+          positionTicks: persistedTicks,
         );
       } catch (error, stackTrace) {
         debugPrint('PLAYER_PROGRESS_SYNC_ERROR $error\n$stackTrace');
@@ -383,10 +475,17 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         .timeout(_exitSyncTimeout, onTimeout: () {});
     if (!mounted) return;
     ref.invalidate(resumeItemsProvider);
+    ref.invalidate(libraryItemsProvider);
+    ref.invalidate(seriesEpisodesProvider);
+    ref.invalidate(seriesSeasonsProvider);
     final userId = _userId;
     final itemId = _progressItemId;
+    final seriesId = _seriesId;
     if (userId != null && itemId != null) {
       ref.invalidate(libraryItemProvider((userId: userId, itemId: itemId)));
+    }
+    if (userId != null && seriesId != null && seriesId.isNotEmpty) {
+      ref.invalidate(libraryItemProvider((userId: userId, itemId: seriesId)));
     }
     setState(() => _allowPop = true);
     if (context.canPop()) {
