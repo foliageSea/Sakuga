@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:forui/forui.dart';
 
+import '../features/detail/detail_page.dart';
 import '../features/downloads/downloads_page.dart';
 import '../features/home/home_page.dart';
 import '../features/library/library_page.dart';
@@ -34,7 +35,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/library', builder: (_, _) => const LibraryPage()),
+              GoRoute(
+                path: '/library',
+                builder: (_, _) => const LibraryPage(),
+                routes: [
+                  GoRoute(
+                    path: ':itemId',
+                    builder: (_, state) => DetailPage(
+                      itemId: state.pathParameters['itemId'] ?? '',
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           StatefulShellBranch(

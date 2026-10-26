@@ -206,6 +206,30 @@ abstract class AppLocalizations {
   /// **'Load more'**
   String get loadMore;
 
+  /// No description provided for @synopsis.
+  ///
+  /// In en, this message translates to:
+  /// **'Synopsis'**
+  String get synopsis;
+
+  /// No description provided for @cast.
+  ///
+  /// In en, this message translates to:
+  /// **'Cast'**
+  String get cast;
+
+  /// No description provided for @episodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Episodes'**
+  String get episodes;
+
+  /// No description provided for @studios.
+  ///
+  /// In en, this message translates to:
+  /// **'Studio'**
+  String get studios;
+
   /// No description provided for @noItems.
   ///
   /// In en, this message translates to:

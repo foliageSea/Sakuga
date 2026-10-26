@@ -64,6 +64,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loadMore => 'Load more';
 
   @override
+  String get synopsis => 'Synopsis';
+
+  @override
+  String get cast => 'Cast';
+
+  @override
+  String get episodes => 'Episodes';
+
+  @override
+  String get studios => 'Studio';
+
+  @override
   String get noItems => 'No items';
 
   @override

@@ -9,8 +9,6 @@ import '../../data/jellyfin/server_profile.dart';
 import '../../data/jellyfin/server_repository.dart';
 
 typedef LibraryQuery = ({String userId, String viewId});
-typedef SeriesQuery = ({String userId, String seriesId});
-typedef EpisodesQuery = ({String userId, String seriesId, String? seasonId});
 
 class LibraryData {
   const LibraryData({
@@ -84,8 +82,8 @@ class LibraryItemsState {
 
 /// Paged contents of one library view.
 ///
-/// TV libraries are asked for `Series` only; their episodes are loaded per
-/// series by [seriesEpisodesProvider] instead of being flattened into the grid.
+/// TV libraries are asked for `Series` only; episodes live on the detail page
+/// instead of being flattened into the poster grid.
 class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
     with LoggingMixin {
   LibraryItemsController(this.query);
@@ -163,19 +161,3 @@ final libraryItemsProvider = AsyncNotifierProvider.autoDispose
     .family<LibraryItemsController, LibraryItemsState, LibraryQuery>(
       LibraryItemsController.new,
     );
-
-final seriesSeasonsProvider = FutureProvider.autoDispose
-    .family<List<JellyfinItem>, SeriesQuery>((ref, query) async {
-      final data = await ref.watch(libraryViewsProvider.future);
-      return data.client.seasons(query.userId, query.seriesId);
-    });
-
-final seriesEpisodesProvider = FutureProvider.autoDispose
-    .family<List<JellyfinItem>, EpisodesQuery>((ref, query) async {
-      final data = await ref.watch(libraryViewsProvider.future);
-      return data.client.episodes(
-        query.userId,
-        query.seriesId,
-        seasonId: query.seasonId,
-      );
-    });

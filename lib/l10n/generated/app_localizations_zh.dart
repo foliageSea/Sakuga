@@ -64,6 +64,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loadMore => '加载更多';
 
   @override
+  String get synopsis => '简介';
+
+  @override
+  String get cast => '演职员';
+
+  @override
+  String get episodes => '分集';
+
+  @override
+  String get studios => '制作';
+
+  @override
   String get noItems => '暂无内容';
 
   @override

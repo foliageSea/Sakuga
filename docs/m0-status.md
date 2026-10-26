@@ -94,16 +94,21 @@ Linux 运行依赖（WSL 最小镜像）：`libva2`、`libva-drm2`、`libva-x11-
 - 调用链：`GET /Users` → `GET /UserViews?userId=`（10.8 回退 `/Users/{userId}/Views`）→ `GET /Items?parentId=`。
 - 按库类型查询：`tvshows` 只取 `Series`（不再把剧集与分集平铺进同一网格），`movies` 取 `Movie,Video`，其余保留宽类型。
 - 分页：`startIndex` + `limit=60` + `TotalRecordCount`；滚动到底自动加载，底部另有“加载更多”兜底按钮与失败重试（失败后不再随滚动自动重试）。
-- 剧集/季/集：点海报进入剧集页，`GET /Shows/{seriesId}/Seasons` 出季筛选，`GET /Shows/{seriesId}/Episodes?seasonId=` 出分集列表（16:9 缩略图、`SxxExx`、已看标记）。
+- 剧集/季/集：点海报进入详情页，`GET /Shows/{seriesId}/Seasons` 出季筛选，`GET /Shows/{seriesId}/Episodes?seasonId=` 出分集列表（16:9 缩略图、`SxxExx`、已看标记）。
+- 详情页：`GET /Items/{itemId}?fields=Overview,Genres,People,Studios,...` 渲染背景图 + 海报 + 年份/分级/类型 + 简介 + 演职员 + 制作；路由 `/library/:itemId` 挂在媒体库分支下，返回键回列表。
 - 海报：优先 `ImageTags.Primary`，缺失时回退 `ParentPrimaryImageTag` / `SeriesPrimaryImageTag`；URL 带 `tag` 以便服务端重新刮削后失效缓存；按 DPR 计算 `maxWidth`；占位图 + 加载淡入。
-- 海报通过 `Image.network(headers: Authorization)` 加载，避免把 API 密钥放进图片 URL。
-- 实测（10.10.7）：`LIB_VIEWS 1`、`LIB_ITEMS 6/6`（“番剧”库 6 部剧，此前混排为 57 条）；剧集页分集数与服务端一致。
+- 图片缓存：自建 `DiskCachedImage`（`lib/core/images/disk_image_cache.dart`）按 URL 落盘到 `ApplicationSupport/image-cache`，30 天清理；图片走 `Authorization` 请求头而非 `api_key`。实测冷启动下载 4 张、重启后 `IMG_DOWNLOAD` 0 次、页面一致。
+- 实测（10.10.7）：`LIB_VIEWS 1`、`LIB_ITEMS 6/6`（“番剧”库 6 部剧，此前混排为 57 条）；详情页分集数与服务端一致（13 集 / 3 集样本）。
 - 相关文件：
   - `lib/data/jellyfin/jellyfin_client.dart`
   - `lib/data/jellyfin/jellyfin_models.dart`
   - `lib/features/library/library_providers.dart`
   - `lib/features/library/library_page.dart`
-- 待办：详情页、搜索、播放、多服务器切换。
+  - `lib/features/detail/detail_page.dart`
+  - `lib/features/detail/detail_providers.dart`
+  - `lib/core/images/disk_image_cache.dart`
+  - `lib/shared/media_widgets.dart`
+- 待办：搜索、播放、多服务器切换。
 
 ## 2. 待完成（M0 剩余）
 

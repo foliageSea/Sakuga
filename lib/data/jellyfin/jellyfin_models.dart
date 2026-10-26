@@ -31,6 +31,27 @@ class JellyfinView {
   );
 }
 
+class JellyfinPerson {
+  const JellyfinPerson({
+    required this.id,
+    required this.name,
+    required this.role,
+    required this.type,
+  });
+
+  final String id;
+  final String name;
+  final String role;
+  final String type;
+
+  factory JellyfinPerson.fromJson(Map<String, dynamic> json) => JellyfinPerson(
+    id: json['Id'] as String? ?? '',
+    name: json['Name'] as String? ?? '',
+    role: json['Role'] as String? ?? '',
+    type: json['Type'] as String? ?? '',
+  );
+}
+
 class JellyfinItem {
   const JellyfinItem({
     required this.id,
@@ -47,6 +68,16 @@ class JellyfinItem {
     this.parentPrimaryImageTag,
     this.seriesPrimaryImageTag,
     this.primaryImageAspectRatio,
+    this.backdropImageTags = const [],
+    this.overview,
+    this.genres = const [],
+    this.studios = const [],
+    this.people = const [],
+    this.officialRating,
+    this.communityRating,
+    this.productionYear,
+    this.childCount,
+    this.recursiveItemCount,
   });
 
   final String id;
@@ -68,6 +99,21 @@ class JellyfinItem {
 
   /// Aspect ratio of the scraped primary image, as reported by the server.
   final double? primaryImageAspectRatio;
+
+  final List<String> backdropImageTags;
+  final String? overview;
+  final List<String> genres;
+  final List<String> studios;
+  final List<JellyfinPerson> people;
+  final String? officialRating;
+  final double? communityRating;
+  final int? productionYear;
+
+  /// Direct children: seasons for a series, episodes for a season.
+  final int? childCount;
+
+  /// Every descendant: episodes for a series.
+  final int? recursiveItemCount;
 
   bool get played => userData?['Played'] == true;
   bool get isSeries => type == 'Series';
@@ -93,6 +139,10 @@ class JellyfinItem {
 
   factory JellyfinItem.fromJson(Map<String, dynamic> json) {
     final tags = json['ImageTags'];
+    final backdrops = json['BackdropImageTags'];
+    final genres = json['Genres'];
+    final studios = json['Studios'];
+    final people = json['People'];
     return JellyfinItem(
       id: json['Id'] as String? ?? '',
       name: json['Name'] as String? ?? '',
@@ -113,6 +163,32 @@ class JellyfinItem {
       seriesPrimaryImageTag: json['SeriesPrimaryImageTag'] as String?,
       primaryImageAspectRatio: (json['PrimaryImageAspectRatio'] as num?)
           ?.toDouble(),
+      backdropImageTags: backdrops is List
+          ? backdrops.map((value) => value.toString()).toList()
+          : const [],
+      overview: json['Overview'] as String?,
+      genres: genres is List
+          ? genres.map((value) => value.toString()).toList()
+          : const [],
+      studios: studios is List
+          ? studios
+                .whereType<Map<String, dynamic>>()
+                .map((value) => value['Name'] as String? ?? '')
+                .where((value) => value.isNotEmpty)
+                .toList()
+          : const [],
+      people: people is List
+          ? people
+                .whereType<Map<String, dynamic>>()
+                .map(JellyfinPerson.fromJson)
+                .where((person) => person.name.isNotEmpty)
+                .toList()
+          : const [],
+      officialRating: json['OfficialRating'] as String?,
+      communityRating: (json['CommunityRating'] as num?)?.toDouble(),
+      productionYear: (json['ProductionYear'] as num?)?.toInt(),
+      childCount: (json['ChildCount'] as num?)?.toInt(),
+      recursiveItemCount: (json['RecursiveItemCount'] as num?)?.toInt(),
     );
   }
 }

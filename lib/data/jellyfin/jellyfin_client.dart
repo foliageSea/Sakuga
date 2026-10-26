@@ -132,6 +132,21 @@ class JellyfinClient {
     return episodes;
   }
 
+  /// One item with the metadata the detail page renders.
+  Future<JellyfinItem> item(String userId, String itemId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/Items/$itemId',
+      queryParameters: {
+        'userId': userId,
+        'fields':
+            'Overview,Genres,People,Studios,ProviderIds,CommunityRating,'
+            'OfficialRating,RunTimeTicks,PremiereDate,BackdropImageTags,'
+            'Taglines,PrimaryImageAspectRatio,ImageTags,UserData',
+      },
+    );
+    return JellyfinItem.fromJson(response.data ?? const {});
+  }
+
   List<JellyfinView> _parseViews(Map<String, dynamic>? data) {
     final items = data?['Items'];
     if (items is! List) return const [];
@@ -188,6 +203,15 @@ class JellyfinClient {
       return _imageUrl(seriesId, seriesTag, width);
     }
     return null;
+  }
+
+  /// The first scraped backdrop, when the item has one.
+  String? backdropUrl(JellyfinItem item, {int width = 1600}) {
+    if (item.backdropImageTags.isEmpty) return null;
+    final tag = item.backdropImageTags.first;
+    if (tag.isEmpty) return null;
+    return '${server.baseUrl}/Items/${item.id}/Images/Backdrop/0'
+        '?maxWidth=$width&tag=$tag';
   }
 
   String _imageUrl(String itemId, String tag, int width) =>
