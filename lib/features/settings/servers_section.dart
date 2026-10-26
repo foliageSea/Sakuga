@@ -83,6 +83,7 @@ class ServersSection extends ConsumerWidget {
     final l = context.l10n;
     final nameController = TextEditingController(text: server?.name ?? '');
     final urlController = TextEditingController(text: server?.baseUrl ?? '');
+    final apiKeyController = TextEditingController(text: server?.apiKey ?? '');
     String? error;
     String? probeResult;
     var testing = false;
@@ -119,6 +120,12 @@ class ServersSection extends ConsumerWidget {
                   label: Text(l.serverUrl),
                   hint: 'http://192.168.1.2:8096',
                   keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 12),
+                FTextField.password(
+                  key: const ValueKey('server-api-key'),
+                  control: .managed(controller: apiKeyController),
+                  label: Text(l.apiKey),
                 ),
                 if (probeResult != null) ...[
                   const SizedBox(height: 12),
@@ -166,7 +173,10 @@ class ServersSection extends ConsumerWidget {
                               try {
                                 final result = await ref
                                     .read(jellyfinProbeProvider)
-                                    .probe(urlController.text);
+                                    .probe(
+                                      urlController.text,
+                                      apiKey: apiKeyController.text,
+                                    );
                                 if (!context.mounted) return;
                                 setState(() {
                                   probeResult = result.version.isEmpty
@@ -209,6 +219,7 @@ class ServersSection extends ConsumerWidget {
                               DateTime.now().microsecondsSinceEpoch.toString(),
                           name: name,
                           baseUrl: baseUrl,
+                          apiKey: apiKeyController.text.trim(),
                         );
                         try {
                           if (server == null) {
@@ -240,6 +251,7 @@ class ServersSection extends ConsumerWidget {
 
     nameController.dispose();
     urlController.dispose();
+    apiKeyController.dispose();
   }
 
   Future<void> _confirmDelete(

@@ -14,11 +14,11 @@ M0（工程基建与内核验证）进行中。当前已完成：
 - `flutter analyze` 通过；Android arm64 debug APK 构建成功，16KB 对齐校验通过。
 - Jellyfin 10.10.7 测试服联调通过（认证、UserViews、Items、PlaybackInfo 直连）。
 - Linux 本地开发 runner 已加回；debug 构建与本地播放验证通过（WSLg 需 X11 + 软件 GL）。
-- 设置页新增 **服务器** 配置入口：服务器名称/URL、测试连接（`/System/Info/Public`）、编辑/删除；首页显示已保存服务器。
+- 设置页新增 **服务器** 配置入口：名称/URL/API 密钥、测试连接、编辑/删除；首页显示已保存服务器。
 
 待完成：
 
-- 服务器登录/Token 持久化（下一步 M1）。
+- 服务器登录（用户名密码）、API 密钥安全存储（Keychain/Keystore）、服务器切换（下一步 M1）。
 - macOS arm64 构建与本地包（需 Mac/CI）。
 - 测试在 Linux 上受 media_kit native assets 编译问题阻塞（见 `docs/m0-status.md`）。
 - Android 真机运行验证（当前环境无设备/模拟器）。

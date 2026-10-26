@@ -52,6 +52,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get serverUrl => '服务器地址';
 
   @override
+  String get apiKey => 'API 密钥';
+
+  @override
   String get testConnection => '测试';
 
   @override
@@ -74,6 +77,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get connectedServer => '已连接';
+
+  @override
+  String get authError => 'API 密钥无效。';
 
   @override
   String get overview => '概览';

@@ -52,6 +52,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get serverUrl => 'Server URL';
 
   @override
+  String get apiKey => 'API key';
+
+  @override
   String get testConnection => 'Test';
 
   @override
@@ -74,6 +77,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get connectedServer => 'Connected';
+
+  @override
+  String get authError => 'API key rejected.';
 
   @override
   String get overview => 'Overview';

@@ -1,4 +1,12 @@
-enum FailureKind { network, timeout, server, storage, invalidData, cancelled }
+enum FailureKind {
+  network,
+  timeout,
+  auth,
+  server,
+  storage,
+  invalidData,
+  cancelled,
+}
 
 class AppException implements Exception {
   const AppException(this.kind, [this.cause]);

@@ -155,6 +155,7 @@ String failureMessage(BuildContext context, Object error) {
   return switch (error) {
     AppException(kind: FailureKind.storage) => l.storageError,
     AppException(kind: FailureKind.timeout) => l.timeoutError,
+    AppException(kind: FailureKind.auth) => l.authError,
     AppException(kind: FailureKind.server) => l.serverError,
     AppException(kind: FailureKind.invalidData) => l.invalidDataError,
     AppException(kind: FailureKind.cancelled) => l.cancelledError,

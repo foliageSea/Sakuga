@@ -882,6 +882,7 @@ abstract interface class PlayerEngine {
 - 自签名证书仅对用户确认的服务器放行；展示 SHA-256 指纹。
 - 默认无遥测；崩溃上报（若启用）需明确开关与隐私说明。
 - 测试服凭据只放本地环境变量/CI secret，不写入仓库、不写进日志。
+- 服务器 API 密钥：当前开发期临时存 `SharedPreferences`（`sakuga.servers.v1`），**仅用于内测**；M1 必须迁移到 Keychain/Keystore（`flutter_secure_storage`），并避免写入日志/导出。
 - 许可证：
   - Anime4K shader：MIT，保留 `LICENSE` 与关于页声明。
   - media_kit / libmpv / FFmpeg：MIT/LGPL/GPL 组合，随包附许可；FFmpeg 的 LGPL/GPL 取决于编译选项，需在关于页说明。

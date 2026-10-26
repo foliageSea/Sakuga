@@ -76,17 +76,17 @@ Linux 运行依赖（WSL 最小镜像）：`libva2`、`libva-drm2`、`libva-x11-
 
 - 设置页新增 **服务器** 标签（最后一个 Tab）：
   - 服务器列表（名称/URL）；
-  - 添加/编辑对话框：名称、URL、测试连接、保存；
+  - 添加/编辑对话框：名称、URL、API 密钥（可选，密码输入）、测试连接、保存；
   - 删除确认；
-  - 测试连接调用 `GET /System/Info/Public`，显示服务器名/版本。
+  - 测试连接：无 API 密钥时调用 `GET /System/Info/Public`；有密钥时带 `Authorization: MediaBrowser` 调 `GET /System/Info` 并校验 401。
 - 首页显示已保存的第一台服务器；未配置时显示“添加服务器”入口。
-- 存储：`SharedPreferences` 键 `sakuga.servers.v1`（只存名称/URL，不含密码/Token）。
+- 存储：`SharedPreferences` 键 `sakuga.servers.v1`，当前包含名称/URL/API 密钥。**开发期临时方案**；M1 需把 API 密钥迁移到 Keychain/Keystore（`flutter_secure_storage`）。
 - 相关文件：
   - `lib/data/jellyfin/server_profile.dart`
   - `lib/data/jellyfin/server_repository.dart`
   - `lib/data/jellyfin/jellyfin_probe.dart`
   - `lib/features/settings/servers_section.dart`
-- 待办：登录（`/Users/AuthenticateByName`）、Token 安全存储、服务器切换、连接状态。
+- 待办：登录（`/Users/AuthenticateByName`）、API 密钥/Token 安全存储、服务器切换、连接状态。
 
 ## 2. 待完成（M0 剩余）
 

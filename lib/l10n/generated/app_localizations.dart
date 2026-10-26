@@ -182,6 +182,12 @@ abstract class AppLocalizations {
   /// **'Server URL'**
   String get serverUrl;
 
+  /// No description provided for @apiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'API key'**
+  String get apiKey;
+
   /// No description provided for @testConnection.
   ///
   /// In en, this message translates to:
@@ -229,6 +235,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connected'**
   String get connectedServer;
+
+  /// No description provided for @authError.
+  ///
+  /// In en, this message translates to:
+  /// **'API key rejected.'**
+  String get authError;
 
   /// No description provided for @overview.
   ///
