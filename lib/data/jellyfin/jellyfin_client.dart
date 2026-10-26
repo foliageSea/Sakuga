@@ -21,6 +21,10 @@ class JellyfinClient {
   final ServerProfile server;
   final Dio _dio;
 
+  /// Fields shared by every browse request: scraped image metadata plus the
+  /// per-user playback state.
+  static const _itemFields = 'PrimaryImageAspectRatio,ImageTags,UserData';
+
   Map<String, String> get authHeaders => _headers(server.apiKey);
 
   static Map<String, String> _headers(String apiKey) => {
@@ -56,10 +60,17 @@ class JellyfinClient {
     }
   }
 
-  Future<List<JellyfinItem>> items(
+  /// One page of a library view.
+  ///
+  /// [includeItemTypes] decides what the page contains: TV libraries should ask
+  /// for `Series` only, so that episodes are not flattened into the poster grid.
+  Future<JellyfinItemsPage> items(
     String userId,
     String parentId, {
+    int startIndex = 0,
     int limit = 60,
+    String includeItemTypes = 'Movie,Series,Episode,Video,MusicVideo',
+    String sortBy = 'SortName',
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/Items',
@@ -67,21 +78,58 @@ class JellyfinClient {
         'userId': userId,
         'parentId': parentId,
         'recursive': true,
-        'includeItemTypes': 'Movie,Series,Episode,Video,MusicVideo',
-        'sortBy': 'SortName',
+        'includeItemTypes': includeItemTypes,
+        'sortBy': sortBy,
         'sortOrder': 'Ascending',
-        'fields': 'PrimaryImageAspectRatio,ImageTags,UserData',
+        'fields': _itemFields,
         'imageTypeLimit': 1,
+        'startIndex': startIndex,
         'limit': limit,
       },
     );
-    final items = response.data?['Items'];
-    if (items is! List) return const [];
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map(JellyfinItem.fromJson)
-        .where((item) => item.id.isNotEmpty)
-        .toList();
+    return _parseItemsPage(response.data);
+  }
+
+  /// Seasons of a series, ordered by season number.
+  Future<List<JellyfinItem>> seasons(String userId, String seriesId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/Shows/$seriesId/Seasons',
+      queryParameters: {
+        'userId': userId,
+        'fields': _itemFields,
+        'imageTypeLimit': 1,
+      },
+    );
+    final seasons = _parseItems(response.data);
+    seasons.sort((a, b) => (a.indexNumber ?? 0).compareTo(b.indexNumber ?? 0));
+    return seasons;
+  }
+
+  /// Episodes of a series, optionally limited to one season.
+  Future<List<JellyfinItem>> episodes(
+    String userId,
+    String seriesId, {
+    String? seasonId,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/Shows/$seriesId/Episodes',
+      queryParameters: {
+        'userId': userId,
+        'seasonId': ?seasonId,
+        'fields': _itemFields,
+        'imageTypeLimit': 1,
+      },
+    );
+    final episodes = _parseItems(response.data);
+    episodes.sort((a, b) {
+      final season = (a.parentIndexNumber ?? 0).compareTo(
+        b.parentIndexNumber ?? 0,
+      );
+      return season != 0
+          ? season
+          : (a.indexNumber ?? 0).compareTo(b.indexNumber ?? 0);
+    });
+    return episodes;
   }
 
   List<JellyfinView> _parseViews(Map<String, dynamic>? data) {
@@ -94,9 +142,54 @@ class JellyfinClient {
         .toList();
   }
 
-  String? imageUrl(JellyfinItem item, {int width = 400}) {
-    final tag = item.imageTags['Primary'];
-    if (tag == null || tag.isEmpty) return null;
-    return '${server.baseUrl}/Items/${item.id}/Images/Primary?maxWidth=$width&tag=$tag';
+  List<JellyfinItem> _parseItems(Map<String, dynamic>? data) {
+    final items = data?['Items'];
+    if (items is! List) return const [];
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(JellyfinItem.fromJson)
+        .where((item) => item.id.isNotEmpty)
+        .toList();
   }
+
+  JellyfinItemsPage _parseItemsPage(Map<String, dynamic>? data) {
+    final items = _parseItems(data);
+    final total = (data?['TotalRecordCount'] as num?)?.toInt() ?? 0;
+    return JellyfinItemsPage(
+      items: items,
+      totalRecordCount: total < items.length ? items.length : total,
+    );
+  }
+
+  /// The scraped primary image for [item].
+  ///
+  /// Episodes rarely have a primary image of their own; the server then exposes
+  /// the owning season/series image through `ParentPrimaryImageTag` or
+  /// `SeriesPrimaryImageTag`, which is used as a fallback here.
+  String? imageUrl(JellyfinItem item, {int width = 400}) {
+    final primary = item.imageTags['Primary'];
+    if (primary != null && primary.isNotEmpty) {
+      return _imageUrl(item.id, primary, width);
+    }
+    final parentId = item.parentPrimaryImageItemId;
+    final parentTag = item.parentPrimaryImageTag;
+    if (parentId != null &&
+        parentId.isNotEmpty &&
+        parentTag != null &&
+        parentTag.isNotEmpty) {
+      return _imageUrl(parentId, parentTag, width);
+    }
+    final seriesId = item.seriesId;
+    final seriesTag = item.seriesPrimaryImageTag;
+    if (seriesId != null &&
+        seriesId.isNotEmpty &&
+        seriesTag != null &&
+        seriesTag.isNotEmpty) {
+      return _imageUrl(seriesId, seriesTag, width);
+    }
+    return null;
+  }
+
+  String _imageUrl(String itemId, String tag, int width) =>
+      '${server.baseUrl}/Items/$itemId/Images/Primary?maxWidth=$width&tag=$tag';
 }

@@ -17,6 +17,7 @@
   "apiKey": "API key",
   "noApiKey": "Add an API key for this server.",
   "refresh": "Refresh",
+  "loadMore": "Load more",
   "noItems": "No items",
   "testConnection": "Test",
   "serverNameRequired": "Enter a name.",

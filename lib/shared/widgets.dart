@@ -15,18 +15,23 @@ const mobileBreakpoint = 600.0;
 bool isMobileLayout(BuildContext context) =>
     MediaQuery.sizeOf(context).width < mobileBreakpoint;
 
+/// The horizontal and vertical padding used by page-level layouts.
+double pagePadding(BuildContext context) {
+  final width = MediaQuery.sizeOf(context).width;
+  return width < mobileBreakpoint
+      ? 16.0
+      : width < 1024
+      ? 24.0
+      : 32.0;
+}
+
 class PageContent extends StatelessWidget {
   const PageContent({required this.children, this.fill = false, super.key});
   final List<Widget> children;
   final bool fill;
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final padding = width < mobileBreakpoint
-        ? 16.0
-        : width < 1024
-        ? 24.0
-        : 32.0;
+    final padding = pagePadding(context);
     return ColoredBox(
       color: context.theme.colors.background,
       child: TweenAnimationBuilder<double>(
@@ -56,6 +61,48 @@ class PageContent extends StatelessWidget {
                     padding: EdgeInsets.all(padding),
                     children: children,
                   ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A [PageContent] variant that lays its content out as slivers, so long lists
+/// can be built lazily.
+class PageScrollView extends StatelessWidget {
+  const PageScrollView({required this.slivers, super.key});
+
+  final List<Widget> slivers;
+
+  @override
+  Widget build(BuildContext context) {
+    final padding = pagePadding(context);
+    return ColoredBox(
+      color: context.theme.colors.background,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 10 * (1 - value)),
+            child: child,
+          ),
+        ),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1440),
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsets.all(padding),
+                  sliver: SliverMainAxisGroup(slivers: slivers),
+                ),
+              ],
+            ),
           ),
         ),
       ),

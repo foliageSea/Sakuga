@@ -61,6 +61,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get refresh => 'Refresh';
 
   @override
+  String get loadMore => 'Load more';
+
+  @override
   String get noItems => 'No items';
 
   @override

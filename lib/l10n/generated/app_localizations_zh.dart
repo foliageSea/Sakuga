@@ -61,6 +61,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get refresh => '刷新';
 
   @override
+  String get loadMore => '加载更多';
+
+  @override
   String get noItems => '暂无内容';
 
   @override

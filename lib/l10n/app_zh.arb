@@ -17,6 +17,7 @@
   "apiKey": "API 密钥",
   "noApiKey": "请先为该服务器配置 API 密钥。",
   "refresh": "刷新",
+  "loadMore": "加载更多",
   "noItems": "暂无内容",
   "testConnection": "测试",
   "serverNameRequired": "请输入名称。",

@@ -200,6 +200,12 @@ abstract class AppLocalizations {
   /// **'Refresh'**
   String get refresh;
 
+  /// No description provided for @loadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get loadMore;
+
   /// No description provided for @noItems.
   ///
   /// In en, this message translates to:
