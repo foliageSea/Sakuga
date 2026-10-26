@@ -10,6 +10,7 @@ import '../../data/jellyfin/jellyfin_client.dart';
 import '../../data/jellyfin/jellyfin_models.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
+import '../../shared/poster_background.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import '../detail/detail_page.dart';
@@ -85,44 +86,52 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               ? _selectedViewId!
               : views.first.id)
         : null;
+    final mobileShell =
+        isMobileLayout(context) &&
+        WindowPosterBackgroundScope.hasShell(context);
+    final viewChips = hasViews
+        ? Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final view in views)
+                FButton(
+                  builder: responsiveButtonContent,
+                  mainAxisSize: MainAxisSize.min,
+                  variant: view.id == activeViewId ? .primary : .outline,
+                  onPress: () => _selectView(view.id),
+                  child: Text(view.name),
+                ),
+            ],
+          )
+        : null;
 
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
       child: PageScrollView(
         controller: _scrollController,
-        headerGap: hasViews ? 20 : 0,
-        header: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PageHeading(
-              l.library,
-              hideTitleOnMobile: true,
-              action: FButton.icon(
-                variant: .outline,
-                size: .sm,
-                semanticsLabel: l.refresh,
-                onPress: () => ref.invalidate(libraryViewsProvider),
-                child: const Icon(FLucideIcons.refreshCw),
-              ),
-            ),
-            if (hasViews)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+        headerGap: hasViews ? (mobileShell ? 16 : 20) : 0,
+        header: mobileShell
+            ? viewChips
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final view in views)
-                    FButton(
-                      builder: responsiveButtonContent,
-                      mainAxisSize: MainAxisSize.min,
-                      variant: view.id == activeViewId ? .primary : .outline,
-                      onPress: () => _selectView(view.id),
-                      child: Text(view.name),
+                  PageHeading(
+                    l.library,
+                    hideTitleOnMobile: true,
+                    action: FButton.icon(
+                      key: const ValueKey('library-refresh'),
+                      variant: .outline,
+                      size: .sm,
+                      semanticsLabel: l.refresh,
+                      onPress: () => ref.invalidate(libraryViewsProvider),
+                      child: const Icon(FLucideIcons.refreshCw),
                     ),
+                  ),
+                  ?viewChips,
                 ],
               ),
-          ],
-        ),
         slivers: data.when(
           data: (library) => _librarySlivers(context, library, activeViewId),
           loading: () => const [SliverToBoxAdapter(child: LoadingNotice())],

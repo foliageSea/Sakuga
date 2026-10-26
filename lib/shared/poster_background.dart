@@ -39,17 +39,27 @@ class PosterBackground {
 class WindowPosterBackgroundScope extends InheritedWidget {
   const WindowPosterBackgroundScope({
     required this.active,
+    this.shellHosted = false,
     required super.child,
     super.key,
   });
 
   final bool active;
+  final bool shellHosted;
 
-  /// Whether an ancestor shell paints the window-level background layer.
+  /// Whether an ancestor paints a [PosterWindowBackground].
   static bool hasHost(BuildContext context) =>
       context
           .dependOnInheritedWidgetOfExactType<WindowPosterBackgroundScope>() !=
       null;
+
+  /// Whether the enclosing [AppShell] owns the mobile header and window
+  /// background.
+  static bool hasShell(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<WindowPosterBackgroundScope>()
+          ?.shellHosted ??
+      false;
 
   /// Whether an ambient poster background is currently displayed.
   static bool isActive(BuildContext context) =>
@@ -60,7 +70,7 @@ class WindowPosterBackgroundScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(WindowPosterBackgroundScope oldWidget) =>
-      active != oldWidget.active;
+      active != oldWidget.active || shellHosted != oldWidget.shellHosted;
 }
 
 /// Full-window ambient background: renders [background] stretched across the

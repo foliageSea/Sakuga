@@ -191,27 +191,27 @@ class PageHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hideTitle = hideTitleOnMobile && isMobileLayout(context);
-    if (hideTitle && action == null) return const SizedBox.shrink();
+    final mobile = isMobileLayout(context);
+    if (hideTitleOnMobile &&
+        mobile &&
+        WindowPosterBackgroundScope.hasShell(context)) {
+      return const SizedBox.shrink();
+    }
+    final hideTitle = hideTitleOnMobile && mobile && action == null;
+    if (hideTitle) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 28),
       child: Row(
         children: [
-          if (!hideTitle)
-            Expanded(
-              child: Text(
-                title,
-                style: context.theme.typography.display.lg.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+          Expanded(
+            child: Text(
+              title,
+              style: context.theme.typography.display.lg.copyWith(
+                fontWeight: FontWeight.w600,
               ),
-            )
-          else
-            const Spacer(),
-          if (action != null) ...[
-            if (!hideTitle) const SizedBox(width: 16),
-            action!,
-          ],
+            ),
+          ),
+          if (action != null) ...[const SizedBox(width: 16), action!],
         ],
       ),
     );

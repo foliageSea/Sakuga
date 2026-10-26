@@ -267,15 +267,22 @@ class _DetailScaffold extends StatelessWidget {
   final List<Widget> slivers;
 
   @override
-  Widget build(BuildContext context) => PageScrollView(
-    header: const _BackBar(),
-    animate: false,
-    transparent: true,
-    slivers: slivers,
-  );
+  Widget build(BuildContext context) {
+    final mobileShell =
+        isMobileLayout(context) &&
+        WindowPosterBackgroundScope.hasShell(context);
+    return PageScrollView(
+      header: mobileShell ? null : const _BackBar(),
+      animate: false,
+      transparent: true,
+      slivers: slivers,
+    );
+  }
 }
 
-FButtonStyleDelta _detailOutlineButtonStyle(BuildContext context) {
+/// Frosted outline button style used by detail navigation and filter actions
+/// when an ambient poster background is active.
+FButtonStyleDelta detailOutlineButtonStyle(BuildContext context) {
   if (!WindowPosterBackgroundScope.isActive(context)) {
     return const .context();
   }
@@ -318,9 +325,9 @@ class _BackBar extends StatelessWidget {
           key: const ValueKey('detail-back'),
           variant: .outline,
           size: .sm,
-          style: _detailOutlineButtonStyle(context),
+          style: detailOutlineButtonStyle(context),
           semanticsLabel: l.back,
-          onPress: () => _goBack(context),
+          onPress: () => popDetailRoute(context),
           child: const Icon(FLucideIcons.arrowLeft),
         ),
       ],
@@ -330,7 +337,7 @@ class _BackBar extends StatelessWidget {
 
 /// Pops the detail route, falling back to the library when the page was opened
 /// directly, e.g. from a deep link.
-void _goBack(BuildContext context) {
+void popDetailRoute(BuildContext context) {
   final router = GoRouter.of(context);
   if (router.canPop()) {
     router.pop();
@@ -715,7 +722,7 @@ class _EpisodesState extends ConsumerState<_Episodes> {
     builder: responsiveButtonContent,
     mainAxisSize: MainAxisSize.min,
     variant: selected ? .primary : .outline,
-    style: selected ? const .context() : _detailOutlineButtonStyle(context),
+    style: selected ? const .context() : detailOutlineButtonStyle(context),
     onPress: onPress,
     child: Text(label),
   );

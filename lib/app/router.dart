@@ -29,6 +29,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state, shell) => AppShell(
           shell: shell,
           isHomeRoute: state.fullPath == '/home',
+          isLibraryRootRoute: state.fullPath == '/library',
           detailBackgroundSpec: _detailBackgroundSpec(state),
         ),
         branches: [

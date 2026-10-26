@@ -485,6 +485,114 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'mobile shell aligns library refresh and detail back button inline with header title',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final servers = MemoryServerRepository()..items = [_server];
+      final container = ProviderContainer(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(
+            const AppSettings(language: 'en'),
+          ),
+          settingsRepositoryProvider.overrideWithValue(MemorySettings()),
+          desktopWindowProvider.overrideWithValue(
+            FakeWindow(available: true, macOS: true),
+          ),
+          serverRepositoryProvider.overrideWithValue(servers),
+          randomItemsProvider.overrideWith((ref) async => const []),
+          resumeItemsProvider.overrideWith((ref) async => const []),
+          latestItemsProvider.overrideWith((ref) async => const []),
+          libraryViewsProvider.overrideWith(
+            (ref) async => LibraryData(
+              client: JellyfinClient(server: _server),
+              userId: 'user-1',
+              views: const [
+                JellyfinView(
+                  id: 'view',
+                  name: 'Shows',
+                  collectionType: 'tvshows',
+                ),
+              ],
+            ),
+          ),
+          libraryItemsProvider.overrideWith2(_FakeItems.new),
+          libraryItemProvider.overrideWith(
+            (ref, query) async => JellyfinItem(
+              id: query.itemId,
+              name: 'Series ${query.itemId}',
+              type: 'Movie',
+              imageTags: const {},
+              overview: List.filled(20, 'A long mobile synopsis.').join(' '),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const SakugaApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      container.read(routerProvider).go('/library');
+      await tester.pumpAndSettle();
+
+      final headerTitle = find.descendant(
+        of: find.byKey(const ValueKey('mobile-header')),
+        matching: find.text('Library'),
+      );
+      final refreshButton = find.byKey(const ValueKey('library-refresh'));
+      final backButton = find.byKey(const ValueKey('detail-back'));
+      final viewChipButton = find.ancestor(
+        of: find.text('Shows'),
+        matching: find.byType(FButton),
+      );
+      final rightCard = find.byKey(const ValueKey('library-mobile-card-b'));
+
+      expect(headerTitle, findsOneWidget);
+      expect(refreshButton, findsOneWidget);
+      expect(backButton, findsNothing);
+
+      final titleRectOnLibrary = tester.getRect(headerTitle);
+      final refreshRect = tester.getRect(refreshButton);
+      expect(refreshRect.center.dy, closeTo(titleRectOnLibrary.center.dy, 1.0));
+      expect(refreshRect.left, greaterThan(titleRectOnLibrary.left));
+      expect(
+        titleRectOnLibrary.left,
+        closeTo(tester.getRect(viewChipButton).left, 1),
+      );
+      expect(refreshRect.right, closeTo(tester.getRect(rightCard).right, 1));
+
+      // Opening a detail page replaces the right refresh button with a single
+      // back button to the left of the "Library" header title on the same row.
+      await tester.tap(find.text('Series a'));
+      await tester.pumpAndSettle();
+
+      expect(refreshButton, findsNothing);
+      expect(backButton, findsOneWidget);
+
+      final titleRectOnDetail = tester.getRect(headerTitle);
+      final backRect = tester.getRect(backButton);
+      expect(backRect.center.dy, closeTo(titleRectOnDetail.center.dy, 1.0));
+      expect(backRect.right, lessThanOrEqualTo(titleRectOnDetail.left));
+
+      await tester.tap(backButton);
+      await tester.pumpAndSettle();
+
+      expect(backButton, findsNothing);
+      expect(refreshButton, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Finder _posterFrameFinder(String id) =>

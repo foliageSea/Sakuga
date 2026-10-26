@@ -9,6 +9,7 @@ import '../core/settings/settings.dart';
 import '../core/window/desktop_window.dart';
 import '../features/detail/detail_page.dart';
 import '../features/home/home_providers.dart';
+import '../features/library/library_providers.dart';
 import '../shared/language_options.dart';
 import '../shared/localization.dart';
 import '../shared/poster_background.dart';
@@ -19,12 +20,14 @@ class AppShell extends ConsumerWidget {
     required this.shell,
     this.backLocation,
     this.isHomeRoute = false,
+    this.isLibraryRootRoute = false,
     this.detailBackgroundSpec,
     super.key,
   });
   final StatefulNavigationShell shell;
   final String? backLocation;
   final bool isHomeRoute;
+  final bool isLibraryRootRoute;
   final DetailBackgroundSpec? detailBackgroundSpec;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,6 +38,13 @@ class AppShell extends ConsumerWidget {
         : isHomeRoute
         ? watchHomePosterBackground(ref)
         : null;
+    final activeServer = isLibraryRootRoute
+        ? ref.watch(activeServerProvider)
+        : null;
+    final canRefreshLibrary =
+        isLibraryRootRoute &&
+        activeServer != null &&
+        activeServer.apiKey.isNotEmpty;
     final l = context.l10n;
     final labels = [l.home, l.library, l.search, l.downloads, l.settings];
     const icons = [
@@ -61,6 +71,7 @@ class AppShell extends ConsumerWidget {
           listenable: window,
           builder: (context, _) => WindowPosterBackgroundScope(
             active: posterBackground != null,
+            shellHosted: true,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -255,10 +266,76 @@ class AppShell extends ConsumerWidget {
                                         ],
                                       )
                                     : mobile
-                                    ? FHeader(
-                                        title: _HeaderTitle(
-                                          labels[shell.currentIndex],
-                                        ),
+                                    ? Builder(
+                                        builder: (headerContext) {
+                                          final pad = pagePadding(
+                                            headerContext,
+                                          );
+                                          return FHeader(
+                                            key: const ValueKey(
+                                              'mobile-header',
+                                            ),
+                                            style: .delta(
+                                              padding: .value(
+                                                EdgeInsets.fromLTRB(
+                                                  pad,
+                                                  8,
+                                                  pad,
+                                                  10,
+                                                ),
+                                              ),
+                                            ),
+                                            title: Row(
+                                              children: [
+                                                if (detailBackgroundSpec !=
+                                                    null) ...[
+                                                  FButton.icon(
+                                                    key: const ValueKey(
+                                                      'detail-back',
+                                                    ),
+                                                    variant: .outline,
+                                                    size: .sm,
+                                                    style:
+                                                        detailOutlineButtonStyle(
+                                                          headerContext,
+                                                        ),
+                                                    semanticsLabel: l.back,
+                                                    onPress: () =>
+                                                        popDetailRoute(
+                                                          headerContext,
+                                                        ),
+                                                    child: const Icon(
+                                                      FLucideIcons.arrowLeft,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                ],
+                                                Expanded(
+                                                  child: _HeaderTitle(
+                                                    labels[shell.currentIndex],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            suffixes: [
+                                              if (canRefreshLibrary)
+                                                FButton.icon(
+                                                  key: const ValueKey(
+                                                    'library-refresh',
+                                                  ),
+                                                  variant: .outline,
+                                                  size: .sm,
+                                                  semanticsLabel: l.refresh,
+                                                  onPress: () => ref.invalidate(
+                                                    libraryViewsProvider,
+                                                  ),
+                                                  child: const Icon(
+                                                    FLucideIcons.refreshCw,
+                                                  ),
+                                                ),
+                                            ],
+                                          );
+                                        },
                                       )
                                     : null,
                                 footer: mobile
