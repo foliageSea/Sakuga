@@ -1,7 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
-import '../core/images/disk_image_cache.dart';
+import '../core/images/artwork_cache.dart';
 import '../data/jellyfin/jellyfin_client.dart';
 import '../data/jellyfin/jellyfin_models.dart';
 import 'widgets.dart';
@@ -25,25 +26,15 @@ class MediaImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = this.url;
     if (url == null) return MediaPlaceholder(icon: icon);
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        MediaPlaceholder(icon: icon),
-        Image(
-          image: DiskCachedImage(url, headers: headers),
-          fit: fit,
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            if (wasSynchronouslyLoaded) return child;
-            return AnimatedOpacity(
-              opacity: frame == null ? 0 : 1,
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              child: child,
-            );
-          },
-          errorBuilder: (_, _, _) => const SizedBox.shrink(),
-        ),
-      ],
+    return CachedNetworkImage(
+      imageUrl: url,
+      httpHeaders: headers,
+      cacheManager: ArtworkCacheManager.instance,
+      fit: fit,
+      fadeInDuration: const Duration(milliseconds: 200),
+      fadeOutDuration: Duration.zero,
+      placeholder: (_, _) => MediaPlaceholder(icon: icon),
+      errorWidget: (_, _, _) => MediaPlaceholder(icon: icon),
     );
   }
 }
