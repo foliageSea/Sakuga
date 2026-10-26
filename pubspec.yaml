@@ -1,0 +1,58 @@
+name: sakuga
+description: A Jellyfin client for macOS and Android with Anime4K super resolution.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.13.0 <4.0.0'
+  flutter: '>=3.47.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  forui: 0.27.5
+  forui_lucide: 0.27.0
+  material_ui: ^1.6.0
+  flutter_riverpod: 3.4.3
+  go_router: ^18.0.2
+  dio: ^5.11.1
+  shared_preferences: ^2.5.6
+  window_manager: ^0.5.2
+  logging: ^1.3.0
+  stack_trace: ^1.12.2
+  path_provider: ^2.1.6
+  archive: ^4.5.1
+  file_selector: ^1.1.0
+  share_plus: ^12.0.2
+  url_launcher: ^6.3.3
+  package_info_plus: ^8.3.1
+  intl: ^0.20.3
+  media_kit:
+    git:
+      url: https://github.com/Predidit/media-kit.git
+      ref: 83b7ca63772856e1ea0158916177e136f7b7b0be
+      path: ./media_kit
+  media_kit_video:
+    git:
+      url: https://github.com/Predidit/media-kit.git
+      ref: 83b7ca63772856e1ea0158916177e136f7b7b0be
+      path: ./media_kit_video
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  generate: true
+  uses-material-design: true
+  assets:
+    - assets/shaders/
+  fonts:
+    - family: MiSans
+      fonts:
+        - asset: assets/MiSans-Regular.ttf

@@ -1,0 +1,512 @@
+import 'package:flutter/widgets.dart';
+import 'package:material_ui/material_ui.dart' show ThemeMode;
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:forui/forui.dart';
+
+import '../core/settings/settings.dart';
+import '../core/window/desktop_window.dart';
+import '../shared/language_options.dart';
+import '../shared/localization.dart';
+import '../shared/widgets.dart';
+
+class AppShell extends ConsumerWidget {
+  const AppShell({required this.shell, this.backLocation, super.key});
+  final StatefulNavigationShell shell;
+  final String? backLocation;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final window = ref.watch(desktopWindowProvider);
+    final settings = ref.watch(settingsProvider);
+    final l = context.l10n;
+    final labels = [l.home, l.library, l.search, l.downloads, l.settings];
+    const icons = [
+      FLucideIcons.house,
+      FLucideIcons.film,
+      FLucideIcons.search,
+      FLucideIcons.download,
+      FLucideIcons.settings2,
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final mobile = constraints.maxWidth < mobileBreakpoint;
+        final compact = constraints.maxWidth < 1024 || settings.compactSidebar;
+        return ListenableBuilder(
+          listenable: window,
+          builder: (context, _) => ColoredBox(
+            color: context.theme.colors.background,
+            child: SafeArea(
+              top: !window.available,
+              child: Column(
+                children: [
+                  if (window.available && !window.fullScreen)
+                    DesktopTitleBar(
+                      controller: window,
+                      compactSidebar: settings.compactSidebar,
+                      onToggleCompactSidebar: () async {
+                        try {
+                          await ref
+                              .read(settingsProvider.notifier)
+                              .update(
+                                (value) => value.copyWith(
+                                  compactSidebar: !value.compactSidebar,
+                                ),
+                              );
+                        } catch (error) {
+                          if (context.mounted) {
+                            notifyUser(context, failureMessage(context, error));
+                          }
+                        }
+                      },
+                      language: settings.language,
+                      onLanguageChanged: (language) => _update(
+                        context,
+                        ref,
+                        (value) => value.copyWith(language: language),
+                      ),
+                      onToggleTheme: () => _update(
+                        context,
+                        ref,
+                        (value) => value.copyWith(
+                          themeMode:
+                              context.theme.colors.brightness == Brightness.dark
+                              ? ThemeMode.light
+                              : ThemeMode.dark,
+                        ),
+                      ),
+                    ),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          width: mobile
+                              ? 0
+                              : compact
+                              ? 76
+                              : 240,
+                          child: mobile
+                              ? null
+                              : FSidebar(
+                                  style: .delta(
+                                    constraints: BoxConstraints.tightFor(
+                                      width: compact ? 76 : 240,
+                                    ),
+                                  ),
+                                  header: SizedBox(
+                                    width: double.infinity,
+                                    child: Padding(
+                                      padding: EdgeInsets.fromLTRB(
+                                        compact ? 16 : 24,
+                                        20,
+                                        compact ? 16 : 24,
+                                        24,
+                                      ),
+                                      child: Align(
+                                        alignment: compact
+                                            ? Alignment.center
+                                            : Alignment.centerLeft,
+                                        child: compact
+                                            ? const Icon(
+                                                FLucideIcons.film,
+                                                size: 26,
+                                              )
+                                            : Text(
+                                                'SAKUGA',
+                                                key: const ValueKey(
+                                                  'sidebar-logo',
+                                                ),
+                                                style: context
+                                                    .theme
+                                                    .typography
+                                                    .display
+                                                    .md
+                                                    .copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      letterSpacing: 3,
+                                                    ),
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                                  children: [
+                                    FSidebarGroup(
+                                      children: [
+                                        for (var i = 0; i < labels.length; i++)
+                                          FSidebarItem(
+                                            icon: Icon(
+                                              icons[i],
+                                              semanticLabel: compact
+                                                  ? labels[i]
+                                                  : null,
+                                            ),
+                                            label: compact
+                                                ? null
+                                                : Text(labels[i]),
+                                            selected: shell.currentIndex == i,
+                                            onPress: () => shell.goBranch(i),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                        ),
+                        Expanded(
+                          child: FScaffold(
+                            childPad: false,
+                            header: backLocation != null
+                                ? FHeader.nested(
+                                    title: Text(labels[shell.currentIndex]),
+                                    titleAlignment:
+                                        AlignmentDirectional.centerStart,
+                                    prefixes: [
+                                      FHeaderAction.back(
+                                        key: const ValueKey('appbar-back'),
+                                        semanticsLabel: l.back,
+                                        semanticsTooltip: l.back,
+                                        onPress: () {
+                                          if (context.canPop()) {
+                                            context.pop();
+                                          } else {
+                                            context.go(backLocation!);
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  )
+                                : mobile
+                                ? FHeader(
+                                    title: _HeaderTitle(
+                                      labels[shell.currentIndex],
+                                    ),
+                                  )
+                                : null,
+                            footer: mobile
+                                ? FBottomNavigationBar(
+                                    index: shell.currentIndex,
+                                    onChange: shell.goBranch,
+                                    children: [
+                                      for (var i = 0; i < labels.length; i++)
+                                        FBottomNavigationBarItem(
+                                          icon: Icon(icons[i]),
+                                          label: Text(labels[i]),
+                                        ),
+                                    ],
+                                  )
+                                : null,
+                            child: shell,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+Future<void> _update(
+  BuildContext context,
+  WidgetRef ref,
+  AppSettings Function(AppSettings) transform,
+) async {
+  try {
+    await ref.read(settingsProvider.notifier).update(transform);
+  } catch (error) {
+    if (context.mounted) notifyUser(context, failureMessage(context, error));
+  }
+}
+
+/// Fades the mobile header title between the branch labels, matching the
+/// transition of the page below it instead of swapping the text abruptly.
+class _HeaderTitle extends StatelessWidget {
+  const _HeaderTitle(this.label);
+  final String label;
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 180),
+    // The header stretches the title to the full width of an Expanded. The
+    // default switcher layout centres its children, which would centre the
+    // title, so keep the incoming and outgoing labels start aligned.
+    layoutBuilder: (current, previous) => Stack(
+      alignment: AlignmentDirectional.centerStart,
+      children: [...previous, ?current],
+    ),
+    child: Text(label, key: ValueKey(label)),
+  );
+}
+
+class DesktopTitleBar extends StatelessWidget {
+  const DesktopTitleBar({
+    required this.controller,
+    this.compactSidebar = false,
+    this.onToggleCompactSidebar,
+    this.language = 'system',
+    this.onLanguageChanged,
+    this.onToggleTheme,
+    super.key,
+  });
+  final DesktopWindowController controller;
+  final bool compactSidebar;
+  final Future<void> Function()? onToggleCompactSidebar;
+  final String language;
+  final Future<void> Function(String language)? onLanguageChanged;
+  final Future<void> Function()? onToggleTheme;
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: context.theme.colors.border)),
+      ),
+      child: Row(
+        children: [
+          if (controller.macOS) ...[
+            const SizedBox(width: 12),
+            _MacWindowButton(
+              key: const ValueKey('mac-close'),
+              label: l.close,
+              color: const Color(0xffff5f57),
+              callback: controller.close,
+            ),
+            _MacWindowButton(
+              key: const ValueKey('mac-minimize'),
+              label: l.minimize,
+              color: const Color(0xffffbd2e),
+              callback: controller.minimize,
+            ),
+            _MacWindowButton(
+              key: const ValueKey('mac-maximize'),
+              label: controller.maximized ? l.restore : l.maximize,
+              color: const Color(0xff28c840),
+              callback: controller.toggleMaximize,
+            ),
+            const SizedBox(width: 12),
+          ],
+          if (onToggleCompactSidebar != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: FButton.icon(
+                key: const ValueKey('toggle-compact-sidebar'),
+                variant: .ghost,
+                size: .xs,
+                semanticsLabel: l.compactSidebar,
+                onPress: onToggleCompactSidebar,
+                child: Icon(
+                  compactSidebar
+                      ? FLucideIcons.panelLeftOpen
+                      : FLucideIcons.panelLeftClose,
+                  size: 16,
+                ),
+              ),
+            ),
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanStart: (_) => controller.drag(),
+              onDoubleTap: controller.toggleMaximize,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    l.appTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.theme.typography.body.sm.copyWith(
+                      color: controller.focused
+                          ? context.theme.colors.foreground
+                          : context.theme.colors.mutedForeground,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (onLanguageChanged != null)
+            _LanguageMenu(
+              key: const ValueKey('language-menu'),
+              label: l.language,
+              language: language,
+              onChanged: onLanguageChanged!,
+            ),
+          if (onToggleTheme != null)
+            _TitleAction(
+              key: const ValueKey('toggle-theme'),
+              label: l.theme,
+              icon: context.theme.colors.brightness == Brightness.dark
+                  ? FLucideIcons.sun
+                  : FLucideIcons.moon,
+              callback: onToggleTheme!,
+            ),
+          if (!controller.macOS) ...[
+            _WindowButton(l.minimize, FLucideIcons.minus, controller.minimize),
+            _WindowButton(
+              controller.maximized ? l.restore : l.maximize,
+              controller.maximized ? FLucideIcons.copy : FLucideIcons.square,
+              controller.toggleMaximize,
+            ),
+            _WindowButton(l.close, FLucideIcons.x, controller.close),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TitleAction extends StatelessWidget {
+  const _TitleAction({
+    required this.label,
+    required this.icon,
+    required this.callback,
+    super.key,
+  });
+  final String label;
+  final IconData icon;
+  final Future<void> Function() callback;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: FButton.icon(
+      variant: .ghost,
+      size: .xs,
+      semanticsLabel: label,
+      onPress: callback,
+      child: Icon(icon, size: 16),
+    ),
+  );
+}
+
+class _LanguageMenu extends StatelessWidget {
+  const _LanguageMenu({
+    required this.label,
+    required this.language,
+    required this.onChanged,
+    super.key,
+  });
+  final String label;
+  final String language;
+  final Future<void> Function(String language) onChanged;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: FPopoverMenu(
+      menuAnchor: Alignment.topRight,
+      childAnchor: Alignment.bottomRight,
+      menuBuilder: (context, controller, _) => [
+        FItemGroup(
+          children: [
+            for (final (value, text) in languageOptions(context))
+              FItem(
+                key: ValueKey('language-option-$value'),
+                title: Text(text),
+                selected: language == value,
+                suffix: language == value
+                    ? const Icon(FLucideIcons.check, size: 16)
+                    : null,
+                onPress: () {
+                  controller.hide();
+                  onChanged(value);
+                },
+              ),
+          ],
+        ),
+      ],
+      builder: (context, controller, _) => FButton.icon(
+        variant: .ghost,
+        size: .xs,
+        semanticsLabel: label,
+        onPress: controller.toggle,
+        child: const Icon(FLucideIcons.languages, size: 16),
+      ),
+    ),
+  );
+}
+
+class _WindowButton extends StatelessWidget {
+  const _WindowButton(this.label, this.icon, this.callback);
+  final String label;
+  final IconData icon;
+  final Future<void> Function() callback;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(4),
+    child: FButton.icon(
+      variant: .ghost,
+      semanticsLabel: label,
+      onPress: () async {
+        try {
+          await callback();
+        } catch (e) {
+          if (context.mounted) notifyUser(context, failureMessage(context, e));
+        }
+      },
+      child: Icon(icon, size: 16),
+    ),
+  );
+}
+
+class _MacWindowButton extends StatelessWidget {
+  const _MacWindowButton({
+    required this.label,
+    required this.color,
+    required this.callback,
+    super.key,
+  });
+  final String label;
+  final Color color;
+  final Future<void> Function() callback;
+  @override
+  Widget build(BuildContext context) {
+    void invoke() {
+      callback().catchError((error) {
+        if (context.mounted) {
+          notifyUser(context, failureMessage(context, error));
+        }
+      });
+    }
+
+    return Semantics(
+      button: true,
+      label: label,
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.basic,
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+          SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+        },
+        actions: {
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              invoke();
+              return null;
+            },
+          ),
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: invoke,
+          child: SizedBox(
+            width: 20,
+            height: 24,
+            child: Center(
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                child: const SizedBox(width: 12, height: 12),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
