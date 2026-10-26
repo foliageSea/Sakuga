@@ -139,6 +139,10 @@ class _MediaSection extends StatelessWidget {
   final AsyncValue<List<JellyfinItem>> items;
   final VoidCallback onRetry;
 
+  /// Portrait cards need more room; an all-episode row uses 16:9 stills.
+  static double _rowHeight(List<JellyfinItem> values) =>
+      values.every((item) => item.isEpisode) ? 250 : 320;
+
   @override
   Widget build(BuildContext context) {
     return items.when(
@@ -157,7 +161,7 @@ class _MediaSection extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               SizedBox(
-                height: 320,
+                height: _rowHeight(values),
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: values.length,
@@ -165,12 +169,16 @@ class _MediaSection extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final item = values[index];
                     final percentage = item.playedPercentage;
+                    final landscape = item.isEpisode;
                     return SizedBox(
-                      width: 160,
+                      width: landscape ? 260 : 160,
                       child: MediaPosterCard(
                         client: client,
                         item: item,
                         progress: percentage == null ? null : percentage / 100,
+                        aspectRatio: landscape
+                            ? item.thumbnailAspectRatio
+                            : null,
                         onTap: () => context.go('/library/${item.id}'),
                       ),
                     );

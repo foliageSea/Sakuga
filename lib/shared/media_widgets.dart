@@ -62,13 +62,17 @@ class MediaPlaceholder extends StatelessWidget {
   );
 }
 
-/// A 2:3 poster card with title, optional subtitle and watch progress.
+/// A poster card with title, optional subtitle and watch progress.
+///
+/// Defaults to a 2:3 poster frame; pass [aspectRatio] to use the scraped shape
+/// instead, e.g. a 16:9 still for episodes.
 class MediaPosterCard extends StatelessWidget {
   const MediaPosterCard({
     required this.client,
     required this.item,
     required this.onTap,
     this.progress,
+    this.aspectRatio,
     super.key,
   });
 
@@ -78,6 +82,9 @@ class MediaPosterCard extends StatelessWidget {
 
   /// Watched fraction between 0 and 1, drawn as a thin bar under the poster.
   final double? progress;
+
+  /// Frame shape; defaults to 2:3.
+  final double? aspectRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +105,7 @@ class MediaPosterCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 AspectRatio(
-                  aspectRatio: 2 / 3,
+                  aspectRatio: aspectRatio ?? 2 / 3,
                   child: ClipRRect(
                     borderRadius: theme.style.borderRadius.md,
                     child: MediaImage(
