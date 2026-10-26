@@ -153,10 +153,6 @@ class _MediaSection extends StatelessWidget {
   final VoidCallback onRetry;
   final ValueChanged<JellyfinItem> onTap;
 
-  /// Portrait cards need more room; an all-episode row uses 16:9 stills.
-  static double _rowHeight(List<JellyfinItem> values) =>
-      values.every((item) => item.isEpisode) ? 250 : 320;
-
   @override
   Widget build(BuildContext context) {
     return items.when(
@@ -174,29 +170,36 @@ class _MediaSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                height: _rowHeight(values),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: values.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final item = values[index];
-                    final percentage = item.playedPercentage;
-                    final landscape = item.isEpisode;
-                    return SizedBox(
-                      width: landscape ? 260 : 160,
-                      child: MediaPosterCard(
-                        client: client,
-                        item: item,
-                        progress: percentage == null ? null : percentage / 100,
-                        aspectRatio: landscape
-                            ? item.thumbnailAspectRatio
-                            : null,
-                        onTap: () => onTap(item),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var index = 0; index < values.length; index++) ...[
+                      if (index > 0) const SizedBox(width: 12),
+                      Builder(
+                        builder: (context) {
+                          final item = values[index];
+                          final percentage = item.playedPercentage;
+                          final landscape = item.isEpisode;
+                          return SizedBox(
+                            width: landscape ? 260 : 160,
+                            child: MediaPosterCard(
+                              client: client,
+                              item: item,
+                              progress: percentage == null
+                                  ? null
+                                  : percentage / 100,
+                              aspectRatio: landscape
+                                  ? item.thumbnailAspectRatio
+                                  : null,
+                              onTap: () => onTap(item),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
+                    ],
+                  ],
                 ),
               ),
             ],

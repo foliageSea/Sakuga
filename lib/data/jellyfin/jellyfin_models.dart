@@ -76,6 +76,7 @@ class JellyfinItem {
     this.officialRating,
     this.communityRating,
     this.productionYear,
+    this.runTimeTicks,
     this.childCount,
     this.recursiveItemCount,
   });
@@ -108,6 +109,7 @@ class JellyfinItem {
   final String? officialRating;
   final double? communityRating;
   final int? productionYear;
+  final int? runTimeTicks;
 
   /// Direct children: seasons for a series, episodes for a season.
   final int? childCount;
@@ -123,6 +125,47 @@ class JellyfinItem {
   double? get playedPercentage {
     final value = userData?['PlayedPercentage'];
     return value is num ? value.toDouble() : null;
+  }
+
+  JellyfinItem withPlaybackPosition(int positionTicks) {
+    final data = <String, dynamic>{
+      ...?userData,
+      'PlaybackPositionTicks': positionTicks,
+    };
+    final runtime = runTimeTicks;
+    if (runtime != null && runtime > 0) {
+      data['PlayedPercentage'] = (positionTicks * 100 / runtime).clamp(
+        0.0,
+        100.0,
+      );
+    }
+    return JellyfinItem(
+      id: id,
+      name: name,
+      type: type,
+      imageTags: imageTags,
+      seriesId: seriesId,
+      seriesName: seriesName,
+      seasonId: seasonId,
+      indexNumber: indexNumber,
+      parentIndexNumber: parentIndexNumber,
+      userData: data,
+      parentPrimaryImageItemId: parentPrimaryImageItemId,
+      parentPrimaryImageTag: parentPrimaryImageTag,
+      seriesPrimaryImageTag: seriesPrimaryImageTag,
+      primaryImageAspectRatio: primaryImageAspectRatio,
+      backdropImageTags: backdropImageTags,
+      overview: overview,
+      genres: genres,
+      studios: studios,
+      people: people,
+      officialRating: officialRating,
+      communityRating: communityRating,
+      productionYear: productionYear,
+      runTimeTicks: runTimeTicks,
+      childCount: childCount,
+      recursiveItemCount: recursiveItemCount,
+    );
   }
 
   /// Title to show on a card: the series for episodes, the item itself
@@ -151,6 +194,13 @@ class JellyfinItem {
   double get thumbnailAspectRatio {
     final ratio = primaryImageAspectRatio;
     if (ratio == null || ratio < 0.5 || ratio > 3) return 16 / 9;
+    return ratio;
+  }
+
+  /// Scraped poster shape, falling back to a conventional 2:3 poster.
+  double get posterAspectRatio {
+    final ratio = primaryImageAspectRatio;
+    if (ratio == null || ratio < 0.5 || ratio > 3) return 2 / 3;
     return ratio;
   }
 
@@ -204,6 +254,7 @@ class JellyfinItem {
       officialRating: json['OfficialRating'] as String?,
       communityRating: (json['CommunityRating'] as num?)?.toDouble(),
       productionYear: (json['ProductionYear'] as num?)?.toInt(),
+      runTimeTicks: (json['RunTimeTicks'] as num?)?.toInt(),
       childCount: (json['ChildCount'] as num?)?.toInt(),
       recursiveItemCount: (json['RecursiveItemCount'] as num?)?.toInt(),
     );

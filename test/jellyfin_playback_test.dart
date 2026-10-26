@@ -67,22 +67,129 @@ void main() {
         {
           'Id': 'media-source',
           'SupportsDirectPlay': false,
-          'TranscodingUrl':
-              '/Videos/item-1/master.m3u8?MediaSourceId=source&token=value',
+          'TranscodingSubProtocol': 'hls',
+          'TranscodingUrl': '/Videos/item-1/master.m3u8?MediaSourceId=source&token=value&StartTimeTicks=150000000',
         },
       ],
     });
     final client = JellyfinClient(server: server, dio: _dio(adapter));
 
-    final source = await client.playbackSource('user-1', 'item-1');
+    final source = await client.playbackSource(
+      'user-1',
+      'item-1',
+      startTimeTicks: 150000000,
+    );
 
     expect(
       source.url,
       'https://media.example/jellyfin/Videos/item-1/master.m3u8'
-      '?MediaSourceId=source&token=value',
+      '?MediaSourceId=source&token=value&StartTimeTicks=150000000',
     );
     expect(source.startPosition, Duration.zero);
+    expect(source.initialPosition, const Duration(seconds: 15));
+    expect(source.positionOffset, Duration.zero);
+    expect(source.session.playMethod, JellyfinPlayMethod.transcode);
+    expect(adapter.lastBody['StartTimeTicks'], 150000000);
   });
+
+  test('offsets zero-based non-HLS transcoding progress', () async {
+    final adapter = _PlaybackAdapter({
+      'MediaSources': [
+        {
+          'Id': 'media-source',
+          'SupportsDirectPlay': false,
+          'TranscodingSubProtocol': 'http',
+          'TranscodingUrl': '/Videos/item-1/stream.ts?StartTimeTicks=90000000',
+        },
+      ],
+    });
+    final client = JellyfinClient(server: server, dio: _dio(adapter));
+
+    final source = await client.playbackSource(
+      'user-1',
+      'item-1',
+      startTimeTicks: 90000000,
+    );
+
+    expect(source.startPosition, Duration.zero);
+    expect(source.initialPosition, const Duration(seconds: 9));
+    expect(source.positionOffset, const Duration(seconds: 9));
+  });
+
+  test(
+    'reports playback start, progress and stop with session metadata',
+    () async {
+      final adapter = _PlaybackAdapter({
+        'PlaySessionId': 'play-session',
+        'MediaSources': [
+          {'Id': 'media-source', 'SupportsDirectPlay': true},
+        ],
+      });
+      final client = JellyfinClient(server: server, dio: _dio(adapter));
+      final source = await client.playbackSource('user-1', 'item-1');
+
+      await client.reportPlaybackStarted(
+        source.session,
+        positionTicks: 10000000,
+        isPaused: false,
+        volume: 75,
+      );
+      await client.reportPlaybackProgress(
+        source.session,
+        positionTicks: 20000000,
+        isPaused: true,
+        volume: 0,
+      );
+      await client.reportPlaybackStopped(
+        source.session,
+        positionTicks: 30000000,
+        failed: false,
+        volume: 50,
+      );
+      await client.updatePlaybackPosition(
+        'user-1',
+        'item-1',
+        positionTicks: 30000000,
+      );
+
+      expect(
+        adapter.requests.map((request) => request.path),
+        containsAllInOrder([
+          '/Items/item-1/PlaybackInfo',
+          '/Sessions/Playing',
+          '/Sessions/Playing/Progress',
+          '/Sessions/Playing/Stopped',
+          '/UserItems/item-1/UserData',
+        ]),
+      );
+      final started = adapter.requests[1].data as Map<String, dynamic>;
+      expect(adapter.requests[1].connectTimeout, const Duration(seconds: 3));
+      expect(adapter.requests[1].receiveTimeout, const Duration(seconds: 3));
+      expect(started['ItemId'], 'item-1');
+      expect(started['MediaSourceId'], 'media-source');
+      expect(started['PlaySessionId'], 'play-session');
+      expect(started['PositionTicks'], 10000000);
+      expect(started['PlayMethod'], 'DirectPlay');
+      expect(started['IsPaused'], isFalse);
+      expect(started['VolumeLevel'], 75);
+
+      final progress = adapter.requests[2].data as Map<String, dynamic>;
+      expect(progress['PositionTicks'], 20000000);
+      expect(progress['IsPaused'], isTrue);
+      expect(progress['IsMuted'], isTrue);
+
+      final stopped = adapter.requests[3].data as Map<String, dynamic>;
+      expect(stopped['PositionTicks'], 30000000);
+      expect(stopped['Failed'], isFalse);
+
+      final userData = adapter.requests[4];
+      expect(userData.queryParameters['userId'], 'user-1');
+      expect(
+        (userData.data as Map<String, dynamic>)['PlaybackPositionTicks'],
+        30000000,
+      );
+    },
+  );
 }
 
 Dio _dio(HttpClientAdapter adapter) => Dio(
@@ -103,6 +210,7 @@ class _PlaybackAdapter implements HttpClientAdapter {
   String? lastPath;
   Map<String, dynamic> lastQuery = const {};
   Map<String, dynamic> lastBody = const {};
+  final List<RequestOptions> requests = [];
 
   @override
   Future<ResponseBody> fetch(
@@ -110,15 +218,17 @@ class _PlaybackAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    requests.add(options);
     lastPath = options.path;
     lastQuery = options.queryParameters;
     final body = options.data;
     lastBody = body is Map<String, dynamic> ? body : const {};
+    final playbackInfo = options.path.endsWith('/PlaybackInfo');
     return ResponseBody.fromString(
-      jsonEncode(response),
-      200,
+      playbackInfo ? jsonEncode(response) : '',
+      playbackInfo ? 200 : 204,
       headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
+        if (playbackInfo) Headers.contentTypeHeader: [Headers.jsonContentType],
       },
     );
   }

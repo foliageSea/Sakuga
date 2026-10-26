@@ -121,7 +121,7 @@ class MediaPosterCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   item.displayTitle,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.typography.body.sm,
                 ),

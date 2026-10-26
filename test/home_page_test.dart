@@ -14,6 +14,7 @@ import 'package:sakuga/features/home/home_page.dart';
 import 'package:sakuga/features/home/home_providers.dart';
 import 'package:sakuga/features/library/library_providers.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
+import 'package:sakuga/shared/widgets.dart';
 
 import 'fakes.dart';
 
@@ -154,6 +155,40 @@ void main() {
     await _tapCard(tester, 'Recent Series');
 
     expect(find.text('detail:series-2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('media cards wrap their content without fixed blank space', (
+    tester,
+  ) async {
+    await pumpHome(tester);
+
+    final continueCard = find
+        .ancestor(
+          of: find.text('Resumed Series'),
+          matching: find.byType(Surface),
+        )
+        .first;
+    final recentCard = find
+        .ancestor(
+          of: find.text('Recent Series'),
+          matching: find.byType(Surface),
+        )
+        .first;
+
+    expect(tester.getSize(continueCard).height, lessThan(240));
+    expect(tester.getSize(recentCard).height, lessThan(310));
+    final titles = tester
+        .widgetList<Text>(find.byType(Text))
+        .where(
+          (text) =>
+              text.data == 'Resumed Series' || text.data == 'Recent Series',
+        );
+    expect(titles, isNotEmpty);
+    for (final title in titles) {
+      expect(title.maxLines, 1);
+      expect(title.overflow, TextOverflow.ellipsis);
+    }
     expect(tester.takeException(), isNull);
   });
 }

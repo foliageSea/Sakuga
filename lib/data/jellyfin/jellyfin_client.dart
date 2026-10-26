@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 
 import '../../core/app_exception.dart';
@@ -5,6 +7,8 @@ import 'jellyfin_models.dart';
 import 'server_profile.dart';
 
 class JellyfinClient {
+  static const _playbackReportTimeout = Duration(seconds: 3);
+
   JellyfinClient({required this.server, Dio? dio})
     : _dio =
           dio ??
@@ -23,7 +27,8 @@ class JellyfinClient {
 
   /// Fields shared by every browse request: scraped image metadata plus the
   /// per-user playback state.
-  static const _itemFields = 'PrimaryImageAspectRatio,ImageTags,UserData';
+  static const _itemFields =
+      'RunTimeTicks,PrimaryImageAspectRatio,ImageTags,UserData';
 
   Map<String, String> get authHeaders => _headers(server.apiKey);
 
@@ -76,6 +81,16 @@ class JellyfinClient {
           entry.key.toString(): entry.value.toString(),
     };
     final subtitles = _subtitleSources(source);
+    final session = JellyfinPlaybackSession(
+      itemId: itemId,
+      mediaSourceId: mediaSourceId,
+      playSessionId: playSessionId,
+      playMethod: source['SupportsDirectPlay'] == true
+          ? JellyfinPlayMethod.directPlay
+          : (source['TranscodingUrl'] as String?)?.isNotEmpty == true
+          ? JellyfinPlayMethod.transcode
+          : JellyfinPlayMethod.directStream,
+    );
 
     if (source['SupportsDirectPlay'] == true) {
       return JellyfinPlaybackSource(
@@ -90,15 +105,24 @@ class JellyfinClient {
         headers: headers,
         startPosition: _durationFromTicks(startTimeTicks),
         subtitles: subtitles,
+        session: session,
       );
     }
 
     final transcodingUrl = source['TranscodingUrl'] as String?;
     if (transcodingUrl != null && transcodingUrl.isNotEmpty) {
+      final transcodeOffset =
+          source['TranscodingSubProtocol']?.toString().toLowerCase() == 'hls' ||
+              _queryFlag(transcodingUrl, 'CopyTimestamps')
+          ? Duration.zero
+          : _durationFromTicks(startTimeTicks);
       return JellyfinPlaybackSource(
         url: _absoluteUrl(transcodingUrl),
         headers: headers,
+        initialPosition: _durationFromTicks(startTimeTicks),
+        positionOffset: transcodeOffset,
         subtitles: subtitles,
+        session: session,
       );
     }
 
@@ -115,10 +139,120 @@ class JellyfinClient {
         headers: headers,
         startPosition: _durationFromTicks(startTimeTicks),
         subtitles: subtitles,
+        session: session,
       );
     }
 
     throw const AppException(FailureKind.invalidData, 'No playable source');
+  }
+
+  Future<void> reportPlaybackStarted(
+    JellyfinPlaybackSession session, {
+    required int positionTicks,
+    required bool isPaused,
+    double volume = 100,
+  }) => _reportPlayback(
+    '/Sessions/Playing',
+    session,
+    positionTicks: positionTicks,
+    isPaused: isPaused,
+    volume: volume,
+  );
+
+  Future<void> reportPlaybackProgress(
+    JellyfinPlaybackSession session, {
+    required int positionTicks,
+    required bool isPaused,
+    double volume = 100,
+  }) => _reportPlayback(
+    '/Sessions/Playing/Progress',
+    session,
+    positionTicks: positionTicks,
+    isPaused: isPaused,
+    volume: volume,
+  );
+
+  Future<void> reportPlaybackStopped(
+    JellyfinPlaybackSession session, {
+    required int positionTicks,
+    required bool failed,
+    double volume = 100,
+  }) => _reportPlayback(
+    '/Sessions/Playing/Stopped',
+    session,
+    positionTicks: positionTicks,
+    isPaused: true,
+    volume: volume,
+    failed: failed,
+  );
+
+  /// Persists resume progress for an explicit user. Session playback reports
+  /// cannot infer a user when the client authenticates with an API key.
+  Future<void> updatePlaybackPosition(
+    String userId,
+    String itemId, {
+    required int positionTicks,
+  }) => _postPlaybackUpdate(
+    '/UserItems/$itemId/UserData',
+    queryParameters: {'userId': userId},
+    data: {
+      'PlaybackPositionTicks': positionTicks,
+      'LastPlayedDate': DateTime.now().toUtc().toIso8601String(),
+    },
+  );
+
+  Future<void> _postPlaybackUpdate(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Object? data,
+  }) async {
+    final cancelToken = CancelToken();
+    try {
+      await _dio
+          .post<void>(
+            path,
+            queryParameters: queryParameters,
+            data: data,
+            cancelToken: cancelToken,
+            options: Options(
+              connectTimeout: _playbackReportTimeout,
+              sendTimeout: _playbackReportTimeout,
+              receiveTimeout: _playbackReportTimeout,
+            ),
+          )
+          .timeout(_playbackReportTimeout);
+    } on TimeoutException {
+      cancelToken.cancel('Playback update timed out');
+      rethrow;
+    }
+  }
+
+  Future<void> _reportPlayback(
+    String path,
+    JellyfinPlaybackSession session, {
+    required int positionTicks,
+    required bool isPaused,
+    required double volume,
+    bool? failed,
+  }) async {
+    await _postPlaybackUpdate(
+      path,
+      data: {
+        'ItemId': session.itemId,
+        if (session.mediaSourceId.isNotEmpty)
+          'MediaSourceId': session.mediaSourceId,
+        if (session.playSessionId.isNotEmpty)
+          'PlaySessionId': session.playSessionId,
+        'PositionTicks': positionTicks,
+        'IsPaused': isPaused,
+        'IsMuted': volume <= 0,
+        'VolumeLevel': volume.round().clamp(0, 100),
+        'CanSeek': true,
+        'PlayMethod': session.playMethod.apiValue,
+        'RepeatMode': 'RepeatNone',
+        'Failed': ?failed,
+      },
+    );
   }
 
   static Map<String, String> _headers(String apiKey) => {
@@ -401,6 +535,16 @@ class JellyfinClient {
   static Duration _durationFromTicks(int ticks) =>
       Duration(microseconds: ticks ~/ 10);
 
+  static bool _queryFlag(String url, String name) {
+    final parameters = Uri.parse(url).queryParameters;
+    for (final entry in parameters.entries) {
+      if (entry.key.toLowerCase() == name.toLowerCase()) {
+        return entry.value.toLowerCase() == 'true';
+      }
+    }
+    return false;
+  }
+
   List<JellyfinSubtitleSource> _subtitleSources(Map<String, dynamic> source) =>
       (source['MediaStreams'] as List? ?? const [])
           .whereType<Map<String, dynamic>>()
@@ -456,14 +600,49 @@ class JellyfinPlaybackSource {
   const JellyfinPlaybackSource({
     required this.url,
     required this.headers,
+    required this.session,
     this.startPosition = Duration.zero,
+    Duration? initialPosition,
+    this.positionOffset = Duration.zero,
     this.subtitles = const [],
-  });
+  }) : initialPosition = initialPosition ?? startPosition;
 
   final String url;
   final Map<String, String> headers;
+  final JellyfinPlaybackSession session;
+
+  /// Position requested during playback negotiation, in the original item.
+  final Duration initialPosition;
+
+  /// Added to a zero-based transcoded stream position when reporting progress.
+  final Duration positionOffset;
+
+  /// Position to seek in the opened stream. Transcoded URLs already encode it.
   final Duration startPosition;
   final List<JellyfinSubtitleSource> subtitles;
+}
+
+enum JellyfinPlayMethod {
+  directPlay('DirectPlay'),
+  directStream('DirectStream'),
+  transcode('Transcode');
+
+  const JellyfinPlayMethod(this.apiValue);
+  final String apiValue;
+}
+
+class JellyfinPlaybackSession {
+  const JellyfinPlaybackSession({
+    required this.itemId,
+    required this.mediaSourceId,
+    required this.playSessionId,
+    required this.playMethod,
+  });
+
+  final String itemId;
+  final String mediaSourceId;
+  final String playSessionId;
+  final JellyfinPlayMethod playMethod;
 }
 
 class JellyfinSubtitleSource {

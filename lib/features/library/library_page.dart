@@ -191,6 +191,15 @@ class _PagedGrid extends ConsumerWidget {
     if (state.items.isEmpty) {
       return SliverToBoxAdapter(child: EmptyNotice(context.l10n.noItems));
     }
+    if (isMobileLayout(context)) {
+      return SliverToBoxAdapter(
+        child: _MobileMasonryGrid(
+          client: client,
+          items: state.items,
+          onTap: onTap,
+        ),
+      );
+    }
     final columns = _columns(context);
     final rows = (state.items.length / columns).ceil();
     return SliverList(
@@ -227,6 +236,67 @@ class _PagedGrid extends ConsumerWidget {
         pagePadding(context) * 2;
     return ((width + 16) / (280 + 16)).floor().clamp(1, 4);
   }
+}
+
+class _MobileMasonryGrid extends StatelessWidget {
+  const _MobileMasonryGrid({
+    required this.client,
+    required this.items,
+    required this.onTap,
+  });
+
+  static const _spacing = 12.0;
+  static const _cardChromeHeight = 55.0;
+
+  final JellyfinClient client;
+  final List<JellyfinItem> items;
+  final ValueChanged<JellyfinItem> onTap;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final cardWidth = (constraints.maxWidth - _spacing) / 2;
+      final columns = <List<JellyfinItem>>[[], []];
+      final heights = [0.0, 0.0];
+      for (final item in items) {
+        final column = heights[0] <= heights[1] ? 0 : 1;
+        columns[column].add(item);
+        heights[column] +=
+            cardWidth / item.posterAspectRatio + _cardChromeHeight + _spacing;
+      }
+      return Row(
+        key: const ValueKey('library-mobile-masonry'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var column = 0; column < columns.length; column++) ...[
+            if (column > 0) const SizedBox(width: _spacing),
+            Expanded(
+              child: Column(
+                children: [
+                  for (
+                    var index = 0;
+                    index < columns[column].length;
+                    index++
+                  ) ...[
+                    if (index > 0) const SizedBox(height: _spacing),
+                    MediaPosterCard(
+                      key: ValueKey(
+                        'library-mobile-card-${columns[column][index].id}',
+                      ),
+                      client: client,
+                      item: columns[column][index],
+                      aspectRatio: columns[column][index].posterAspectRatio,
+                      onTap: () => onTap(columns[column][index]),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      );
+    },
+  );
 }
 
 class _PageFooter extends ConsumerWidget {
