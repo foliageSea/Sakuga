@@ -17,9 +17,9 @@ M0（工程基建与内核验证）进行中。当前已完成：
 待完成：
 
 - macOS arm64 构建与本地包（需 Mac/CI）。
-- 播放器空页面与全屏路由。
+- Linux 本地开发 runner 已加回；debug 构建与本地播放验证通过（WSLg 需 X11 + 软件 GL）。
 - 测试在 Linux 上受 media_kit native assets 编译问题阻塞（见 `docs/m0-status.md`）。
-- Android 真机运行验证（当前环境无设备/模拟器）。
+- macOS arm64 构建与 Android 真机运行验证（当前环境无 Mac/设备）。
 
 ## 开发
 
@@ -42,6 +42,38 @@ fvm flutter run -d <android-device>
 ```sh
 fvm flutter build apk --debug --target-platform android-arm64
 fvm flutter build macos --release --arch arm64
+fvm flutter build linux --debug
+```
+
+Linux（本地开发/验证，非发布目标）：
+
+```sh
+# WSLg 建议 X11 + 软件 GL；普通桌面可省略
+GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 fvm flutter run -d linux
+```
+
+Linux 需要系统多媒体库：
+
+```sh
+sudo apt install libva2 libva-drm2 libva-x11-2 libva-wayland2 libvdpau1 \
+  libpulse0 libsndfile1 libasyncns0 libxss1 libxv1
+```
+
+没有 sudo 时，用项目脚本自动下载/解压到用户缓存并设置运行环境：
+
+```sh
+tool/run_linux.sh
+```
+
+脚本会调用 `tool/linux_deps.sh`（`apt-get download` + `dpkg-deb -x`，不需要 root），并设置 `GDK_BACKEND=x11`、`LIBGL_ALWAYS_SOFTWARE=1` 与 `LD_LIBRARY_PATH`。
+
+本地播放验证（不提交 token）：
+
+```sh
+fvm flutter build linux --debug \
+  --dart-define=DEV_START_ROUTE=/player \
+  --dart-define=DEV_MEDIA_URL='<direct-play-url>'
+GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 ./build/linux/x64/debug/bundle/sakuga
 ```
 
 检查：

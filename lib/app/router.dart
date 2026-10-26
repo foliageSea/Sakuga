@@ -16,10 +16,12 @@ import 'shell.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
+const _devStartRoute = String.fromEnvironment('DEV_START_ROUTE');
+
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     navigatorKey: rootNavigatorKey,
-    initialLocation: '/home',
+    initialLocation: _devStartRoute.isEmpty ? '/home' : _devStartRoute,
     routes: [
       StatefulShellRoute(
         navigatorContainerBuilder: animatedBranchContainer,

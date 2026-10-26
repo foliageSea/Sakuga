@@ -1,85 +1,74 @@
-# Linux 端可行性验证
+# Linux 端支持记录
 
 > 日期：2026-10-26 · 环境：WSL2 Ubuntu 24.04 x86_64 / Flutter 3.47.6 / GTK3 可用
-> 结论：**可以构建并运行，但当前 v1 不作为正式目标平台，工程里没有 linux/ runner。**
+> 结论：**Linux 已作为本地开发/验证平台接入**，可构建并播放；**不作为正式发布目标**。
 
-## 1. 验证方法
+## 1. 工程接入
 
-在 `/tmp/sakuga_linux_probe` 复制当前工程（排除 build/.git/.dart_tool），然后：
+- 已加回 `linux/` runner（`flutter create --platforms=linux --project-name sakuga .`）。
+- Linux runner 设置：
+  - 窗口标题 `Sakuga`；
+  - `fl_dart_project_set_enable_impeller(project, FALSE)`，与 macOS/Android 的关闭 Impeller 基线一致。
+- 构建：
 
 ```sh
-fvm flutter create --platforms=linux --project-name sakuga .
-fvm flutter pub get
 fvm flutter build linux --debug
 ```
 
-结果：
+结果：`✓ Built build/linux/x64/debug/bundle/sakuga`。
 
-```text
-✓ Built build/linux/x64/debug/bundle/sakuga
-```
+## 2. 系统依赖
 
-说明：
-
-- Forui / material_ui / window_manager / media_kit_video / share_plus / file_selector 等依赖均有 Linux 实现。
-- media_kit fork 的 `native_bundles.json` 包含 `linux_x64` / `linux_arm64`，构建期会下载 libmpv。
-- `flutter build linux` 不受 `flutter test` 在 WSL 上的 native assets 编译问题影响。
-
-## 2. 运行验证
-
-在 WSLg 下直接启动 bundle：
-
-```sh
-cd build/linux/x64/debug/bundle
-./sakuga
-```
-
-应用窗口能创建（Impeller OpenGLESSDF），但 `MediaKit.ensureInitialized()` 因缺少系统多媒体库失败：
-
-```text
-Failed to load dynamic library 'libmpv.so.2':
-libva-drm.so.2: cannot open shared object file
-```
-
-补齐后依次暴露：
-
-| 缺失库 | Ubuntu 包 |
-| --- | --- |
-| `libva.so.2` / `libva-drm.so.2` | `libva2`、`libva-drm2` |
-| `libva-x11.so.2` | `libva-x11-2` |
-| `libva-wayland.so.2` | `libva-wayland2` |
-| `libvdpau.so.1` | `libvdpau1` |
-| `libpulse.so.0` / `libpulsecommon-16.1.so` | `libpulse0` |
-| `libsndfile.so.1` | `libsndfile1` |
-| `libasyncns.so.0` | `libasyncns0` |
-| `libXss.so.1` | `libxss1` |
-| `libXv.so.1` | `libxv1` |
-
-普通 Ubuntu 桌面通常已安装这些；WSL2 最小镜像没有。安装命令：
+media_kit 的 bundled libmpv 依赖系统多媒体库；WSL2 最小镜像需要：
 
 ```sh
 sudo apt install libva2 libva-drm2 libva-x11-2 libva-wayland2 libvdpau1 \
   libpulse0 libsndfile1 libasyncns0 libxss1 libxv1
 ```
 
-本机没有 sudo，无法完成全链路运行验证；上述为逐项 `ldd` 得到的缺失列表。
+普通 Ubuntu 桌面通常已安装其中大部分。
 
-## 3. 当前工程的差距
+## 3. 运行与播放验证
 
-| 项 | 状态 |
-| --- | --- |
-| Linux runner | 当前仓库已删除 `linux/`，需要 `flutter create --platforms=linux` 加回 |
-| 构建 | 已验证通过 |
-| 播放 | media_kit 支持 Linux；需补齐系统多媒体库后验证 |
-| 窗口 | `window_manager` 支持 Linux；自绘标题栏已有 Linux 分支（非 macOS 的红黄绿按钮） |
-| 快捷键 | 已有 macOS 键盘方案，Linux 可复用，但菜单栏/媒体键需另做 |
-| 打包 | 未做 deb/AppImage/Flatpak |
-| 测试 | `flutter test` 在 WSL 上仍受 media_kit native assets 阻塞 |
-| 发布 | 不在 v1 范围 |
+WSLg 下用 X11 + 软件 GL：
 
-## 4. 建议
+```sh
+GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 ./build/linux/x64/debug/bundle/sakuga
+```
 
-- **作为本地开发/调试平台**：成本低，推荐。加回 `linux/`，文档列出系统依赖即可。
-- **作为正式第三平台**：需要补 Linux 窗口/快捷键/媒体键、打包、系统依赖说明、测试矩阵，并更新计划范围。
+开发播放验证（token 只放命令行，不写入仓库）：
 
-若只是“能在 Linux 上跑起来看 UI/播放”，按第 2 节安装依赖并加回 runner 即可。
+```sh
+fvm flutter build linux --debug \
+  --dart-define=DEV_START_ROUTE=/player \
+  --dart-define=DEV_MEDIA_URL='<direct-play-url>'
+
+GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 ./build/linux/x64/debug/bundle/sakuga
+```
+
+实测日志：
+
+```text
+DEV_PLAYER url=...
+DEV_PLAYING false
+DEV_POSITION 0
+DEV_PLAYING true
+VideoOutput.Resize {width: 1920, height: 1080}
+DEV_POSITION 41
+...
+DEV_POSITION 1335
+```
+
+说明：
+
+- `MediaKit.ensureInitialized()` 成功；
+- `VideoController` 创建纹理并输出 1920×1080；
+- 播放位置持续推进，播放链路可用；
+- 默认 Wayland/EGL 组合在 WSLg 下会 segfault（`media_kit: VideoOutput: Got engine EGL display (GLES2)`），改用 X11 + 软件 GL 后稳定。
+
+## 4. 范围与限制
+
+- Linux 仅用于本地开发/验证：不打包 deb/AppImage，不做商店分发。
+- 窗口/快捷键/媒体键/打包/测试矩阵不在 v1 范围；后续要正式支持需单独立项。
+- `flutter test` 在 WSL 上仍受 media_kit native assets 编译问题阻塞（与 Linux 运行无关）。
+- 不要在仓库中写入测试服 token；`DEV_MEDIA_URL` 仅通过 `--dart-define` 临时传入。

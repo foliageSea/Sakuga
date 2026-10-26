@@ -8,7 +8,7 @@
 ### 1.1 工程迁移
 
 - 从 `/home/foliage/projects/forui_app` 同步 `lib`、`test`、`android`、`macos`、`assets`、`pubspec.yaml`、`l10n.yaml` 等。
-- 删除 `ios/`、`windows/`、`linux/`、`web/`、`macos/RunnerTests/`。
+- 删除 `ios/`、`windows/`、`web/`、`macos/RunnerTests/`；**保留 `linux/` 作为本地开发/验证 runner**。
 - 删除模板示例：`features/catalog`、`features/tasks`、`features/network`、`features/overview`、`assets/snippets`、`tool/sync_snippets.dart`。
 - 保留并改造：`app/`、`core/`（日志/设置/网络/窗口）、`shared/`、`l10n/`、`settings`。
 
@@ -20,7 +20,7 @@
 | Dart 包名 | `sakuga` |
 | Android namespace / applicationId | `com.foliage.sakuga` |
 | macOS bundle id | `com.foliage.sakuga` |
-| macOS 最低系统 | 13.0（待改工程配置；模板原 12.0） |
+| macOS 最低系统 | 13.0（已改工程配置；模板原 12.0） |
 | Android minSdk | 26 |
 | 版本 | `0.1.0+1` |
 
@@ -51,10 +51,14 @@
 | `fvm flutter analyze` | 通过（No issues found） |
 | `fvm flutter build apk --debug --target-platform android-arm64` | 通过，APK 173MB（debug，含 media_kit/Video 与 Vulkan validation layer） |
 | 16KB 对齐 `zipalign -c -P 16 -v 4` | 通过 |
+| `fvm flutter build linux --debug` | 通过（`build/linux/x64/debug/bundle/sakuga`） |
+| Linux 本地播放 | 通过：X11 + 软件 GL 下 `DEV_PLAYING true`，位置持续推进，VideoOutput 1920×1080 |
 | macOS arm64 构建 | 未验证（当前主机 Linux） |
 | `fvm flutter test` | **失败**（见 §3） |
 
 APK 内原生库：`libmpv.so`（22.8MB）、`libmediakitandroidhelper.so`、`libmedia_kit_event_loop.so`、`libVkLayer_khronos_validation.so`（debug）。
+
+Linux 运行依赖（WSL 最小镜像）：`libva2`、`libva-drm2`、`libva-x11-2`、`libva-wayland2`、`libvdpau1`、`libpulse0`、`libsndfile1`、`libasyncns0`、`libxss1`、`libxv1`；WSLg 下需 `GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1`。Linux runner 已关闭 Impeller。无 sudo 时用 `tool/run_linux.sh`（内部 `tool/linux_deps.sh` 下载/解压依赖到用户缓存）。
 
 ### 1.6 Jellyfin 测试服联调
 
@@ -75,9 +79,9 @@ APK 内原生库：`libmpv.so`（22.8MB）、`libmediakitandroidhelper.so`、`li
    - 失败则回退 CocoaPods；
    - 13.0 deployment target、entitlements、ATS。
 2. **测试**：解决 Linux 上 media_kit native assets 编译问题，或改为在 macOS/CI 跑 `flutter test`。
-3. **Impeller 决策**：M0 基线关闭；在 Android 真机/Mac 上验证 HUD blur 是否仍触发 abort。
+3. **Impeller 决策**：M0 基线关闭；Linux runner 已关闭；在 Android 真机/Mac 上验证 HUD blur 是否仍触发 abort。
 4. **Android 真机**：安装 APK，验证启动、导航、media_kit 初始化不崩溃。
-5. **CI**：PR 跑 format/analyze/test；主分支构建 Android arm64；macOS 用 Apple Silicon runner。
+5. **CI**：PR 跑 format/analyze/test；主分支构建 Android arm64；macOS 用 Apple Silicon runner；Linux 只做 debug 构建/冒烟。
 
 ## 3. 已知阻塞：Linux 上 `flutter test` 失败
 

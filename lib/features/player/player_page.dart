@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +17,8 @@ class PlayerPage extends StatefulWidget {
 }
 
 class _PlayerPageState extends State<PlayerPage> {
+  static const _devMediaUrl = String.fromEnvironment('DEV_MEDIA_URL');
+
   late final Player _player;
   late final VideoController _controller;
 
@@ -23,6 +27,21 @@ class _PlayerPageState extends State<PlayerPage> {
     super.initState();
     _player = Player();
     _controller = VideoController(_player);
+    debugPrint('DEV_PLAYER url=$_devMediaUrl');
+    if (_devMediaUrl.isNotEmpty) {
+      _player.stream.playing.listen(
+        (playing) => debugPrint('DEV_PLAYING $playing'),
+      );
+      _player.stream.position.listen(
+        (position) => debugPrint('DEV_POSITION ${position.inMilliseconds}'),
+      );
+      _player.stream.error.listen((error) => debugPrint('DEV_ERROR $error'));
+      unawaited(_openDevMedia());
+    }
+  }
+
+  Future<void> _openDevMedia() async {
+    await _player.open(Media(_devMediaUrl), play: true);
   }
 
   @override

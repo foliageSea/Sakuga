@@ -1,7 +1,7 @@
 # Sakuga 开发计划
 
 > 版本：v0.3（决策稿） · 日期：2026-10-26 · 状态：**M0 进行中**（进度见 [m0-status.md](m0-status.md)）
-> 目标平台：macOS（Apple Silicon / arm64）+ Android（arm64-v8a）
+> 目标平台：macOS（Apple Silicon / arm64）+ Android（arm64-v8a）为正式目标；**Linux 作为本地开发/验证平台**（不做正式发布）。
 > 工程底座：`/home/foliage/projects/forui_app`（Flutter 3.47.6 + Forui 0.27.5 + Riverpod 3.4.3）
 > 超分参考：Predidit/Kazumi（GPL-3.0，仅作行为参考，不复制其 Dart 代码）
 > 配套调研：`docs/research/template-audit.md`、`kazumi-player.md`、`jellyfin-api.md`、`playback-engine.md`
@@ -76,7 +76,7 @@ Sakuga 是一个 **Jellyfin 第三方客户端**，不是媒体服务器，也�
 
 ### 1.4 非目标（本期不做）
 
-- iOS、Windows、Linux、Web、Android TV / tvOS。
+- iOS、Windows、Web、Android TV / tvOS；**Linux 仅作为本地开发/验证平台，不做正式发布**。
 - Jellyfin 服务端、转码器、媒体整理。
 - 音乐/照片/直播电视/DVR（后续可评估）。
 - DRM（Jellyfin 本身不提供 DRM 内容）。
@@ -122,7 +122,8 @@ Sakuga 是一个 **Jellyfin 第三方客户端**，不是媒体服务器，也�
 | `test/` | 状态/网络/组件/布局测试 | **保留测试风格**，删除示例测试，补播放器与 API 测试。 |
 | macOS 工程 | deployment target 12.0；App Sandbox；自绘标题栏；**纯 SPM、无 Podfile** | **改造**：最低 13.0（native assets 要求）；优先保持纯 SPM（fork 有 Package.swift），失败再回退 CocoaPods；补 ATS；签名/公证。 |
 | Android 工程 | AGP 9.0.1 / Gradle 9.1.0 / Kotlin 2.3.20 / compileSdk 36 / minSdk 24 / targetSdk 36 | **改造**：applicationId、minSdk 26、签名、ABI、cleartext、PiP、前台服务、通知权限、extractNativeLibs。 |
-| iOS/Windows/Linux/Web | 模板自带 | 本期**删除**（减少 CI 与维护面）。 |
+| iOS/Windows/Web | 模板自带 | 本期**删除**（减少 CI 与维护面）。 |
+| Linux | 模板自带 | **保留为本地开发/验证 runner**；不作为发布目标。 |
 
 #### 2.1.1 模板的 12 个“必须处理”集成点
 
@@ -839,6 +840,32 @@ abstract interface class PlayerEngine {
 - 热/电：`PowerManager` 热状态；低电量策略；超分自动降级。
 - Impeller：基线关闭（manifest `EnableImpeller=false`），M0 验证后再决定。
 
+#### 3.8.3 Linux（本地开发/验证平台，不发布）
+
+- 定位：用于在 Linux 开发机上验证 UI、media_kit 播放、超分 shader 与 Jellyfin 接口；**不作为发布目标**，不做 deb/AppImage/商店分发。
+- 构建/运行：
+  ```sh
+  fvm flutter create --platforms=linux --project-name sakuga .   # 已加回
+  fvm flutter build linux --debug
+  fvm flutter run -d linux
+  ```
+- 系统依赖（media_kit 的 bundled libmpv 需要）：
+  ```sh
+  sudo apt install libva2 libva-drm2 libva-x11-2 libva-wayland2 libvdpau1 \
+    libpulse0 libsndfile1 libasyncns0 libxss1 libxv1
+  ```
+  无 sudo 时用 `tool/run_linux.sh`：它调用 `tool/linux_deps.sh` 把依赖下载/解压到 `~/.cache/sakuga/linux-deps`，并设置 `LD_LIBRARY_PATH`、`GDK_BACKEND=x11`、`LIBGL_ALWAYS_SOFTWARE=1`。
+- 渲染：Linux runner 已调用 `fl_dart_project_set_enable_impeller(project, FALSE)`，与 macOS/Android 的“关闭 Impeller”基线一致；WSLg 下还需 `GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1` 才能稳定创建 media_kit 视频纹理。
+- 开发播放验证（不写入仓库的 token）：
+  ```sh
+  fvm flutter build linux --debug \
+    --dart-define=DEV_START_ROUTE=/player \
+    --dart-define=DEV_MEDIA_URL='<direct-play-url>'
+  GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 ./build/linux/x64/debug/bundle/sakuga
+  ```
+  仅用于本地验证；正式播放器在 M2 接入 Jellyfin 协商。
+- 限制：Wayland/EGL 组合在部分环境会崩溃，优先 X11；Linux 的窗口/快捷键/媒体键/打包不在 v1 范围。
+
 ### 3.9 数据、缓存与离线
 
 - 设置：SharedPreferences（模板）；播放器设置单独 key/版本；迁移策略。
@@ -871,7 +898,7 @@ abstract interface class PlayerEngine {
 
 | 里程碑 | 周期 | 目标 | 交付物 | 验收标准 |
 | --- | --- | --- | --- | --- |
-| **M0 基建与内核验证** | 1.5 周 | 工程可跑、内核 go/no-go | 从模板初始化 Sakuga；删除示例；改包名/图标/启动页；CI；日志/设置/l10n/主题；**media_kit fork 双端构建 spike**；SPM/native assets/macOS 13；Impeller 关闭基线；SR 首帧 spike；ATS/cleartext；全屏路由/方向 | macOS arm64 与 Android arm64 debug 构建成功；SR 能在两端打开/关闭；Impeller 决策记录；局域网 http Jellyfin 10.10.7 可连 |
+| **M0 基建与内核验证** | 1.5 周 | 工程可跑、内核 go/no-go | 从模板初始化 Sakuga；删除示例；改包名/图标/启动页；CI；日志/设置/l10n/主题；**media_kit fork 双端构建 spike**；SPM/native assets/macOS 13；Impeller 关闭基线；SR 首帧 spike；ATS/cleartext；全屏路由/方向；Linux 开发 runner | macOS arm64 与 Android arm64 debug 构建成功；Linux debug 构建与本地播放验证；SR 能在两端打开/关闭；Impeller 决策记录；局域网 http Jellyfin 10.10.7 可连 |
 | **M1 连接与浏览** | 1.5 周 | 能登录、能找到片 | 服务器发现/手动地址/登录/Quick Connect/多服务器；首页/媒体库/详情/搜索；图片；继续观看；错误/空态；版本路由 | 真机连 10.10.7 + 10.8/10.9；浏览 1000+ item 列表流畅；登录失败有明确提示 |
 | **M2 播放 MVP** | 2 周 | 能稳定播 | media_kit 集成；PlaybackInfo + DeviceProfile；直连/转码/HLS；基础控制层；手势；字幕/音轨；进度上报；续播；全屏/横屏；错误降级；字幕字体 | 6 类样片（MP4/H.264、MKV/HEVC、AV1、ASS、PGS、HDR）可播；首帧/seek 达标；进度在服务器可见；Android 中文 ASS 不缺字 |
 | **M3 超分** | 1 周 | 超分可用可关 | shader 资源管线（版本戳）；四档 + 自动；运行时切换；Android vo/hwdec 策略；性能守卫；颜色验收；设置页；许可声明 | Mac M1 效率档生效且可切换（4K 输出 ≥30fps）；Android 旗舰效率档 ≥45fps；mediacodec_embed 下正确禁用；掉帧自动降级；ΔE<3 |
@@ -905,7 +932,7 @@ abstract interface class PlayerEngine {
 - [ ] 从 forui_app 初始化仓库；删除 catalog/tasks/network/snippets。
 - [ ] 改 applicationId/bundle id/应用名/图标/启动页/版本号（`com.foliage.sakuga`）。
 - [ ] 统一 FVM 3.47.6；配置 analyze/format/test CI。
-- [ ] 删除非目标平台工程（iOS/Windows/Linux/Web）。
+- [ ] 删除非目标平台工程（iOS/Windows/Web）；Linux 保留为本地开发 runner。
 - [ ] 日志/设置/主题/l10n 迁移与验证。
 - [ ] macOS 13.0 + SPM/native assets（失败回退 CocoaPods）+ arm64-only + ATS；Android minSdk 26 + cleartext + 前台服务/PiP 清单。
 - [ ] 根 navigatorKey + 全屏播放器路由；SystemChrome 方向/沉浸式。
