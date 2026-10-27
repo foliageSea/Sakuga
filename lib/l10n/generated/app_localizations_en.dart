@@ -321,6 +321,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String get audioTrackError => 'Could not switch audio tracks.';
 
   @override
+  String get trackLanguageChinese => 'Chinese';
+
+  @override
+  String get trackLanguageChineseSimplified => 'Chinese (Simplified)';
+
+  @override
+  String get trackLanguageChineseTraditional => 'Chinese (Traditional)';
+
+  @override
+  String get trackLanguageJapanese => 'Japanese';
+
+  @override
+  String get trackLanguageEnglish => 'English';
+
+  @override
+  String get trackLanguageKorean => 'Korean';
+
+  @override
+  String get trackLanguageCantonese => 'Cantonese';
+
+  @override
+  String get trackLanguageFrench => 'French';
+
+  @override
+  String get trackLanguageGerman => 'German';
+
+  @override
+  String get trackLanguageSpanish => 'Spanish';
+
+  @override
+  String get trackLanguagePortuguese => 'Portuguese';
+
+  @override
+  String get trackLanguageRussian => 'Russian';
+
+  @override
+  String get trackLanguageItalian => 'Italian';
+
+  @override
+  String get trackLanguageArabic => 'Arabic';
+
+  @override
+  String get trackLanguageThai => 'Thai';
+
+  @override
+  String get trackLanguageVietnamese => 'Vietnamese';
+
+  @override
+  String get trackMono => 'Mono';
+
+  @override
+  String get trackStereo => 'Stereo';
+
+  @override
+  String trackChannelCount(int count) {
+    return '$count channels';
+  }
+
+  @override
   String get subtitles => 'Subtitles';
 
   @override

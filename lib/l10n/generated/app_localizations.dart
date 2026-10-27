@@ -716,6 +716,120 @@ abstract class AppLocalizations {
   /// **'Could not switch audio tracks.'**
   String get audioTrackError;
 
+  /// No description provided for @trackLanguageChinese.
+  ///
+  /// In en, this message translates to:
+  /// **'Chinese'**
+  String get trackLanguageChinese;
+
+  /// No description provided for @trackLanguageChineseSimplified.
+  ///
+  /// In en, this message translates to:
+  /// **'Chinese (Simplified)'**
+  String get trackLanguageChineseSimplified;
+
+  /// No description provided for @trackLanguageChineseTraditional.
+  ///
+  /// In en, this message translates to:
+  /// **'Chinese (Traditional)'**
+  String get trackLanguageChineseTraditional;
+
+  /// No description provided for @trackLanguageJapanese.
+  ///
+  /// In en, this message translates to:
+  /// **'Japanese'**
+  String get trackLanguageJapanese;
+
+  /// No description provided for @trackLanguageEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get trackLanguageEnglish;
+
+  /// No description provided for @trackLanguageKorean.
+  ///
+  /// In en, this message translates to:
+  /// **'Korean'**
+  String get trackLanguageKorean;
+
+  /// No description provided for @trackLanguageCantonese.
+  ///
+  /// In en, this message translates to:
+  /// **'Cantonese'**
+  String get trackLanguageCantonese;
+
+  /// No description provided for @trackLanguageFrench.
+  ///
+  /// In en, this message translates to:
+  /// **'French'**
+  String get trackLanguageFrench;
+
+  /// No description provided for @trackLanguageGerman.
+  ///
+  /// In en, this message translates to:
+  /// **'German'**
+  String get trackLanguageGerman;
+
+  /// No description provided for @trackLanguageSpanish.
+  ///
+  /// In en, this message translates to:
+  /// **'Spanish'**
+  String get trackLanguageSpanish;
+
+  /// No description provided for @trackLanguagePortuguese.
+  ///
+  /// In en, this message translates to:
+  /// **'Portuguese'**
+  String get trackLanguagePortuguese;
+
+  /// No description provided for @trackLanguageRussian.
+  ///
+  /// In en, this message translates to:
+  /// **'Russian'**
+  String get trackLanguageRussian;
+
+  /// No description provided for @trackLanguageItalian.
+  ///
+  /// In en, this message translates to:
+  /// **'Italian'**
+  String get trackLanguageItalian;
+
+  /// No description provided for @trackLanguageArabic.
+  ///
+  /// In en, this message translates to:
+  /// **'Arabic'**
+  String get trackLanguageArabic;
+
+  /// No description provided for @trackLanguageThai.
+  ///
+  /// In en, this message translates to:
+  /// **'Thai'**
+  String get trackLanguageThai;
+
+  /// No description provided for @trackLanguageVietnamese.
+  ///
+  /// In en, this message translates to:
+  /// **'Vietnamese'**
+  String get trackLanguageVietnamese;
+
+  /// No description provided for @trackMono.
+  ///
+  /// In en, this message translates to:
+  /// **'Mono'**
+  String get trackMono;
+
+  /// No description provided for @trackStereo.
+  ///
+  /// In en, this message translates to:
+  /// **'Stereo'**
+  String get trackStereo;
+
+  /// No description provided for @trackChannelCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} channels'**
+  String trackChannelCount(int count);
+
   /// No description provided for @subtitles.
   ///
   /// In en, this message translates to:

@@ -5,6 +5,7 @@ import 'package:forui/forui.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../../shared/localization.dart';
+import 'player_track_format.dart';
 
 class PlayerAudioMenu extends StatelessWidget {
   const PlayerAudioMenu({
@@ -30,6 +31,10 @@ class PlayerAudioMenu extends StatelessWidget {
       AudioTrack.no(),
       ...available,
     ];
+    final labels = [
+      for (var index = 0; index < choices.length; index++)
+        formatAudioTrack(context.l10n, choices[index], index - 1),
+    ];
     return FPopoverMenu(
       maxHeight: 420,
       menuAnchor: .topRight,
@@ -40,8 +45,14 @@ class PlayerAudioMenu extends StatelessWidget {
             for (var index = 0; index < choices.length; index++)
               FItem(
                 key: ValueKey('audio-${choices[index].id}'),
-                title: Text(_label(context, choices[index], index)),
-                subtitle: _details(choices[index]),
+                title: Text(
+                  labels[index].title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: labels[index].details == null
+                    ? null
+                    : Text(labels[index].details!),
                 selected: selected.id == choices[index].id,
                 suffix: selected.id == choices[index].id
                     ? const Icon(FLucideIcons.check, size: 16)
@@ -69,22 +80,5 @@ class PlayerAudioMenu extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _label(BuildContext context, AudioTrack track, int index) {
-    if (track.id == 'auto') return context.l10n.audioAutomatic;
-    if (track.id == 'no') return context.l10n.audioOff;
-    final title = track.title?.trim();
-    return title == null || title.isEmpty
-        ? '${context.l10n.audioTrack} ${index - 1}'
-        : title;
-  }
-
-  Widget? _details(AudioTrack track) {
-    final parts = [track.language, track.codec]
-        .whereType<String>()
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty);
-    return parts.isEmpty ? null : Text(parts.join(' · '));
   }
 }

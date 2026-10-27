@@ -23,6 +23,7 @@ import 'player_controls.dart';
 import 'player_controls_controller.dart';
 import 'player_exit.dart';
 import 'player_subtitles.dart';
+import 'player_track_format.dart';
 import 'player_screenshot.dart';
 
 // This provider outlives the route so pending saves can refresh the library
@@ -893,6 +894,10 @@ class _SubtitleMenu extends StatelessWidget {
       SubtitleTrack.auto(),
       ...tracks.where((track) => track.id != 'no' && track.id != 'auto'),
     ];
+    final labels = [
+      for (var index = 0; index < choices.length; index++)
+        formatSubtitleTrack(context.l10n, choices[index], index - 1),
+    ];
     return FPopoverMenu(
       maxHeight: 420,
       menuAnchor: .topRight,
@@ -903,8 +908,14 @@ class _SubtitleMenu extends StatelessWidget {
             for (var index = 0; index < choices.length; index++)
               FItem(
                 key: ValueKey('subtitle-${choices[index].id}'),
-                title: Text(_label(context, choices[index], index)),
-                subtitle: _details(choices[index]),
+                title: Text(
+                  labels[index].title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: labels[index].details == null
+                    ? null
+                    : Text(labels[index].details!),
                 selected: selected == choices[index],
                 suffix: selected == choices[index]
                     ? const Icon(FLucideIcons.check, size: 16)
@@ -945,22 +956,5 @@ class _SubtitleMenu extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _label(BuildContext context, SubtitleTrack track, int index) {
-    if (track.id == 'no') return context.l10n.subtitlesOff;
-    if (track.id == 'auto') return context.l10n.subtitlesAutomatic;
-    final title = track.title?.trim();
-    return title == null || title.isEmpty
-        ? '${context.l10n.subtitleTrack} ${index - 1}'
-        : title;
-  }
-
-  Widget? _details(SubtitleTrack track) {
-    final parts = [
-      track.language,
-      track.codec,
-    ].whereType<String>().where((value) => value.isNotEmpty).toList();
-    return parts.isEmpty ? null : Text(parts.join(' · '));
   }
 }

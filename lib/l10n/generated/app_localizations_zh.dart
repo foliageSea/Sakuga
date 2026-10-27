@@ -319,6 +319,65 @@ class AppLocalizationsZh extends AppLocalizations {
   String get audioTrackError => '无法切换音轨。';
 
   @override
+  String get trackLanguageChinese => '中文';
+
+  @override
+  String get trackLanguageChineseSimplified => '简体中文';
+
+  @override
+  String get trackLanguageChineseTraditional => '繁體中文';
+
+  @override
+  String get trackLanguageJapanese => '日语';
+
+  @override
+  String get trackLanguageEnglish => '英语';
+
+  @override
+  String get trackLanguageKorean => '韩语';
+
+  @override
+  String get trackLanguageCantonese => '粤语';
+
+  @override
+  String get trackLanguageFrench => '法语';
+
+  @override
+  String get trackLanguageGerman => '德语';
+
+  @override
+  String get trackLanguageSpanish => '西班牙语';
+
+  @override
+  String get trackLanguagePortuguese => '葡萄牙语';
+
+  @override
+  String get trackLanguageRussian => '俄语';
+
+  @override
+  String get trackLanguageItalian => '意大利语';
+
+  @override
+  String get trackLanguageArabic => '阿拉伯语';
+
+  @override
+  String get trackLanguageThai => '泰语';
+
+  @override
+  String get trackLanguageVietnamese => '越南语';
+
+  @override
+  String get trackMono => '单声道';
+
+  @override
+  String get trackStereo => '立体声';
+
+  @override
+  String trackChannelCount(int count) {
+    return '$count 声道';
+  }
+
+  @override
   String get subtitles => '字幕';
 
   @override

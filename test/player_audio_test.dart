@@ -78,12 +78,9 @@ void main() {
       );
       await _open(tester);
       expect(find.text('Japanese'), findsOneWidget);
-      expect(
-        find.text(language == 'zh' ? '音轨 2' : 'Audio track 2'),
-        findsOneWidget,
-      );
-      expect(find.text('jpn · aac'), findsOneWidget);
-      expect(find.text('eng · ac3'), findsOneWidget);
+      expect(find.text(language == 'zh' ? '英语' : 'English'), findsOneWidget);
+      expect(find.text(language == 'zh' ? '日语 · AAC' : 'AAC'), findsOneWidget);
+      expect(find.text('AC-3'), findsOneWidget);
       expect(find.byKey(const ValueKey('audio-auto')), findsOneWidget);
       expect(find.byKey(const ValueKey('audio-no')), findsOneWidget);
       expect(
