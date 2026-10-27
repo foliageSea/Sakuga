@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../data/jellyfin/jellyfin_probe.dart';
 import '../../data/jellyfin/server_profile.dart';
@@ -9,11 +10,35 @@ import '../../shared/localization.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 
-class ServersSection extends ConsumerWidget {
+class ServersSection extends ConsumerStatefulWidget {
   const ServersSection({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ServersSection> createState() => _ServersSectionState();
+}
+
+class _ServersSectionState extends ConsumerState<ServersSection> {
+  String? _switchingServerId;
+  Object? _switchError;
+
+  Future<void> _switchServer(String id) async {
+    if (_switchingServerId != null) return;
+    setState(() {
+      _switchingServerId = id;
+      _switchError = null;
+    });
+    try {
+      await ref.read(serversProvider.notifier).setActive(id);
+      if (mounted) context.go('/library');
+    } catch (error) {
+      if (mounted) setState(() => _switchError = error);
+    } finally {
+      if (mounted) setState(() => _switchingServerId = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l = context.l10n;
     final servers = ref.watch(serversProvider);
     return Surface(
@@ -33,13 +58,19 @@ class ServersSection extends ConsumerWidget {
               FButton.icon(
                 key: const ValueKey('add-server'),
                 variant: .outline,
-                onPress: () => _showEditor(context, ref),
+                onPress: _switchingServerId != null
+                    ? null
+                    : () => _showEditor(context, ref),
                 semanticsLabel: l.addServer,
                 child: const Icon(FLucideIcons.plus),
               ),
             ],
           ),
           const SizedBox(height: 16),
+          if (_switchError != null) ...[
+            ErrorNotice(_switchError!),
+            const SizedBox(height: 16),
+          ],
           servers.when(
             data: (items) => items.isEmpty
                 ? EmptyNotice(
@@ -55,10 +86,19 @@ class ServersSection extends ConsumerWidget {
                     children: [
                       for (final server in items) ...[
                         _ServerTile(
+                          key: ValueKey(server.id),
                           server: server,
-                          onEdit: () =>
-                              _showEditor(context, ref, server: server),
-                          onDelete: () => _confirmDelete(context, ref, server),
+                          active: server.id == items.first.id,
+                          switching: server.id == _switchingServerId,
+                          onSwitch: _switchingServerId != null
+                              ? null
+                              : () => _switchServer(server.id),
+                          onEdit: _switchingServerId != null
+                              ? null
+                              : () => _showEditor(context, ref, server: server),
+                          onDelete: _switchingServerId != null
+                              ? null
+                              : () => _confirmDelete(context, ref, server),
                         ),
                         if (server != items.last) const SizedBox(height: 8),
                       ],
@@ -315,14 +355,21 @@ class ServersSection extends ConsumerWidget {
 
 class _ServerTile extends StatelessWidget {
   const _ServerTile({
+    super.key,
     required this.server,
+    required this.active,
+    required this.switching,
+    required this.onSwitch,
     required this.onEdit,
     required this.onDelete,
   });
 
   final ServerProfile server;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final bool active;
+  final bool switching;
+  final VoidCallback? onSwitch;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -349,6 +396,25 @@ class _ServerTile extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FTooltip(
+            tipBuilder: (context, controller) => Text(
+              active ? context.l10n.currentServer : context.l10n.switchServer,
+            ),
+            child: FButton.icon(
+              key: ValueKey('switch-server-${server.id}'),
+              variant: .ghost,
+              onPress: active ? null : onSwitch,
+              semanticsLabel: active
+                  ? context.l10n.currentServer
+                  : context.l10n.switchServer,
+              child: switching
+                  ? const FCircularProgress.loader()
+                  : Icon(
+                      active ? FLucideIcons.check : FLucideIcons.arrowRightLeft,
+                    ),
             ),
           ),
           FButton.icon(

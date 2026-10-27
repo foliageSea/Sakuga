@@ -112,13 +112,15 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
     final current = state.value;
     if (current == null || current.loadingMore || !current.hasMore) return;
     if (current.loadMoreError != null && !retry) return;
-    state = AsyncData(
-      current.copyWith(loadingMore: true, clearLoadMoreError: true),
+    final loading = current.copyWith(
+      loadingMore: true,
+      clearLoadMoreError: true,
     );
+    state = AsyncData(loading);
     try {
       final data = await ref.read(libraryViewsProvider.future);
       final page = await _fetch(data, startIndex: current.items.length);
-      if (!ref.mounted) return;
+      if (!ref.mounted || !identical(state.value, loading)) return;
       final existingIds = {for (final item in current.items) item.id};
       state = AsyncData(
         LibraryItemsState(
@@ -131,7 +133,7 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
         ),
       );
     } catch (error, stackTrace) {
-      if (!ref.mounted) return;
+      if (!ref.mounted || !identical(state.value, loading)) return;
       log.warning('Failed to load more items', error, stackTrace);
       state = AsyncData(
         current.copyWith(loadingMore: false, loadMoreError: error),

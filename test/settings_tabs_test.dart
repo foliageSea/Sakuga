@@ -21,6 +21,8 @@ void main() {
         'settings tabs swipe in both directions with $device on $platform',
         (tester) async {
           tester.view.physicalSize = const Size(1200, 500);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetDevicePixelRatio);
           addTearDown(tester.view.resetPhysicalSize);
           final container = appContainer();
           addTearDown(container.dispose);
@@ -49,10 +51,19 @@ void main() {
             await settle(tester);
           }
 
+          expect(
+            find.byKey(const ValueKey('add-server')).hitTestable(),
+            findsOneWidget,
+          );
+          await tester.tap(find.text('General'));
+          await settle(tester);
+          expect(controller.page, closeTo(1, 0.001));
           await swipe(1);
           expect(controller.page, closeTo(0, 0.001));
           await swipe(-1);
           expect(controller.page, closeTo(1, 0.001));
+          await swipe(-1);
+          expect(controller.page, closeTo(2, 0.001));
           expect(
             find.byKey(const ValueKey('theme-color-blue')).hitTestable(),
             findsOneWidget,
@@ -80,10 +91,10 @@ void main() {
           );
           await settle(tester);
           expect(position.pixels, greaterThan(0));
-          expect(controller.page, closeTo(1, 0.001));
+          expect(controller.page, closeTo(2, 0.001));
 
           await swipe(1);
-          expect(controller.page, closeTo(0, 0.001));
+          expect(controller.page, closeTo(1, 0.001));
           expect(
             find.byKey(const ValueKey('language-select')).hitTestable(),
             findsOneWidget,
@@ -92,11 +103,11 @@ void main() {
           await tester.ensureVisible(find.text('About Sakuga'));
           await tester.tap(find.text('About Sakuga'));
           await settle(tester);
-          expect(controller.page, closeTo(4, 0.001));
+          expect(controller.page, closeTo(5, 0.001));
           await swipe(-1);
-          expect(controller.page, closeTo(4, 0.001));
+          expect(controller.page, closeTo(5, 0.001));
           await swipe(1);
-          expect(controller.page, closeTo(3, 0.001));
+          expect(controller.page, closeTo(4, 0.001));
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox());
           await settle(tester);
@@ -110,6 +121,8 @@ void main() {
     tester,
   ) async {
     tester.view.physicalSize = const Size(600, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);

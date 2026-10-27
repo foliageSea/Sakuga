@@ -170,6 +170,18 @@ abstract class AppLocalizations {
   /// **'Edit server'**
   String get editServer;
 
+  /// No description provided for @currentServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get currentServer;
+
+  /// No description provided for @switchServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch'**
+  String get switchServer;
+
   /// No description provided for @serverName.
   ///
   /// In en, this message translates to:

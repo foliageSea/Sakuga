@@ -12,6 +12,8 @@
   "servers": "服务器",
   "addServer": "添加服务器",
   "editServer": "编辑服务器",
+  "currentServer": "当前使用",
+  "switchServer": "切换",
   "serverName": "名称",
   "serverUrl": "服务器地址",
   "apiKey": "API 密钥",

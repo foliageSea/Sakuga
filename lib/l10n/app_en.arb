@@ -12,6 +12,8 @@
   "servers": "Servers",
   "addServer": "Add server",
   "editServer": "Edit server",
+  "currentServer": "Current",
+  "switchServer": "Switch",
   "serverName": "Name",
   "serverUrl": "Server URL",
   "apiKey": "API key",

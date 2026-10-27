@@ -81,6 +81,17 @@ class ServersNotifier extends AsyncNotifier<List<ServerProfile>> {
     ]);
   }
 
+  /// The first saved profile is the active server used by all media providers.
+  Future<void> setActive(String id) async {
+    final current = state.value ?? await future;
+    final index = current.indexWhere((server) => server.id == id);
+    if (index <= 0) return;
+    await _save([
+      current[index],
+      ...current.where((server) => server.id != id),
+    ]);
+  }
+
   Future<void> remove(String id) async {
     final current = state.value ?? await future;
     await _save(current.where((server) => server.id != id).toList());

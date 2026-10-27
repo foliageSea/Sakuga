@@ -46,6 +46,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editServer => 'Edit server';
 
   @override
+  String get currentServer => 'Current';
+
+  @override
+  String get switchServer => 'Switch';
+
+  @override
   String get serverName => 'Name';
 
   @override

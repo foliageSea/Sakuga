@@ -28,6 +28,7 @@ Future<void> settle(WidgetTester tester) async {
 ProviderContainer appContainer({
   FakeWindow? window,
   MemorySettings? settingsRepository,
+  ServerRepository? serverRepository,
   LogExportService? logExporter,
   RuntimeEnvironment? environment,
   AppSettings settings = const AppSettings(language: 'en'),
@@ -40,7 +41,9 @@ ProviderContainer appContainer({
       settingsRepository ?? MemorySettings(),
     ),
     desktopWindowProvider.overrideWithValue(window ?? FakeWindow()),
-    serverRepositoryProvider.overrideWithValue(MemoryServerRepository()),
+    serverRepositoryProvider.overrideWithValue(
+      serverRepository ?? MemoryServerRepository(),
+    ),
     logExportServiceProvider.overrideWithValue(
       logExporter ?? FakeLogExporter(),
     ),
