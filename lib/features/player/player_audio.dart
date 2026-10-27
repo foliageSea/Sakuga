@@ -5,6 +5,7 @@ import 'package:forui/forui.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../../shared/localization.dart';
+import 'player_button_style.dart';
 import 'player_track_format.dart';
 
 class PlayerAudioMenu extends StatelessWidget {
@@ -68,6 +69,7 @@ class PlayerAudioMenu extends StatelessWidget {
       builder: (context, controller, _) => FButton.icon(
         key: const ValueKey('audio-menu'),
         variant: .ghost,
+        style: playerOverlayButtonStyle,
         size: .sm,
         onPress: enabled && available.isNotEmpty ? controller.toggle : null,
         semanticsLabel: available.isEmpty

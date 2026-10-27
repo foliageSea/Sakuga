@@ -17,6 +17,7 @@ import '../home/home_providers.dart';
 import '../library/library_providers.dart';
 import 'player_assets.dart';
 import 'player_audio.dart';
+import 'player_button_style.dart';
 import 'player_gpu_usage.dart';
 import 'playback_progress_repository.dart';
 import 'player_controls.dart';
@@ -757,6 +758,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         FButton.icon(
           key: const ValueKey('player-back'),
           variant: .ghost,
+          style: playerOverlayButtonStyle,
           size: .sm,
           onPress: onBack,
           semanticsLabel: context.l10n.back,
@@ -854,6 +856,7 @@ class _SuperResolutionMenu extends StatelessWidget {
     builder: (context, controller, _) => FButton.icon(
       key: const ValueKey('super-resolution-menu'),
       variant: .ghost,
+      style: playerOverlayButtonStyle,
       size: .sm,
       onPress: controller.toggle,
       semanticsLabel: context.l10n.superResolution,
@@ -944,6 +947,7 @@ class _SubtitleMenu extends StatelessWidget {
       builder: (context, controller, _) => FButton.icon(
         key: const ValueKey('subtitle-menu'),
         variant: .ghost,
+        style: playerOverlayButtonStyle,
         size: .sm,
         onPress: controller.toggle,
         semanticsLabel: context.l10n.subtitles,

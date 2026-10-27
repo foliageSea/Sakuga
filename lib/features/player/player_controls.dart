@@ -13,6 +13,7 @@ import '../../shared/localization.dart';
 import '../../shared/widgets.dart';
 import '../detail/detail_providers.dart';
 import '../library/library_providers.dart';
+import 'player_button_style.dart';
 import 'player_subtitles.dart';
 import 'player_controls_controller.dart';
 import 'player_slider.dart';
@@ -641,17 +642,7 @@ class PlayerControlButton extends StatelessWidget {
   Widget build(BuildContext context) => FButton.icon(
     variant: .ghost,
     size: .sm,
-    style: .delta(
-      decoration: .delta([
-        .base(
-          .shapeDelta(
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(2.0)),
-            ),
-          ),
-        ),
-      ]),
-    ),
+    style: playerOverlayButtonStyle,
     semanticsLabel: label,
     onPress: onPress,
     child: Icon(
