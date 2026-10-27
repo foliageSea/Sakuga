@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:forui/forui.dart';
 
 import '../features/detail/detail_page.dart';
-import '../features/downloads/downloads_page.dart';
 import '../features/home/home_page.dart';
 import '../features/library/library_page.dart';
 import '../features/player/player_page.dart';
@@ -70,14 +69,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(path: '/search', builder: (_, _) => const SearchPage()),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/downloads',
-                builder: (_, _) => const DownloadsPage(),
-              ),
             ],
           ),
           StatefulShellBranch(

@@ -70,13 +70,7 @@ void main() {
     await settle(tester);
     expect(tester.takeException(), isNull);
 
-    for (final path in [
-      '/home',
-      '/library',
-      '/search',
-      '/downloads',
-      '/settings',
-    ]) {
+    for (final path in ['/home', '/library', '/search', '/settings']) {
       container.read(routerProvider).go(path);
       await settle(tester);
       expect(tester.takeException(), isNull, reason: path);
@@ -86,7 +80,7 @@ void main() {
     await settle(tester);
   });
 
-  testWidgets('desktop shell renders five branches', (tester) async {
+  testWidgets('desktop shell renders four branches', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -103,7 +97,7 @@ void main() {
     expect(find.text('Home'), findsWidgets);
     expect(find.text('Library'), findsWidgets);
     expect(find.text('Search'), findsWidgets);
-    expect(find.text('Downloads'), findsWidgets);
+    expect(find.text('Downloads'), findsNothing);
     expect(find.text('Settings'), findsWidgets);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
