@@ -16,6 +16,7 @@ import '../detail/detail_providers.dart';
 import '../home/home_providers.dart';
 import '../library/library_providers.dart';
 import 'player_assets.dart';
+import 'player_audio.dart';
 import 'player_gpu_usage.dart';
 import 'playback_progress_repository.dart';
 import 'player_controls.dart';
@@ -581,6 +582,29 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     ]);
   }
 
+  Future<void> _setAudio(AudioTrack track, int generation) async {
+    if (!mounted ||
+        generation != _openGeneration ||
+        _loading ||
+        _switchingEpisode.value ||
+        _exiting) {
+      return;
+    }
+    if (track.id != 'auto' &&
+        track.id != 'no' &&
+        !_tracks.audio.contains(track)) {
+      return;
+    }
+    try {
+      await _player.setAudioTrack(track);
+    } catch (error, stackTrace) {
+      debugPrint('PLAYER_AUDIO_ERROR $error\n$stackTrace');
+      if (mounted && generation == _openGeneration) {
+        notifyUser(context, context.l10n.audioTrackError);
+      }
+    }
+  }
+
   Future<void> _setSubtitle(SubtitleTrack track) async {
     try {
       await _player.setSubtitleTrack(track);
@@ -726,6 +750,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   Widget _buildHeader(JellyfinItem? item, VoidCallback onBack) {
+    final generation = _openGeneration;
     return Row(
       children: [
         FButton.icon(
@@ -758,6 +783,16 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         _SuperResolutionMenu(
           mode: _superResolutionMode,
           onChanged: _setSuperResolution,
+        ),
+        const SizedBox(width: 8),
+        ValueListenableBuilder<bool>(
+          valueListenable: _switchingEpisode,
+          builder: (context, switching, _) => PlayerAudioMenu(
+            tracks: _tracks.audio,
+            selected: _track.audio,
+            enabled: !_loading && !switching && !_exiting,
+            onChanged: (track) => _setAudio(track, generation),
+          ),
         ),
         const SizedBox(width: 8),
         _SubtitleMenu(

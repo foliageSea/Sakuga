@@ -303,6 +303,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get superResolutionError => 'Could not change super resolution mode.';
 
   @override
+  String get audioTracks => 'Audio tracks';
+
+  @override
+  String get audioTrack => 'Audio track';
+
+  @override
+  String get audioAutomatic => 'Automatic';
+
+  @override
+  String get audioOff => 'Audio off';
+
+  @override
+  String get noAudioTracks => 'No audio tracks';
+
+  @override
+  String get audioTrackError => 'Could not switch audio tracks.';
+
+  @override
   String get subtitles => 'Subtitles';
 
   @override

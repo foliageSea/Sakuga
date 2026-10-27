@@ -301,6 +301,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get superResolutionError => '无法切换视频超分模式。';
 
   @override
+  String get audioTracks => '音轨';
+
+  @override
+  String get audioTrack => '音轨';
+
+  @override
+  String get audioAutomatic => '自动选择';
+
+  @override
+  String get audioOff => '关闭音轨';
+
+  @override
+  String get noAudioTracks => '无可用音轨';
+
+  @override
+  String get audioTrackError => '无法切换音轨。';
+
+  @override
   String get subtitles => '字幕';
 
   @override

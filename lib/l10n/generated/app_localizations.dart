@@ -680,6 +680,42 @@ abstract class AppLocalizations {
   /// **'Could not change super resolution mode.'**
   String get superResolutionError;
 
+  /// No description provided for @audioTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio tracks'**
+  String get audioTracks;
+
+  /// No description provided for @audioTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio track'**
+  String get audioTrack;
+
+  /// No description provided for @audioAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get audioAutomatic;
+
+  /// No description provided for @audioOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio off'**
+  String get audioOff;
+
+  /// No description provided for @noAudioTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'No audio tracks'**
+  String get noAudioTracks;
+
+  /// No description provided for @audioTrackError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not switch audio tracks.'**
+  String get audioTrackError;
+
   /// No description provided for @subtitles.
   ///
   /// In en, this message translates to:
