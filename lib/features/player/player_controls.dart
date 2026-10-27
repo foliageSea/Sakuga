@@ -619,6 +619,17 @@ class PlayerControlButton extends StatelessWidget {
   Widget build(BuildContext context) => FButton.icon(
     variant: .ghost,
     size: .sm,
+    style: .delta(
+      decoration: .delta([
+        .base(
+          .shapeDelta(
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(2.0)),
+            ),
+          ),
+        ),
+      ]),
+    ),
     semanticsLabel: label,
     onPress: onPress,
     child: Icon(
