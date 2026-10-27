@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -141,6 +142,106 @@ Future<void> _tapCard(WidgetTester tester, String title) async {
 }
 
 void main() {
+  for (final kind in [
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.touch,
+  ]) {
+    testWidgets(
+      'home media rows scroll both ways with ${kind.name}',
+      (tester) async {
+        await pumpHome(
+          tester,
+          resume: List.generate(10, (_) => _resumableEpisode()),
+          latest: List.generate(10, (_) => _series()),
+        );
+        final rows = find.byWidgetPredicate(
+          (widget) =>
+              widget is SingleChildScrollView &&
+              widget.scrollDirection == Axis.horizontal,
+        );
+        expect(rows, findsNWidgets(2));
+        for (var index = 0; index < 2; index++) {
+          final row = rows.at(index);
+          final scrollable = find
+              .descendant(of: row, matching: find.byType(Scrollable))
+              .first;
+          final position = tester.state<ScrollableState>(scrollable).position;
+          final otherRow = tester
+              .state<ScrollableState>(
+                find
+                    .descendant(
+                      of: rows.at(1 - index),
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
+              )
+              .position;
+          final page = tester
+              .state<ScrollableState>(
+                find
+                    .descendant(
+                      of: find.byType(ListView),
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
+              )
+              .position;
+          final otherOffset = otherRow.pixels;
+          final pageOffset = page.pixels;
+          await tester.drag(row, const Offset(-240, 0), kind: kind);
+          await tester.pumpAndSettle();
+          final forwardOffset = position.pixels;
+          expect(forwardOffset, greaterThan(0));
+          await tester.drag(row, const Offset(160, 0), kind: kind);
+          await tester.pumpAndSettle();
+          expect(position.pixels, lessThan(forwardOffset));
+          expect(otherRow.pixels, otherOffset);
+          expect(page.pixels, pageOffset);
+          expect(find.byType(HomePage), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(
+        kind == PointerDeviceKind.touch
+            ? TargetPlatform.android
+            : TargetPlatform.macOS,
+      ),
+    );
+  }
+
+  testWidgets('vertical wheel scroll over media rows scrolls the home page', (
+    tester,
+  ) async {
+    await pumpHome(tester, size: const Size(1280, 420));
+    final page = tester
+        .state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(ListView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        )
+        .position;
+    final row = find
+        .byWidgetPredicate(
+          (widget) =>
+              widget is SingleChildScrollView &&
+              widget.scrollDirection == Axis.horizontal,
+        )
+        .first;
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: tester.getCenter(row),
+        scrollDelta: const Offset(0, 120),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(page.pixels, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   testWidgets('continue watching resumes the episode in the player', (
     tester,
   ) async {

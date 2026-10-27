@@ -641,35 +641,44 @@ class _MediaSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var index = 0; index < values.length; index++) ...[
-                      if (index > 0) const SizedBox(width: 12),
-                      Builder(
-                        builder: (context) {
-                          final item = values[index];
-                          final landscape = item.isEpisode;
-                          return SizedBox(
-                            width: landscape ? 260 : 160,
-                            child: MediaPosterCard(
-                              client: client,
-                              item: item,
-                              translucent: ambient,
-                              progress: item.progressFraction,
-                              aspectRatio: landscape
-                                  ? item.thumbnailAspectRatio
-                                  : null,
-                              onPosterTap: (posterUrl) =>
-                                  onTap(item, posterUrl),
-                            ),
-                          );
-                        },
-                      ),
+              ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  dragDevices: {
+                    ...ScrollConfiguration.of(context).dragDevices,
+                    PointerDeviceKind.mouse,
+                    PointerDeviceKind.trackpad,
+                  },
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var index = 0; index < values.length; index++) ...[
+                        if (index > 0) const SizedBox(width: 12),
+                        Builder(
+                          builder: (context) {
+                            final item = values[index];
+                            final landscape = item.isEpisode;
+                            return SizedBox(
+                              width: landscape ? 260 : 160,
+                              child: MediaPosterCard(
+                                client: client,
+                                item: item,
+                                translucent: ambient,
+                                progress: item.progressFraction,
+                                aspectRatio: landscape
+                                    ? item.thumbnailAspectRatio
+                                    : null,
+                                onPosterTap: (posterUrl) =>
+                                    onTap(item, posterUrl),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],
