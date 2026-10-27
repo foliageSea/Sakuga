@@ -497,8 +497,41 @@ class _PlayerControlsState extends State<PlayerControls> {
                 ListenableBuilder(
                   listenable: widget.controller,
                   builder: (context, _) => widget.controller.buffering
-                      ? const IgnorePointer(
-                          child: Center(child: FCircularProgress()),
+                      ? IgnorePointer(
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const FCircularProgress(),
+                                if (widget.controller.downloadBytesPerSecond
+                                    case final speed?) ...[
+                                  const SizedBox(height: 12),
+                                  DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0x99000000),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      child: Text(
+                                        formatPlayerDownloadSpeed(speed),
+                                        key: const ValueKey(
+                                          'player-download-speed',
+                                        ),
+                                        style: context.theme.typography.body.sm
+                                            .copyWith(
+                                              color: const Color(0xFFFFFFFF),
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -509,6 +542,19 @@ class _PlayerControlsState extends State<PlayerControls> {
       ),
     );
   }
+}
+
+String formatPlayerDownloadSpeed(double bytesPerSecond) {
+  if (bytesPerSecond >= 1024 * 1024 * 1024) {
+    return '${(bytesPerSecond / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB/s';
+  }
+  if (bytesPerSecond >= 1024 * 1024) {
+    return '${(bytesPerSecond / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+  }
+  if (bytesPerSecond >= 1024) {
+    return '${(bytesPerSecond / 1024).toStringAsFixed(1)} KB/s';
+  }
+  return '${bytesPerSecond.toStringAsFixed(0)} B/s';
 }
 
 String formatPlayerTime(Duration value) {

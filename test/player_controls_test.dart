@@ -163,6 +163,28 @@ void main() {
             .opacity,
         0,
       );
+      // Buffering remains visible even after the control bar auto-hides.
+      controller.updateBuffering(true);
+      await tester.pump();
+      expect(find.byType(FCircularProgress), findsOneWidget);
+      expect(find.byKey(const ValueKey('player-download-speed')), findsNothing);
+      controller.updateBuffering(true, speed: 1536);
+      await tester.pump();
+      expect(find.text('1.5 KB/s'), findsOneWidget);
+      controller.updateBuffering(true, speed: 2.5 * 1024 * 1024);
+      await tester.pump();
+      expect(find.text('2.5 MB/s'), findsOneWidget);
+      controller.updateBuffering(true, speed: 0);
+      await tester.pump();
+      expect(find.text('0 B/s'), findsOneWidget);
+      controller.updateBuffering(true);
+      await tester.pump();
+      expect(find.byType(FCircularProgress), findsOneWidget);
+      expect(find.byKey(const ValueKey('player-download-speed')), findsNothing);
+      controller.updateBuffering(false, speed: 1536);
+      await tester.pump();
+      expect(find.byType(FCircularProgress), findsNothing);
+      expect(find.byKey(const ValueKey('player-download-speed')), findsNothing);
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await tester.pumpAndSettle();
       expect(controller.playing, isFalse);
@@ -307,6 +329,15 @@ class _ControlsController extends PlayerControlsController {
   bool playing = false;
   @override
   bool buffering = false;
+  @override
+  double? downloadBytesPerSecond;
+
+  void updateBuffering(bool value, {double? speed}) {
+    buffering = value;
+    downloadBytesPerSecond = speed;
+    notifyListeners();
+  }
+
   @override
   Duration position = const Duration(seconds: 30);
   @override
