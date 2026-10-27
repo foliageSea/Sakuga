@@ -1,7 +1,34 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.isFile) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+val requiredSigningProperties = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+
+// Keep debug builds available without credentials, but never publish an unsigned release.
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    doFirst {
+        check(keystorePropertiesFile.isFile) {
+            "Release signing requires android/key.properties. Restore the signing files from Git."
+        }
+        requiredSigningProperties.forEach { name ->
+            check(!keystoreProperties.getProperty(name).isNullOrBlank()) {
+                "Missing release signing property: $name in android/key.properties"
+            }
+        }
+        check(rootProject.file(keystoreProperties.getProperty("storeFile")).isFile) {
+            "Release keystore does not exist. Check storeFile in android/key.properties."
+        }
+    }
 }
 
 android {
@@ -25,11 +52,18 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+            storeFile = keystoreProperties.getProperty("storeFile")?.let { rootProject.file(it) }
+            storePassword = keystoreProperties.getProperty("storePassword")
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

@@ -8,8 +8,9 @@ GeneratedPluginRegistrant.java
 .cxx/
 /build/
 
-# Remember to never publicly share your keystore.
-# See https://flutter.dev/to/reference-keystore
+# Keep other signing files local; version the project release credentials.
 key.properties
 **/*.keystore
 **/*.jks
+!/key.properties
+!/sakuga-release.jks

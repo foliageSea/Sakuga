@@ -51,6 +51,20 @@ fvm flutter build macos --release --arch arm64
 fvm flutter build linux --debug
 ```
 
+### Android 发布签名
+
+Release 构建使用仓库中的 `android/sakuga-release.jks`，别名为 `sakuga`，密码保存在同样纳入版本控制的 `android/key.properties` 中。克隆仓库后可直接构建，无需额外配置。`storeFile` 的相对路径以 `android/` 为基准。
+
+缺少签名配置时 release 构建会报错；debug 构建不需要发布密钥。
+
+```sh
+fvm flutter build apk --release --target-platform android-arm64
+# Google Play 使用 AAB：
+fvm flutter build appbundle --release --target-platform android-arm64
+```
+
+APK 输出为 `build/app/outputs/flutter-apk/app-release.apk`。后续更新需继续使用仓库中的同一发布密钥。
+
 Linux（本地开发/验证，非发布目标）：
 
 ```sh
