@@ -90,6 +90,20 @@ fvm flutter analyze
 fvm flutter test
 ```
 
+## 应用图标
+
+采用「漫画分镜」图标，SVG 与 1024 px PNG 源图位于 `assets/icons/`。
+`icons_launcher.yaml` 仅启用 Android 与 macOS；Android 自适应图标使用透明前景与独立背景色，macOS 使用带白色圆角底的完整图标。
+
+更新 PNG 源图后，执行：
+
+```sh
+fvm flutter pub get
+fvm dart run icons_launcher:create
+```
+
+生成资源位于 `android/app/src/main/res/` 与 `macos/Runner/Assets.xcassets/AppIcon.appiconset/`。重新构建并安装应用后生效。
+
 ## 目录
 
 ```text
