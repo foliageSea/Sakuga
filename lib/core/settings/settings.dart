@@ -13,7 +13,7 @@ class AppSettings {
   const AppSettings({
     this.themeMode = ThemeMode.system,
     this.language = 'system',
-    this.compactSidebar = false,
+    this.compactSidebar = true,
     this.themeColor = AppThemeColor.neutral,
     this.radiusScale = 1,
     this.fontScale = 1,
@@ -82,7 +82,7 @@ class AppSettings {
     language: ['zh', 'en'].contains(json['language'])
         ? json['language'] as String
         : 'system',
-    compactSidebar: json['compactSidebar'] == true,
+    compactSidebar: json['compactSidebar'] != false,
     themeColor: AppThemeColor.values.firstWhere(
       (value) => value.name == json['themeColor'],
       orElse: () => AppThemeColor.neutral,

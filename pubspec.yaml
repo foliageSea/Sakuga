@@ -55,6 +55,7 @@ flutter:
   generate: true
   uses-material-design: true
   assets:
+    - assets/icons/sakuga.png
     - assets/shaders/
   fonts:
     - family: MiSans

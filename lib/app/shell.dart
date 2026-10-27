@@ -124,105 +124,99 @@ class AppShell extends ConsumerWidget {
                       Expanded(
                         child: Row(
                           children: [
-                            AnimatedContainer(
+                            AnimatedSize(
                               duration: const Duration(milliseconds: 220),
                               curve: Curves.easeOutCubic,
-                              width: sidebarWidth,
-                              child: mobile
-                                  ? null
-                                  : FSidebar(
-                                      style: .delta(
-                                        decoration: .boxDelta(
-                                          color: null,
-                                          border: BorderDirectional(
-                                            end: BorderSide(
-                                              color: dividerColor,
-                                              width: theme.style.borderWidth,
-                                            ),
-                                          ),
-                                        ),
-                                        groupStyle: .delta(
-                                          itemStyle: .delta(
-                                            backgroundColor: FVariants(
-                                              const Color(0x00000000),
-                                              variants: {
-                                                [.selected, .hovered, .pressed]:
-                                                    sidebarActiveFill,
-                                                [.disabled]: const Color(
-                                                  0x00000000,
-                                                ),
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                        constraints: BoxConstraints.tightFor(
-                                          width: sidebarWidth,
-                                        ),
-                                      ),
-                                      header: SizedBox(
-                                        width: double.infinity,
-                                        child: Padding(
-                                          padding: EdgeInsets.fromLTRB(
-                                            compact ? 16 : 24,
-                                            20,
-                                            compact ? 16 : 24,
-                                            24,
-                                          ),
-                                          child: Align(
-                                            alignment: compact
-                                                ? Alignment.center
-                                                : Alignment.centerLeft,
-                                            child: compact
-                                                ? const Icon(
-                                                    FLucideIcons.film,
-                                                    size: 26,
-                                                  )
-                                                : Text(
-                                                    'SAKUGA',
-                                                    key: const ValueKey(
-                                                      'sidebar-logo',
-                                                    ),
-                                                    style: context
-                                                        .theme
-                                                        .typography
-                                                        .display
-                                                        .md
-                                                        .copyWith(
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          letterSpacing: 3,
-                                                        ),
-                                                  ),
-                                          ),
-                                        ),
-                                      ),
-                                      children: [
-                                        FSidebarGroup(
-                                          children: [
-                                            for (
-                                              var i = 0;
-                                              i < labels.length;
-                                              i++
-                                            )
-                                              FSidebarItem(
-                                                icon: Icon(
-                                                  icons[i],
-                                                  semanticLabel: compact
-                                                      ? labels[i]
-                                                      : null,
-                                                ),
-                                                label: compact
-                                                    ? null
-                                                    : Text(labels[i]),
-                                                selected:
-                                                    shell.currentIndex == i,
-                                                onPress: () =>
-                                                    shell.goBranch(i),
+                              alignment: Alignment.topLeft,
+                              child: SizedBox(
+                                width: sidebarWidth,
+                                child: mobile
+                                    ? null
+                                    : FSidebar(
+                                        style: .delta(
+                                          decoration: .boxDelta(
+                                            color: null,
+                                            border: BorderDirectional(
+                                              end: BorderSide(
+                                                color: dividerColor,
+                                                width: theme.style.borderWidth,
                                               ),
-                                          ],
+                                            ),
+                                          ),
+                                          groupStyle: .delta(
+                                            itemStyle: .delta(
+                                              backgroundColor: FVariants(
+                                                const Color(0x00000000),
+                                                variants: {
+                                                  [
+                                                    .selected,
+                                                    .hovered,
+                                                    .pressed,
+                                                  ]: sidebarActiveFill,
+                                                  [.disabled]: const Color(
+                                                    0x00000000,
+                                                  ),
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                          constraints: BoxConstraints.tightFor(
+                                            width: sidebarWidth,
+                                          ),
                                         ),
-                                      ],
-                                    ),
+                                        header: SizedBox(
+                                          width: double.infinity,
+                                          child: Padding(
+                                            padding: EdgeInsets.fromLTRB(
+                                              compact ? 16 : 24,
+                                              20,
+                                              compact ? 16 : 24,
+                                              24,
+                                            ),
+                                            child: Align(
+                                              alignment: compact
+                                                  ? Alignment.center
+                                                  : Alignment.centerLeft,
+                                              child: Image.asset(
+                                                'assets/icons/sakuga.png',
+                                                key: const ValueKey(
+                                                  'sidebar-logo',
+                                                ),
+                                                width: 32,
+                                                height: 32,
+                                                semanticLabel: l.appTitle,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        children: [
+                                          FSidebarGroup(
+                                            children: [
+                                              for (
+                                                var i = 0;
+                                                i < labels.length;
+                                                i++
+                                              )
+                                                FSidebarItem(
+                                                  icon: Icon(
+                                                    icons[i],
+                                                    semanticLabel: compact
+                                                        ? labels[i]
+                                                        : null,
+                                                  ),
+                                                  label: compact
+                                                      ? null
+                                                      : Text(labels[i]),
+                                                  selected:
+                                                      shell.currentIndex == i,
+                                                  onPress: () =>
+                                                      shell.goBranch(i),
+                                                ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                              ),
                             ),
                             Expanded(
                               child: FScaffold(
@@ -415,7 +409,7 @@ class DesktopTitleBar extends StatelessWidget {
   const DesktopTitleBar({
     required this.controller,
     this.borderColor,
-    this.compactSidebar = false,
+    this.compactSidebar = true,
     this.onToggleCompactSidebar,
     this.language = 'system',
     this.onLanguageChanged,

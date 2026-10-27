@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sakuga/app/app.dart';
@@ -80,7 +81,7 @@ void main() {
     await settle(tester);
   });
 
-  testWidgets('desktop shell renders four branches', (tester) async {
+  testWidgets('desktop sidebar starts compact and can expand', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -93,12 +94,34 @@ void main() {
       UncontrolledProviderScope(container: container, child: const SakugaApp()),
     );
     await settle(tester);
-    expect(find.text('SAKUGA'), findsOneWidget);
+    final sidebar = find.byType(FSidebar);
+    final logo = find.byKey(const ValueKey('sidebar-logo'));
+    expect(tester.getSize(sidebar).width, 76);
+    expect(find.byType(FSidebarItem), findsNWidgets(4));
+    expect(
+      tester.widget<Image>(logo).image,
+      const AssetImage('assets/icons/sakuga.png'),
+    );
+    expect(container.read(settingsProvider).compactSidebar, isTrue);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const ValueKey('toggle-compact-sidebar')));
+    await settle(tester);
+    expect(tester.getSize(sidebar).width, 200);
+    expect(logo, findsOneWidget);
+    expect(container.read(settingsProvider).compactSidebar, isFalse);
     expect(find.text('Home'), findsWidgets);
     expect(find.text('Library'), findsWidgets);
     expect(find.text('Search'), findsWidgets);
     expect(find.text('Downloads'), findsNothing);
     expect(find.text('Settings'), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const ValueKey('toggle-compact-sidebar')));
+    await settle(tester);
+    expect(tester.getSize(sidebar).width, 76);
+    expect(logo, findsOneWidget);
+    expect(container.read(settingsProvider).compactSidebar, isTrue);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await settle(tester);
