@@ -92,6 +92,7 @@
   "loading": "Loading…",
   "playbackError": "Unable to play this video.",
   "superResolution": "Video super resolution",
+  "gpuSystemUsage": "System GPU usage",
   "superResolutionOff": "Super resolution off",
   "superResolutionEfficiency": "Efficiency",
   "superResolutionQuality": "Quality",

@@ -16,6 +16,7 @@ import '../detail/detail_providers.dart';
 import '../home/home_providers.dart';
 import '../library/library_providers.dart';
 import 'player_assets.dart';
+import 'player_gpu_usage.dart';
 import 'playback_progress_repository.dart';
 import 'player_controls.dart';
 import 'player_controls_controller.dart';
@@ -672,6 +673,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                     itemId: _currentItemId,
                     switching: _switchingEpisode,
                     onSelectEpisode: _selectEpisode,
+                    topLeftOverlay:
+                        _superResolutionMode == SuperResolutionMode.off
+                        ? null
+                        : const PlayerGpuUsage(),
                   ),
                 ),
               ),

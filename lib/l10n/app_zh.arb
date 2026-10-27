@@ -92,6 +92,7 @@
   "loading": "加载中…",
   "playbackError": "无法播放此视频。",
   "superResolution": "视频超分",
+  "gpuSystemUsage": "系统 GPU 占用",
   "superResolutionOff": "关闭超分",
   "superResolutionEfficiency": "效率模式",
   "superResolutionQuality": "质量模式",

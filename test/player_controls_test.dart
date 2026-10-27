@@ -367,6 +367,106 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets(
+    'topLeftOverlay stays visible in top-left when controls hide and shifts below header when shown',
+    (tester) async {
+      final controller = _ControlsController()..playing = true;
+      final currentId = ValueNotifier<String?>(null);
+      final switching = ValueNotifier(false);
+      addTearDown(currentId.dispose);
+      addTearDown(switching.dispose);
+      final container = ProviderContainer(
+        overrides: [
+          settingsRepositoryProvider.overrideWithValue(MemorySettings()),
+          initialSettingsProvider.overrideWithValue(const AppSettings()),
+        ],
+      );
+      final theme = createAppTheme(
+        const AppSettings(),
+        brightness: Brightness.dark,
+        touch: false,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            locale: const Locale('zh'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              ...FLocalizations.localizationsDelegates,
+            ],
+            builder: (context, child) => FTheme(
+              data: theme,
+              child: FToaster(child: child!),
+            ),
+            home: PlayerControls(
+              controller: controller,
+              onToggleFullscreen: () async {},
+              onExitFullscreen: () async {},
+              fullscreen: false,
+              header: const SizedBox(
+                key: ValueKey('test-header'),
+                height: 32,
+                child: Text('Episode'),
+              ),
+              itemId: currentId,
+              switching: switching,
+              onSelectEpisode: (_) async {},
+              topLeftOverlay: const SizedBox(
+                key: ValueKey('test-gpu-hud'),
+                width: 64,
+                height: 24,
+                child: Text('GPU 50%'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Initially controls are visible; HUD sits below the header at (12, 56).
+      final hudFinder = find.byKey(const ValueKey('test-gpu-hud'));
+      expect(hudFinder, findsOneWidget);
+      expect(tester.getTopLeft(hudFinder), const Offset(12, 56));
+
+      // Auto-hide after 3 seconds of playback: controls fade out to opacity 0,
+      // while the HUD remains visible and glides into the top-left corner (12, 12).
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      final opacity = tester.widget<AnimatedOpacity>(
+        find.ancestor(
+          of: find.byKey(const ValueKey('test-header')),
+          matching: find.byType(AnimatedOpacity),
+        ),
+      );
+      expect(opacity.opacity, 0);
+      expect(hudFinder, findsOneWidget);
+      expect(tester.getTopLeft(hudFinder), const Offset(12, 12));
+
+      // Tapping right on the HUD passes through IgnorePointer to reveal controls.
+      await tester.tapAt(const Offset(24, 20));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<AnimatedOpacity>(
+              find.ancestor(
+                of: find.byKey(const ValueKey('test-header')),
+                matching: find.byType(AnimatedOpacity),
+              ),
+            )
+            .opacity,
+        1,
+      );
+      expect(tester.getTopLeft(hudFinder), const Offset(12, 56));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      container.dispose();
+    },
+  );
 }
 
 class _ControlsController extends PlayerControlsController {

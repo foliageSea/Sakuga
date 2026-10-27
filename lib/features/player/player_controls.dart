@@ -34,6 +34,7 @@ class PlayerControls extends ConsumerStatefulWidget {
     required this.switching,
     required this.onSelectEpisode,
     this.onScreenshot,
+    this.topLeftOverlay,
     super.key,
   });
 
@@ -46,6 +47,7 @@ class PlayerControls extends ConsumerStatefulWidget {
   final ValueListenable<bool> switching;
   final Future<void> Function(JellyfinItem) onSelectEpisode;
   final Future<void> Function()? onScreenshot;
+  final Widget? topLeftOverlay;
 
   @override
   ConsumerState<PlayerControls> createState() => _PlayerControlsState();
@@ -570,6 +572,26 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
                         )
                       : const SizedBox.shrink(),
                 ),
+                if (widget.topLeftOverlay case final overlay?)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: IgnorePointer(
+                      child: SafeArea(
+                        right: false,
+                        bottom: false,
+                        child: AnimatedPadding(
+                          duration: const Duration(milliseconds: 160),
+                          curve: Curves.easeOutCubic,
+                          padding: EdgeInsets.only(
+                            left: 12,
+                            top: _visible ? 56 : 12,
+                          ),
+                          child: overlay,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

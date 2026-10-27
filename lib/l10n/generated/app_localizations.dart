@@ -650,6 +650,12 @@ abstract class AppLocalizations {
   /// **'Video super resolution'**
   String get superResolution;
 
+  /// No description provided for @gpuSystemUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'System GPU usage'**
+  String get gpuSystemUsage;
+
   /// No description provided for @superResolutionOff.
   ///
   /// In en, this message translates to:

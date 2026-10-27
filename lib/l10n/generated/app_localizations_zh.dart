@@ -286,6 +286,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get superResolution => '视频超分';
 
   @override
+  String get gpuSystemUsage => '系统 GPU 占用';
+
+  @override
   String get superResolutionOff => '关闭超分';
 
   @override

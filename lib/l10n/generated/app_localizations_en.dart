@@ -288,6 +288,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get superResolution => 'Video super resolution';
 
   @override
+  String get gpuSystemUsage => 'System GPU usage';
+
+  @override
   String get superResolutionOff => 'Super resolution off';
 
   @override
