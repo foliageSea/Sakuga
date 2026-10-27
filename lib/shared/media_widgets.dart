@@ -104,7 +104,7 @@ class PosterHero extends StatelessWidget {
 ///
 /// Defaults to a 2:3 poster frame; pass [aspectRatio] to use the scraped shape
 /// instead, e.g. a 16:9 still for episodes.
-class MediaPosterCard extends StatelessWidget {
+class MediaPosterCard extends StatefulWidget {
   const MediaPosterCard({
     required this.client,
     required this.item,
@@ -113,7 +113,7 @@ class MediaPosterCard extends StatelessWidget {
     this.heroTag,
     this.progress,
     this.aspectRatio,
-    this.translucent = false,
+    this.translucent = true,
     super.key,
   }) : assert(onTap != null || onPosterTap != null);
 
@@ -138,57 +138,138 @@ class MediaPosterCard extends StatelessWidget {
   final bool translucent;
 
   @override
+  State<MediaPosterCard> createState() => _MediaPosterCardState();
+}
+
+class _MediaPosterCardState extends State<MediaPosterCard> {
+  bool _hovered = false;
+  Offset _pointerPosition = Offset.zero;
+
+  void _updateHover(Offset localPosition) {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize || box.size.isEmpty) return;
+    final position = Offset(
+      (localPosition.dx / box.size.width * 2 - 1).clamp(-1.0, 1.0),
+      (localPosition.dy / box.size.height * 2 - 1).clamp(-1.0, 1.0),
+    );
+    if (_hovered && position == _pointerPosition) return;
+    setState(() {
+      _hovered = true;
+      _pointerPosition = position;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final posterUrl = client.imageUrl(item);
-    final subtitle = item.displaySubtitle;
-    final watched = progress;
-    return GestureDetector(
-      onTap: () {
-        final onPosterTap = this.onPosterTap;
-        if (onPosterTap != null) {
-          onPosterTap(posterUrl);
-        } else {
-          onTap?.call();
-        }
-      },
-      child: Surface(
-        padding: 10,
-        translucent: translucent,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: aspectRatio ?? 2 / 3,
-              child: PosterHero(
-                tag: heroTag,
-                borderRadius: theme.style.borderRadius.md,
-                child: MediaImage(url: posterUrl, headers: client.authHeaders),
-              ),
-            ),
-            if (watched != null && watched > 0) ...[
-              const SizedBox(height: 6),
-              MediaProgressBar(value: watched),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              item.displayTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.typography.body.sm,
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.typography.body.xs.copyWith(
-                  color: theme.colors.mutedForeground,
+    final posterUrl = widget.client.imageUrl(widget.item);
+    final subtitle = widget.item.displaySubtitle;
+    final watched = widget.progress;
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (event) => _updateHover(event.localPosition),
+      onHover: (event) => _updateHover(event.localPosition),
+      onExit: (_) => setState(() => _hovered = false),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: _hovered ? 1 : 0),
+        duration: reduceMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        builder: (context, hoverProgress, _) => TweenAnimationBuilder<Offset>(
+          tween: Tween(
+            begin: Offset.zero,
+            end: _hovered && !reduceMotion ? _pointerPosition : Offset.zero,
+          ),
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          builder: (context, tilt, child) {
+            final lift = reduceMotion ? 0.0 : hoverProgress;
+            final scale = 1 + 0.018 * lift;
+            return Transform(
+              alignment: Alignment.center,
+              // Keep the pointer region fixed while the card tilts beneath it.
+              transformHitTests: false,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.001)
+                ..translateByDouble(0, -4 * lift, 0, 1)
+                ..rotateX(-tilt.dy * 0.055)
+                ..rotateY(tilt.dx * 0.055)
+                ..scaleByDouble(scale, scale, scale, 1),
+              child: DecoratedBox(
+                decoration: ShapeDecoration(
+                  shape: RoundedSuperellipseBorder(
+                    borderRadius: theme.style.borderRadius.lg,
+                  ),
+                  shadows: [
+                    BoxShadow(
+                      color: const Color(0xFF000000)
+                          .withValues(alpha: 0.16 * hoverProgress),
+                      blurRadius: 18 * hoverProgress,
+                      offset: Offset(0, 8 * hoverProgress),
+                    ),
+                  ],
                 ),
+                child: child,
               ),
-            ],
-          ],
+            );
+          },
+          child: GestureDetector(
+            onTap: () {
+              final onPosterTap = widget.onPosterTap;
+              if (onPosterTap != null) {
+                onPosterTap(posterUrl);
+              } else {
+                widget.onTap?.call();
+              }
+            },
+            child: Surface(
+              padding: 10,
+              translucent: widget.translucent,
+              hoverProgress: hoverProgress,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AspectRatio(
+                    aspectRatio: widget.aspectRatio ?? 2 / 3,
+                    child: PosterHero(
+                      tag: widget.heroTag,
+                      borderRadius: theme.style.borderRadius.md,
+                      child: MediaImage(
+                        url: posterUrl,
+                        headers: widget.client.authHeaders,
+                      ),
+                    ),
+                  ),
+                  if (watched != null && watched > 0) ...[
+                    const SizedBox(height: 6),
+                    MediaProgressBar(value: watched),
+                  ],
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.item.displayTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.typography.body.sm,
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.typography.body.xs.copyWith(
+                        color: theme.colors.mutedForeground,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

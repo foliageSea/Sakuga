@@ -73,7 +73,7 @@ final homeCarouselIndexProvider =
     NotifierProvider.autoDispose<HomeCarouselIndex, int>(HomeCarouselIndex.new);
 
 /// Resolves the active home carousel slide's poster for the global window
-/// background when viewing the home branch.
+/// background shared by the home and library root routes.
 PosterBackground? watchHomePosterBackground(WidgetRef ref) {
   final servers = ref.watch(serversProvider).value;
   if (servers == null || servers.isEmpty || servers.first.apiKey.isEmpty) {

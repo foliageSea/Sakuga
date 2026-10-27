@@ -625,7 +625,6 @@ class _MediaSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ambient = WindowPosterBackgroundScope.isActive(context);
     return items.when(
       data: (values) {
         if (values.isEmpty) return const SizedBox.shrink();
@@ -651,6 +650,10 @@ class _MediaSection extends StatelessWidget {
                 ),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 12,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -665,7 +668,6 @@ class _MediaSection extends StatelessWidget {
                               child: MediaPosterCard(
                                 client: client,
                                 item: item,
-                                translucent: ambient,
                                 progress: item.progressFraction,
                                 aspectRatio: landscape
                                     ? item.thumbnailAspectRatio

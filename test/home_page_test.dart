@@ -302,6 +302,33 @@ void main() {
       expect(title.maxLines, 1);
       expect(title.overflow, TextOverflow.ellipsis);
     }
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    for (final card in [continueCard, recentCard]) {
+      final restingRect = tester.getRect(card);
+      final title = find
+          .descendant(of: card, matching: find.byType(Text))
+          .first;
+      final restingTitleRect = tester.getRect(title);
+      await mouse.moveTo(restingRect.center + const Offset(20, 20));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(card), isNot(restingRect));
+      expect(tester.getRect(title), isNot(restingTitleRect));
+
+      // Moving within the card changes its tilt without changing layout size.
+      final hoveredRect = tester.getRect(card);
+      await mouse.moveTo(restingRect.center - const Offset(20, 20));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(card), isNot(hoveredRect));
+      expect(tester.getSize(card), restingRect.size);
+
+      await mouse.moveTo(Offset.zero);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(card), restingRect);
+      expect(tester.getRect(title), restingTitleRect);
+    }
+    await mouse.removePointer();
     expect(tester.takeException(), isNull);
   });
 
@@ -431,6 +458,22 @@ void main() {
           'http://127.0.0.1:8096/Items/featured-2/Images/Primary?maxWidth=600&tag=poster-b',
         ),
       );
+
+      // The library inherits the currently selected carousel poster.
+      container.read(routerProvider).go('/library');
+      await pumpFrames();
+      expect(tester.getRect(bgFinder), Offset.zero & windowSize);
+      expect(blurMaskFinder, findsOneWidget);
+      expect(
+        activeBackgroundUrls(),
+        contains(
+          'http://127.0.0.1:8096/Items/featured-2/Images/Primary?maxWidth=600&tag=poster-b',
+        ),
+      );
+
+      container.read(routerProvider).go('/home');
+      await pumpFrames();
+      expect(find.text('Starlight Sonata'), findsOneWidget);
 
       // Clicking the previous arrow returns to the first slide.
       await tester.tap(find.byKey(const ValueKey('home-carousel-prev')));

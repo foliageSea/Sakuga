@@ -35,7 +35,7 @@ class AppShell extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final posterBackground = detailBackgroundSpec != null
         ? watchDetailPosterBackground(ref, detailBackgroundSpec)
-        : isHomeRoute
+        : isHomeRoute || isLibraryRootRoute
         ? watchHomePosterBackground(ref)
         : null;
     final activeServer = isLibraryRootRoute

@@ -178,12 +178,16 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       ];
     }
     return [
-      _PagedGrid(
-        client: library.client,
-        query: (userId: library.userId, viewId: viewId),
-        onTap: (item, posterUrl) => context.go(
-          '/library/${item.id}',
-          extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
+      SliverPadding(
+        // Leave room inside the viewport for the first row's 3D hover effect.
+        padding: const EdgeInsets.only(top: 24),
+        sliver: _PagedGrid(
+          client: library.client,
+          query: (userId: library.userId, viewId: viewId),
+          onTap: (item, posterUrl) => context.go(
+            '/library/${item.id}',
+            extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
+          ),
         ),
       ),
     ];

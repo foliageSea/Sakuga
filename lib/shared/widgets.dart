@@ -224,27 +224,39 @@ class Surface extends StatelessWidget {
     this.padding = 24,
     this.expand = false,
     this.translucent = false,
+    this.hoverProgress = 0,
     super.key,
   });
   final Widget child;
   final double padding;
   final bool expand;
   final bool translucent;
+
+  /// Animated pointer emphasis, from rest (0) to fully hovered (1).
+  final double hoverProgress;
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
     final colors = theme.colors;
     final dark = colors.brightness == Brightness.dark;
     final card = FCard(
-      style: translucent
+      style: translucent || hoverProgress > 0
           ? .delta(
               decoration: .shapeDelta(
-                color: colors.card.withValues(alpha: dark ? 0.56 : 0.64),
+                color: colors.card.withValues(
+                  alpha: translucent
+                      ? (dark ? 0.56 : 0.64) + 0.2 * hoverProgress
+                      : 1,
+                ),
                 shape: RoundedSuperellipseBorder(
                   side: BorderSide(
-                    color: dark
-                        ? colors.border
-                        : colors.foreground.withValues(alpha: 0.09),
+                    color: Color.lerp(
+                      dark
+                          ? colors.border
+                          : colors.foreground.withValues(alpha: 0.09),
+                      colors.primary.withValues(alpha: 0.4),
+                      hoverProgress,
+                    )!,
                     width: theme.style.borderWidth,
                   ),
                   borderRadius: theme.style.borderRadius.lg,
