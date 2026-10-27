@@ -3,10 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_exception.dart';
 import '../../core/logging.dart';
-import '../../data/jellyfin/jellyfin_client.dart';
-import '../../data/jellyfin/jellyfin_models.dart';
-import '../../data/jellyfin/server_profile.dart';
-import '../../data/jellyfin/server_repository.dart';
+import '../../data/media_server/media_server_client.dart';
+import '../../data/media_server/media_server_factory.dart';
+import '../../data/media_server/media_models.dart';
+import '../../data/media_server/server_profile.dart';
+import '../../data/media_server/server_repository.dart';
 import '../player/playback_progress_repository.dart';
 
 typedef LibraryQuery = ({String userId, String viewId});
@@ -18,11 +19,11 @@ class LibraryData {
     required this.views,
   });
 
-  final JellyfinClient client;
+  final MediaServerClient client;
   final String userId;
-  final List<JellyfinView> views;
+  final List<MediaLibrary> views;
 
-  JellyfinView? viewById(String id) {
+  MediaLibrary? viewById(String id) {
     for (final view in views) {
       if (view.id == id) return view;
     }
@@ -41,8 +42,8 @@ final libraryViewsProvider = FutureProvider.autoDispose<LibraryData>((
 ) async {
   final server = ref.watch(activeServerProvider);
   if (server == null) throw const AppException(FailureKind.invalidData);
-  if (server.apiKey.isEmpty) throw const AppException(FailureKind.auth);
-  final client = JellyfinClient(server: server);
+  final client = ref.watch(mediaServerClientProvider(server));
+  if (!client.isConfigured) throw const AppException(FailureKind.auth);
   final users = await client.users();
   if (users.isEmpty) throw const AppException(FailureKind.server);
   final views = await client.views(users.first.id);
@@ -58,7 +59,7 @@ class LibraryItemsState {
     this.loadMoreError,
   });
 
-  final List<JellyfinItem> items;
+  final List<MediaItem> items;
   final int totalRecordCount;
   final bool loadingMore;
   final Object? loadMoreError;
@@ -66,7 +67,7 @@ class LibraryItemsState {
   bool get hasMore => items.length < totalRecordCount;
 
   LibraryItemsState copyWith({
-    List<JellyfinItem>? items,
+    List<MediaItem>? items,
     int? totalRecordCount,
     bool? loadingMore,
     Object? loadMoreError,
@@ -141,7 +142,7 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
     }
   }
 
-  Future<JellyfinItemsPage> _fetch(
+  Future<MediaItemsPage> _fetch(
     LibraryData data, {
     required int startIndex,
   }) async {
@@ -151,7 +152,7 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
       query.viewId,
       startIndex: startIndex,
       limit: pageSize,
-      includeItemTypes: _includeItemTypes(view),
+      types: _itemTypes(view),
     );
     final items = await ref
         .read(playbackProgressRepositoryProvider)
@@ -160,20 +161,25 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
           serverId: data.client.server.id,
           userId: query.userId,
         );
-    return JellyfinItemsPage(
+    return MediaItemsPage(
       items: items,
       totalRecordCount: page.totalRecordCount,
     );
   }
 
-  String _includeItemTypes(JellyfinView? view) =>
-      switch (view?.collectionType) {
-        'tvshows' => 'Series',
-        'movies' => 'Movie,Video',
-        'musicvideos' => 'MusicVideo',
-        'homevideos' => 'Video',
-        _ => 'Movie,Series,Episode,Video,MusicVideo',
-      };
+  Set<MediaType> _itemTypes(MediaLibrary? view) => switch (view?.type) {
+    MediaLibraryType.tvShows => {MediaType.series},
+    MediaLibraryType.movies => {MediaType.movie, MediaType.video},
+    MediaLibraryType.musicVideos => {MediaType.musicVideo},
+    MediaLibraryType.homeVideos => {MediaType.video},
+    _ => {
+      MediaType.movie,
+      MediaType.series,
+      MediaType.episode,
+      MediaType.video,
+      MediaType.musicVideo,
+    },
+  };
 }
 
 final libraryItemsProvider = AsyncNotifierProvider.autoDispose

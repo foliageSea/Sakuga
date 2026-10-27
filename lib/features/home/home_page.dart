@@ -6,9 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/jellyfin/jellyfin_client.dart';
-import '../../data/jellyfin/jellyfin_models.dart';
-import '../../data/jellyfin/server_repository.dart';
+import '../../data/media_server/media_server_client.dart';
+import '../../data/media_server/media_server_factory.dart';
+import '../../data/media_server/media_models.dart';
+import '../../data/media_server/server_repository.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/poster_background.dart';
@@ -43,7 +44,9 @@ class HomePage extends ConsumerWidget {
                 ),
               );
             }
-            if (items.first.apiKey.isEmpty) {
+            if (!ref
+                .watch(mediaServerClientProvider(items.first))
+                .isConfigured) {
               return EmptyNotice(
                 l.noApiKey,
                 child: FButton(
@@ -109,7 +112,7 @@ class HomePage extends ConsumerWidget {
 }
 
 /// Resumes playback where the user left off; series open their detail page.
-void _resume(BuildContext context, JellyfinItem item, String? posterUrl) {
+void _resume(BuildContext context, MediaItem item, String? posterUrl) {
   if (item.isSeries) {
     _openDetail(context, item, posterUrl);
   } else {
@@ -117,7 +120,7 @@ void _resume(BuildContext context, JellyfinItem item, String? posterUrl) {
   }
 }
 
-void _openDetail(BuildContext context, JellyfinItem item, String? posterUrl) {
+void _openDetail(BuildContext context, MediaItem item, String? posterUrl) {
   if (item.isEpisode) {
     context.push(playerLocation(item.id));
     return;
@@ -131,7 +134,7 @@ void _openDetail(BuildContext context, JellyfinItem item, String? posterUrl) {
 class _PosterCarouselSection extends ConsumerWidget {
   const _PosterCarouselSection({required this.client});
 
-  final JellyfinClient client;
+  final MediaServerClient client;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -160,8 +163,8 @@ class _PosterCarousel extends ConsumerStatefulWidget {
   static const autoPlayInterval = Duration(seconds: 6);
   static const _slideDuration = Duration(milliseconds: 420);
 
-  final JellyfinClient client;
-  final List<JellyfinItem> items;
+  final MediaServerClient client;
+  final List<MediaItem> items;
   final double height;
 
   @override
@@ -420,16 +423,16 @@ class _CarouselSlide extends StatelessWidget {
     required this.hasMultiple,
   });
 
-  final JellyfinClient client;
-  final JellyfinItem item;
+  final MediaServerClient client;
+  final MediaItem item;
   final bool mobile;
   final bool hasMultiple;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final posterUrl = client.imageUrl(item);
-    final backdropUrl = client.backdropUrl(item);
+    final posterUrl = item.poster?.url();
+    final backdropUrl = item.backdrop?.url(width: 1920);
     final overview = item.overview?.trim() ?? '';
     final pad = mobile ? 14.0 : 24.0;
     final posterWidth = mobile ? 80.0 : 120.0;
@@ -450,7 +453,10 @@ class _CarouselSlide extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (backdropUrl != null)
-              MediaImage(url: backdropUrl, headers: client.authHeaders)
+              MediaImage(
+                url: backdropUrl,
+                headers: item.backdrop?.headers ?? const {},
+              )
             else if (posterUrl != null)
               ClipRect(
                 child: ImageFiltered(
@@ -463,7 +469,7 @@ class _CarouselSlide extends StatelessWidget {
                     scale: 1.15,
                     child: MediaImage(
                       url: posterUrl,
-                      headers: client.authHeaders,
+                      headers: item.poster?.headers ?? const {},
                     ),
                   ),
                 ),
@@ -525,7 +531,7 @@ class _CarouselSlide extends StatelessWidget {
                             borderRadius: theme.style.borderRadius.md,
                             child: MediaImage(
                               url: posterUrl,
-                              headers: client.authHeaders,
+                              headers: item.poster?.headers ?? const {},
                             ),
                           ),
                         ),
@@ -617,11 +623,11 @@ class _MediaSection extends StatelessWidget {
     required this.onTap,
   });
 
-  final JellyfinClient client;
+  final MediaServerClient client;
   final String title;
-  final AsyncValue<List<JellyfinItem>> items;
+  final AsyncValue<List<MediaItem>> items;
   final VoidCallback onRetry;
-  final void Function(JellyfinItem item, String? posterUrl) onTap;
+  final void Function(MediaItem item, String? posterUrl) onTap;
 
   @override
   Widget build(BuildContext context) {

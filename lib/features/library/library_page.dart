@@ -6,8 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/jellyfin/jellyfin_client.dart';
-import '../../data/jellyfin/jellyfin_models.dart';
+import '../../data/media_server/media_server_client.dart';
+import '../../data/media_server/media_server_factory.dart';
+import '../../data/media_server/media_models.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/poster_background.dart';
@@ -61,7 +62,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         ],
       );
     }
-    if (server.apiKey.isEmpty) {
+    if (!ref.watch(mediaServerClientProvider(server)).isConfigured) {
       return PageContent(
         children: [
           PageHeading(l.library, hideTitleOnMobile: true),
@@ -194,7 +195,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   }
 }
 
-typedef _OpenLibraryItem = void Function(JellyfinItem item, String? posterUrl);
+typedef _OpenLibraryItem = void Function(MediaItem item, String? posterUrl);
 
 class _PagedGrid extends ConsumerWidget {
   const _PagedGrid({
@@ -203,7 +204,7 @@ class _PagedGrid extends ConsumerWidget {
     required this.onTap,
   });
 
-  final JellyfinClient client;
+  final MediaServerClient client;
   final LibraryQuery query;
   final _OpenLibraryItem onTap;
 
@@ -277,7 +278,7 @@ class _PagedGrid extends ConsumerWidget {
     );
   }
 
-  List<JellyfinItem> _uniqueItems(List<JellyfinItem> items) {
+  List<MediaItem> _uniqueItems(List<MediaItem> items) {
     final seen = <String>{};
     return [
       for (final item in items)
@@ -303,15 +304,15 @@ class _MobileMasonryGrid extends StatelessWidget {
   static const _spacing = 12.0;
   static const _cardChromeHeight = 55.0;
 
-  final JellyfinClient client;
-  final List<JellyfinItem> items;
+  final MediaServerClient client;
+  final List<MediaItem> items;
   final _OpenLibraryItem onTap;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final cardWidth = (constraints.maxWidth - _spacing) / 2;
-      final columns = <List<JellyfinItem>>[[], []];
+      final columns = <List<MediaItem>>[[], []];
       final heights = [0.0, 0.0];
       for (final item in items) {
         final column = heights[0] <= heights[1] ? 0 : 1;

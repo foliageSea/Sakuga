@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/jellyfin/jellyfin_probe.dart';
-import '../../data/jellyfin/server_profile.dart';
-import '../../data/jellyfin/server_repository.dart';
+import '../../data/media_server/media_server_factory.dart';
+import '../../data/media_server/server_probe.dart';
+import '../../data/media_server/server_profile.dart';
+import '../../data/media_server/server_repository.dart';
 import '../../shared/localization.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
@@ -212,7 +213,12 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
                               });
                               try {
                                 final result = await ref
-                                    .read(jellyfinProbeProvider)
+                                    .read(
+                                      serverProbeProvider(
+                                        server?.type ??
+                                            MediaServerType.jellyfin,
+                                      ),
+                                    )
                                     .probe(
                                       urlController.text,
                                       apiKey: apiKeyController.text,
@@ -260,6 +266,7 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
                           name: name,
                           baseUrl: baseUrl,
                           apiKey: apiKeyController.text.trim(),
+                          type: server?.type ?? MediaServerType.jellyfin,
                         );
                         try {
                           if (server == null) {

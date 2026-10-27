@@ -3,8 +3,8 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../core/images/artwork_cache.dart';
-import '../data/jellyfin/jellyfin_client.dart';
-import '../data/jellyfin/jellyfin_models.dart';
+import '../data/media_server/media_server_client.dart';
+import '../data/media_server/media_models.dart';
 import 'widgets.dart';
 
 /// A remote artwork frame: cached on disk, faded in, with a placeholder behind.
@@ -117,8 +117,8 @@ class MediaPosterCard extends StatefulWidget {
     super.key,
   }) : assert(onTap != null || onPosterTap != null);
 
-  final JellyfinClient client;
-  final JellyfinItem item;
+  final MediaServerClient client;
+  final MediaItem item;
   final VoidCallback? onTap;
 
   /// Invoked with the resolved poster URL when tapped, so a destination route
@@ -162,7 +162,7 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final posterUrl = widget.client.imageUrl(widget.item);
+    final posterUrl = widget.item.poster?.url();
     final subtitle = widget.item.displaySubtitle;
     final watched = widget.progress;
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
@@ -240,7 +240,7 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
                       borderRadius: theme.style.borderRadius.md,
                       child: MediaImage(
                         url: posterUrl,
-                        headers: widget.client.authHeaders,
+                        headers: widget.item.poster?.headers ?? const {},
                       ),
                     ),
                   ),

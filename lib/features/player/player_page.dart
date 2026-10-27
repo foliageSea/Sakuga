@@ -7,8 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
-import '../../data/jellyfin/jellyfin_client.dart';
-import '../../data/jellyfin/jellyfin_models.dart';
+import '../../data/media_server/media_server_client.dart';
+import '../../data/media_server/media_models.dart';
+import '../../data/media_server/playback_models.dart';
 import '../../shared/localization.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
@@ -45,11 +46,11 @@ final _refreshPlaybackProvider = Provider((ref) {
   };
 });
 
-/// Full-screen Jellyfin player.
+/// Full-screen media player.
 class PlayerPage extends ConsumerStatefulWidget {
   const PlayerPage({this.itemId, super.key});
 
-  /// The Jellyfin item to play. Null on the dev route, which plays
+  /// The media item to play. Null on the dev route, which plays
   /// [DEV_MEDIA_URL] instead of a library item.
   final String? itemId;
 
@@ -75,8 +76,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   Track _track = const Track();
   SuperResolutionMode _superResolutionMode = SuperResolutionMode.off;
   PlayerAssets? _assets;
-  JellyfinClient? _client;
-  JellyfinPlaybackSession? _playbackSession;
+  MediaServerClient? _client;
+  PlaybackSession? _playbackSession;
   String? _serverId;
   String? _userId;
   String? _progressItemId;
@@ -88,7 +89,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   Duration? _pendingStartPosition;
   bool _fallbackStartSeekIssued = false;
   DateTime? _fileLoadedAt;
-  List<JellyfinSubtitleSource> _pendingSubtitles = const [];
+  List<SubtitleSource> _pendingSubtitles = const [];
   String _externalSubtitleLabel = '';
   bool _subtitlesAttached = false;
   bool _receivedPlayerPosition = false;
@@ -277,7 +278,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       if (!mounted || generation != _openGeneration) return;
       final item = await library.client.item(library.userId, itemId);
       if (!mounted || generation != _openGeneration) return;
-      final serverTicks = item.playbackPositionTicks ?? 0;
+      final serverTicks = _durationToTicks(
+        item.playbackPosition ?? Duration.zero,
+      );
       final localTicks = await _loadLocalProgress(
         serverId: library.client.server.id,
         userId: library.userId,
@@ -288,7 +291,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       final source = await library.client.playbackSource(
         library.userId,
         itemId,
-        startTimeTicks: ticks,
+        startPosition: Duration(microseconds: ticks ~/ 10),
       );
       if (!mounted || generation != _openGeneration) return;
       _client = library.client;
@@ -297,7 +300,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       _userId = library.userId;
       _progressItemId = itemId;
       _seriesId = item.seriesId;
-      _runtimeTicks = item.runTimeTicks;
+      _runtimeTicks = item.runtime == null
+          ? null
+          : _durationToTicks(item.runtime!);
       _position = source.initialPosition;
       _initialPosition = source.initialPosition;
       _positionOffset = source.positionOffset;
@@ -416,21 +421,21 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           if (stopped) {
             await client.reportPlaybackStopped(
               session,
-              positionTicks: sessionTicks,
+              position: Duration(microseconds: sessionTicks ~/ 10),
               failed: failed,
               volume: volume,
             );
           } else if (started) {
             await client.reportPlaybackStarted(
               session,
-              positionTicks: sessionTicks,
+              position: Duration(microseconds: sessionTicks ~/ 10),
               isPaused: isPaused,
               volume: volume,
             );
           } else {
             await client.reportPlaybackProgress(
               session,
-              positionTicks: sessionTicks,
+              position: Duration(microseconds: sessionTicks ~/ 10),
               isPaused: isPaused,
               volume: volume,
             );
@@ -441,7 +446,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         await client.updatePlaybackPosition(
           userId,
           itemId,
-          positionTicks: persistedTicks,
+          position: Duration(microseconds: persistedTicks ~/ 10),
           played: finished ? true : null,
         );
         await _clearLocalIfCurrent(
@@ -616,7 +621,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     }
   }
 
-  Future<void> _selectEpisode(JellyfinItem episode) async {
+  Future<void> _selectEpisode(MediaItem episode) async {
     if (_switchingEpisode.value ||
         _exiting ||
         episode.id == _currentItemId.value) {
@@ -751,7 +756,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     );
   }
 
-  Widget _buildHeader(JellyfinItem? item, VoidCallback onBack) {
+  Widget _buildHeader(MediaItem? item, VoidCallback onBack) {
     final generation = _openGeneration;
     return Row(
       children: [
@@ -808,7 +813,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   /// The item the route asked for, once the library session is available.
-  JellyfinItem? get _item {
+  MediaItem? get _item {
     final currentItemId = _currentItemId.value;
     if (currentItemId == null || currentItemId.isEmpty) return null;
     final userId = ref.watch(libraryViewsProvider).value?.userId;
@@ -818,7 +823,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         .value;
   }
 
-  String _title(JellyfinItem item) {
+  String _title(MediaItem item) {
     final code = item.episodeCode;
     return code == null ? item.name : '$code · ${item.name}';
   }

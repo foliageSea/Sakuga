@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/jellyfin/jellyfin_client.dart';
-import '../../data/jellyfin/jellyfin_models.dart';
+import '../../data/media_server/media_server_client.dart';
+import '../../data/media_server/media_server_factory.dart';
+import '../../data/media_server/media_models.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/poster_background.dart';
@@ -19,7 +20,7 @@ import 'detail_providers.dart';
 class DetailRouteExtra {
   const DetailRouteExtra({required this.item, this.posterUrl});
 
-  final JellyfinItem item;
+  final MediaItem item;
   final String? posterUrl;
 }
 
@@ -54,7 +55,7 @@ CustomTransitionPage<void> buildDetailTransitionPage(GoRouterState state) {
 /// Route inputs needed to resolve the detail page's ambient poster background.
 typedef DetailBackgroundSpec = ({
   String itemId,
-  JellyfinItem? initialItem,
+  MediaItem? initialItem,
   String? initialPosterUrl,
 });
 
@@ -69,7 +70,6 @@ PosterBackground? watchDetailPosterBackground(
   final library = ref.watch(libraryViewsProvider);
   return library.when(
     data: (data) {
-      final client = data.client;
       final item = ref.watch(
         libraryItemProvider((userId: data.userId, itemId: spec.itemId)),
       );
@@ -77,31 +77,31 @@ PosterBackground? watchDetailPosterBackground(
         data: (value) {
           final reusePosterUrl =
               spec.initialPosterUrl != null &&
-              value.imageTags['Primary'] == preview?.imageTags['Primary'];
+              value.poster?.cacheKey == preview?.poster?.cacheKey;
           return (reusePosterUrl ? spec.initialPosterUrl : null) ??
-              client.imageUrl(value);
+              value.poster?.url();
         },
-        loading: () =>
-            spec.initialPosterUrl ??
-            (preview == null ? null : client.imageUrl(preview)),
-        error: (_, _) =>
-            spec.initialPosterUrl ??
-            (preview == null ? null : client.imageUrl(preview)),
+        loading: () => spec.initialPosterUrl ?? preview?.poster?.url(),
+        error: (_, _) => spec.initialPosterUrl ?? preview?.poster?.url(),
       );
       return url == null
           ? null
-          : PosterBackground(url: url, headers: client.authHeaders);
+          : PosterBackground(
+              url: url,
+              headers:
+                  (item.value?.poster ?? preview?.poster)?.headers ?? const {},
+            );
     },
     loading: () {
       final server = ref.watch(activeServerProvider);
       if (server == null) return null;
-      final client = JellyfinClient(server: server);
-      final url =
-          spec.initialPosterUrl ??
-          (preview == null ? null : client.imageUrl(preview));
+      final url = spec.initialPosterUrl ?? preview?.poster?.url();
       return url == null
           ? null
-          : PosterBackground(url: url, headers: client.authHeaders);
+          : PosterBackground(
+              url: url,
+              headers: preview?.poster?.headers ?? const {},
+            );
     },
     error: (_, _) => null,
   );
@@ -116,7 +116,7 @@ class DetailPage extends ConsumerWidget {
   });
 
   final String itemId;
-  final JellyfinItem? initialItem;
+  final MediaItem? initialItem;
   final String? initialPosterUrl;
 
   @override
@@ -138,7 +138,7 @@ class DetailPage extends ConsumerWidget {
             slivers: [
               SliverToBoxAdapter(
                 child: _Hero(
-                  client: JellyfinClient(server: server),
+                  client: ref.watch(mediaServerClientProvider(server)),
                   item: preview,
                   posterUrl: initialPosterUrl,
                 ),
@@ -190,10 +190,10 @@ class _DetailBody extends ConsumerWidget {
     this.initialPosterUrl,
   });
 
-  final JellyfinClient client;
+  final MediaServerClient client;
   final String userId;
   final String itemId;
-  final JellyfinItem? initialItem;
+  final MediaItem? initialItem;
   final String? initialPosterUrl;
 
   @override
@@ -205,7 +205,7 @@ class _DetailBody extends ConsumerWidget {
       data: (value) {
         final reusePosterUrl =
             initialPosterUrl != null &&
-            value.imageTags['Primary'] == preview?.imageTags['Primary'];
+            value.poster?.cacheKey == preview?.poster?.cacheKey;
         return _DetailScaffold(
           slivers: [
             SliverToBoxAdapter(
@@ -349,8 +349,8 @@ void popDetailRoute(BuildContext context) {
 class _Hero extends StatelessWidget {
   const _Hero({required this.client, required this.item, this.posterUrl});
 
-  final JellyfinClient client;
-  final JellyfinItem item;
+  final MediaServerClient client;
+  final MediaItem item;
   final String? posterUrl;
 
   @override
@@ -364,14 +364,14 @@ class _Hero extends StatelessWidget {
         tag: posterHeroTag(item.id),
         borderRadius: theme.style.borderRadius.md,
         child: MediaImage(
-          url: posterUrl ?? client.imageUrl(item),
-          headers: client.authHeaders,
+          url: posterUrl ?? item.poster?.url(),
+          headers: item.poster?.headers ?? const {},
         ),
       ),
     );
     final backdrop = MediaImage(
-      url: client.backdropUrl(item),
-      headers: client.authHeaders,
+      url: item.backdrop?.url(width: 1920),
+      headers: item.backdrop?.headers ?? const {},
     );
     if (mobile) {
       return Column(
@@ -434,7 +434,7 @@ class _Hero extends StatelessWidget {
 class _TitleBlock extends StatelessWidget {
   const _TitleBlock({required this.item, required this.onDark});
 
-  final JellyfinItem item;
+  final MediaItem item;
   final bool onDark;
 
   @override
@@ -514,7 +514,7 @@ class _Tag extends StatelessWidget {
 class _About extends StatelessWidget {
   const _About({required this.item});
 
-  final JellyfinItem item;
+  final MediaItem item;
 
   @override
   Widget build(BuildContext context) {
@@ -578,7 +578,7 @@ class _SectionTitle extends StatelessWidget {
 class _PersonChip extends StatelessWidget {
   const _PersonChip({required this.person});
 
-  final JellyfinPerson person;
+  final MediaPerson person;
 
   @override
   Widget build(BuildContext context) {
@@ -628,9 +628,9 @@ class _Episodes extends ConsumerStatefulWidget {
     required this.series,
   });
 
-  final JellyfinClient client;
+  final MediaServerClient client;
   final String userId;
-  final JellyfinItem series;
+  final MediaItem series;
 
   @override
   ConsumerState<_Episodes> createState() => _EpisodesState();
@@ -687,7 +687,7 @@ class _EpisodesState extends ConsumerState<_Episodes> {
     );
   }
 
-  Widget _seasonChips(BuildContext context, List<JellyfinItem> seasons) {
+  Widget _seasonChips(BuildContext context, List<MediaItem> seasons) {
     final l = context.l10n;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -727,10 +727,7 @@ class _EpisodesState extends ConsumerState<_Episodes> {
     child: Text(label),
   );
 
-  List<Widget> _episodeSlivers(
-    BuildContext context,
-    List<JellyfinItem> episodes,
-  ) {
+  List<Widget> _episodeSlivers(BuildContext context, List<MediaItem> episodes) {
     final ambient = WindowPosterBackgroundScope.isActive(context);
     if (episodes.isEmpty) {
       return [
@@ -764,8 +761,8 @@ class _EpisodeTile extends StatelessWidget {
     this.translucent = false,
   });
 
-  final JellyfinClient client;
-  final JellyfinItem item;
+  final MediaServerClient client;
+  final MediaItem item;
   final bool translucent;
 
   @override
@@ -793,8 +790,8 @@ class _EpisodeTile extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: theme.style.borderRadius.md,
                       child: MediaImage(
-                        url: client.imageUrl(item),
-                        headers: client.authHeaders,
+                        url: item.poster?.url(),
+                        headers: item.poster?.headers ?? const {},
                       ),
                     ),
                   ),

@@ -2,10 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_client.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_models.dart';
-import 'package:sakuga/data/jellyfin/server_profile.dart';
-import 'package:sakuga/data/jellyfin/server_repository.dart';
+import 'package:sakuga/data/media_server/media_models.dart';
+import 'package:sakuga/data/media_server/server_profile.dart';
+import 'package:sakuga/data/media_server/server_repository.dart';
 import 'package:sakuga/features/library/library_providers.dart';
 import 'package:sakuga/features/player/playback_progress_repository.dart';
 
@@ -19,33 +18,34 @@ class _Progress extends Fake implements PlaybackProgressRepository {
   }) async => {};
 }
 
-class _Client extends JellyfinClient {
+class _Client extends FakeMediaServerClient {
   _Client(ServerProfile server) : super(server: server);
 
   final pageStarted = Completer<void>();
-  final nextPage = Completer<JellyfinItemsPage>();
+  final nextPage = Completer<MediaItemsPage>();
 
   @override
-  Future<JellyfinItemsPage> items(
+  Future<MediaItemsPage> items(
     String userId,
     String parentId, {
     int startIndex = 0,
     int limit = 60,
-    String includeItemTypes = 'Movie,Series,Episode,Video,MusicVideo',
-    String sortBy = 'SortName',
+    Set<MediaType> types = const {
+      MediaType.movie,
+      MediaType.series,
+      MediaType.episode,
+      MediaType.video,
+      MediaType.musicVideo,
+    },
+    MediaSort sort = MediaSort.name,
   }) async {
     if (startIndex > 0) {
       pageStarted.complete();
       return nextPage.future;
     }
-    return JellyfinItemsPage(
+    return MediaItemsPage(
       items: [
-        JellyfinItem(
-          id: 'same-item-id',
-          name: server.name,
-          type: 'Movie',
-          imageTags: const {},
-        ),
+        MediaItem(id: 'same-item-id', name: server.name, type: MediaType.movie),
       ],
       totalRecordCount: 2,
     );
@@ -71,10 +71,10 @@ void main() {
                 client: clients[server.id]!,
                 userId: 'same-user',
                 views: const [
-                  JellyfinView(
+                  MediaLibrary(
                     id: 'same-view',
                     name: 'Movies',
-                    collectionType: 'movies',
+                    type: MediaLibraryType.movies,
                   ),
                 ],
               );
@@ -99,7 +99,7 @@ void main() {
           clients['a']!.nextPage.completeError(StateError('old server failed'));
         } else {
           clients['a']!.nextPage.complete(
-            const JellyfinItemsPage(items: [], totalRecordCount: 1),
+            const MediaItemsPage(items: [], totalRecordCount: 1),
           );
         }
         await oldRequest;

@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 
 import '../../core/app_exception.dart';
-import 'jellyfin_models.dart';
-import 'server_profile.dart';
+import '../media_server/media_models.dart';
+import '../media_server/media_server_client.dart';
+import '../media_server/playback_models.dart';
+import '../media_server/server_profile.dart';
+import 'jellyfin_mapper.dart';
+import 'jellyfin_playback_session.dart';
 
-class JellyfinClient {
+class JellyfinClient implements MediaServerClient {
   static const _playbackReportTimeout = Duration(seconds: 3);
 
   JellyfinClient({required this.server, Dio? dio})
@@ -22,8 +26,17 @@ class JellyfinClient {
             ),
           );
 
+  @override
   final ServerProfile server;
+
+  @override
+  bool get isConfigured => server.apiKey.isNotEmpty;
   final Dio _dio;
+
+  late final _mapper = JellyfinMapper(
+    baseUrl: server.baseUrl,
+    headers: authHeaders,
+  );
 
   /// Fields shared by every browse request: scraped image metadata plus the
   /// per-user playback state.
@@ -37,11 +50,13 @@ class JellyfinClient {
   /// mpv supports the common Jellyfin containers and codecs directly. The
   /// server can still return a transcoding URL when the source is not suitable
   /// for direct playback; that URL must be used as-is.
-  Future<JellyfinPlaybackSource> playbackSource(
+  @override
+  Future<PlaybackSource> playbackSource(
     String userId,
     String itemId, {
-    int startTimeTicks = 0,
+    Duration startPosition = Duration.zero,
   }) async {
+    final startTimeTicks = jellyfinTicks(startPosition);
     final response = await _dio.post<Map<String, dynamic>>(
       '/Items/$itemId/PlaybackInfo',
       queryParameters: {'userId': userId},
@@ -86,14 +101,14 @@ class JellyfinClient {
       mediaSourceId: mediaSourceId,
       playSessionId: playSessionId,
       playMethod: source['SupportsDirectPlay'] == true
-          ? JellyfinPlayMethod.directPlay
+          ? PlayMethod.directPlay
           : (source['TranscodingUrl'] as String?)?.isNotEmpty == true
-          ? JellyfinPlayMethod.transcode
-          : JellyfinPlayMethod.directStream,
+          ? PlayMethod.transcode
+          : PlayMethod.directStream,
     );
 
     if (source['SupportsDirectPlay'] == true) {
-      return JellyfinPlaybackSource(
+      return PlaybackSource(
         url: _url(
           '/Videos/$itemId/stream',
           queryParameters: {
@@ -117,7 +132,7 @@ class JellyfinClient {
           isHls || _queryFlag(transcodingUrl, 'CopyTimestamps')
           ? Duration.zero
           : _durationFromTicks(startTimeTicks);
-      return JellyfinPlaybackSource(
+      return PlaybackSource(
         url: _absoluteUrl(transcodingUrl),
         headers: headers,
         startPosition: isHls
@@ -131,7 +146,7 @@ class JellyfinClient {
     }
 
     if (source['SupportsDirectStream'] == true) {
-      return JellyfinPlaybackSource(
+      return PlaybackSource(
         url: _url(
           '/Videos/$itemId/stream',
           queryParameters: {
@@ -150,41 +165,44 @@ class JellyfinClient {
     throw const AppException(FailureKind.invalidData, 'No playable source');
   }
 
+  @override
   Future<void> reportPlaybackStarted(
-    JellyfinPlaybackSession session, {
-    required int positionTicks,
+    PlaybackSession session, {
+    required Duration position,
     required bool isPaused,
     double volume = 100,
   }) => _reportPlayback(
     '/Sessions/Playing',
     session,
-    positionTicks: positionTicks,
+    positionTicks: jellyfinTicks(position),
     isPaused: isPaused,
     volume: volume,
   );
 
+  @override
   Future<void> reportPlaybackProgress(
-    JellyfinPlaybackSession session, {
-    required int positionTicks,
+    PlaybackSession session, {
+    required Duration position,
     required bool isPaused,
     double volume = 100,
   }) => _reportPlayback(
     '/Sessions/Playing/Progress',
     session,
-    positionTicks: positionTicks,
+    positionTicks: jellyfinTicks(position),
     isPaused: isPaused,
     volume: volume,
   );
 
+  @override
   Future<void> reportPlaybackStopped(
-    JellyfinPlaybackSession session, {
-    required int positionTicks,
+    PlaybackSession session, {
+    required Duration position,
     required bool failed,
     double volume = 100,
   }) => _reportPlayback(
     '/Sessions/Playing/Stopped',
     session,
-    positionTicks: positionTicks,
+    positionTicks: jellyfinTicks(position),
     isPaused: true,
     volume: volume,
     failed: failed,
@@ -192,14 +210,15 @@ class JellyfinClient {
 
   /// Persists resume progress for an explicit user. Session playback reports
   /// cannot infer a user when the client authenticates with an API key.
+  @override
   Future<void> updatePlaybackPosition(
     String userId,
     String itemId, {
-    required int positionTicks,
+    required Duration position,
     bool? played,
   }) async {
     final payload = {
-      'PlaybackPositionTicks': positionTicks,
+      'PlaybackPositionTicks': jellyfinTicks(position),
       'LastPlayedDate': DateTime.now().toUtc().toIso8601String(),
       'Played': ?played,
     };
@@ -246,12 +265,19 @@ class JellyfinClient {
 
   Future<void> _reportPlayback(
     String path,
-    JellyfinPlaybackSession session, {
+    PlaybackSession session, {
     required int positionTicks,
     required bool isPaused,
     required double volume,
     bool? failed,
   }) async {
+    if (session is! JellyfinPlaybackSession) {
+      throw ArgumentError.value(
+        session,
+        'session',
+        'Expected a Jellyfin session',
+      );
+    }
     await _postPlaybackUpdate(
       path,
       data: {
@@ -265,7 +291,11 @@ class JellyfinClient {
         'IsMuted': volume <= 0,
         'VolumeLevel': volume.round().clamp(0, 100),
         'CanSeek': true,
-        'PlayMethod': session.playMethod.apiValue,
+        'PlayMethod': switch (session.playMethod) {
+          PlayMethod.directPlay => 'DirectPlay',
+          PlayMethod.directStream => 'DirectStream',
+          PlayMethod.transcode => 'Transcode',
+        },
         'RepeatMode': 'RepeatNone',
         'Failed': ?failed,
       },
@@ -277,19 +307,21 @@ class JellyfinClient {
         'MediaBrowser Token="$apiKey", Client="Sakuga", Device="Sakuga", DeviceId="sakuga", Version="0.1.0"',
   };
 
-  Future<List<JellyfinUser>> users() async {
+  @override
+  Future<List<MediaUser>> users() async {
     if (server.apiKey.isEmpty) {
       throw const AppException(FailureKind.auth);
     }
     final response = await _dio.get<List<dynamic>>('/Users');
     return (response.data ?? const [])
         .whereType<Map<String, dynamic>>()
-        .map(JellyfinUser.fromJson)
+        .map(_mapper.user)
         .where((user) => user.id.isNotEmpty)
         .toList();
   }
 
-  Future<List<JellyfinView>> views(String userId) async {
+  @override
+  Future<List<MediaLibrary>> views(String userId) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/UserViews',
@@ -307,15 +339,22 @@ class JellyfinClient {
 
   /// One page of a library view.
   ///
-  /// [includeItemTypes] decides what the page contains: TV libraries should ask
+  /// [types] decides what the page contains: TV libraries should ask
   /// for `Series` only, so that episodes are not flattened into the poster grid.
-  Future<JellyfinItemsPage> items(
+  @override
+  Future<MediaItemsPage> items(
     String userId,
     String parentId, {
     int startIndex = 0,
     int limit = 60,
-    String includeItemTypes = 'Movie,Series,Episode,Video,MusicVideo',
-    String sortBy = 'SortName',
+    Set<MediaType> types = const {
+      MediaType.movie,
+      MediaType.series,
+      MediaType.episode,
+      MediaType.video,
+      MediaType.musicVideo,
+    },
+    MediaSort sort = MediaSort.name,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/Items',
@@ -323,8 +362,11 @@ class JellyfinClient {
         'userId': userId,
         'parentId': parentId,
         'recursive': true,
-        'includeItemTypes': includeItemTypes,
-        'sortBy': sortBy,
+        'includeItemTypes': types.map(JellyfinMapper.itemType).join(','),
+        'sortBy': switch (sort) {
+          MediaSort.name => 'SortName',
+          MediaSort.random => 'Random',
+        },
         'sortOrder': 'Ascending',
         'fields': _itemFields,
         'imageTypeLimit': 1,
@@ -336,7 +378,8 @@ class JellyfinClient {
   }
 
   /// Seasons of a series, ordered by season number.
-  Future<List<JellyfinItem>> seasons(String userId, String seriesId) async {
+  @override
+  Future<List<MediaItem>> seasons(String userId, String seriesId) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/Shows/$seriesId/Seasons',
       queryParameters: {
@@ -351,7 +394,8 @@ class JellyfinClient {
   }
 
   /// Episodes of a series, optionally limited to one season.
-  Future<List<JellyfinItem>> episodes(
+  @override
+  Future<List<MediaItem>> episodes(
     String userId,
     String seriesId, {
     String? seasonId,
@@ -378,7 +422,8 @@ class JellyfinClient {
   }
 
   /// One item with the metadata the detail page renders.
-  Future<JellyfinItem> item(String userId, String itemId) async {
+  @override
+  Future<MediaItem> item(String userId, String itemId) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/Items/$itemId',
       queryParameters: {
@@ -389,11 +434,12 @@ class JellyfinClient {
             'Taglines,PrimaryImageAspectRatio,ImageTags,UserData',
       },
     );
-    return JellyfinItem.fromJson(response.data ?? const {});
+    return _mapper.item(response.data ?? const {});
   }
 
   /// Items the user has started but not finished, most recent first.
-  Future<List<JellyfinItem>> resume(String userId, {int limit = 12}) async {
+  @override
+  Future<List<MediaItem>> resume(String userId, {int limit = 12}) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/Items',
       queryParameters: {
@@ -412,7 +458,8 @@ class JellyfinClient {
   }
 
   /// Recently added media. The server answers with a plain array here.
-  Future<List<JellyfinItem>> latest(String userId, {int limit = 12}) async {
+  @override
+  Future<List<MediaItem>> latest(String userId, {int limit = 12}) async {
     final response = await _dio.get<List<dynamic>>(
       '/Users/$userId/Items/Latest',
       queryParameters: {
@@ -423,13 +470,14 @@ class JellyfinClient {
     );
     return (response.data ?? const [])
         .whereType<Map<String, dynamic>>()
-        .map(JellyfinItem.fromJson)
+        .map(_mapper.item)
         .where((item) => item.id.isNotEmpty)
         .toList();
   }
 
   /// Random movies and series with hero metadata for the home carousel.
-  Future<List<JellyfinItem>> randomItems(String userId, {int limit = 8}) async {
+  @override
+  Future<List<MediaItem>> randomItems(String userId, {int limit = 8}) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/Items',
       queryParameters: {
@@ -449,7 +497,8 @@ class JellyfinClient {
   }
 
   /// Server-side search across movies, series and videos.
-  Future<List<JellyfinItem>> search(
+  @override
+  Future<List<MediaItem>> search(
     String userId,
     String term, {
     int limit = 60,
@@ -471,82 +520,34 @@ class JellyfinClient {
     return _parseItems(response.data);
   }
 
-  List<JellyfinView> _parseViews(Map<String, dynamic>? data) {
+  List<MediaLibrary> _parseViews(Map<String, dynamic>? data) {
     final items = data?['Items'];
     if (items is! List) return const [];
     return items
         .whereType<Map<String, dynamic>>()
-        .map(JellyfinView.fromJson)
+        .map(_mapper.library)
         .where((view) => view.id.isNotEmpty)
         .toList();
   }
 
-  List<JellyfinItem> _parseItems(Map<String, dynamic>? data) {
+  List<MediaItem> _parseItems(Map<String, dynamic>? data) {
     final items = data?['Items'];
     if (items is! List) return const [];
     return items
         .whereType<Map<String, dynamic>>()
-        .map(JellyfinItem.fromJson)
+        .map(_mapper.item)
         .where((item) => item.id.isNotEmpty)
         .toList();
   }
 
-  JellyfinItemsPage _parseItemsPage(Map<String, dynamic>? data) {
+  MediaItemsPage _parseItemsPage(Map<String, dynamic>? data) {
     final items = _parseItems(data);
     final total = (data?['TotalRecordCount'] as num?)?.toInt() ?? 0;
-    return JellyfinItemsPage(
+    return MediaItemsPage(
       items: items,
       totalRecordCount: total < items.length ? items.length : total,
     );
   }
-
-  /// The scraped primary image for [item].
-  ///
-  /// Uses a stable canonical [width] by default so responsive layout changes
-  /// and window resizes keep hitting the memory and disk caches instead of
-  /// requesting a new `maxWidth` variant per pixel.
-  ///
-  /// Episodes rarely have a primary image of their own; the server then exposes
-  /// the owning season/series image through `ParentPrimaryImageTag` or
-  /// `SeriesPrimaryImageTag`, which is used as a fallback here.
-  String? imageUrl(JellyfinItem item, {int width = 600}) {
-    final primary = item.imageTags['Primary'];
-    if (primary != null && primary.isNotEmpty) {
-      return _imageUrl(item.id, primary, width);
-    }
-    final parentId = item.parentPrimaryImageItemId;
-    final parentTag = item.parentPrimaryImageTag;
-    if (parentId != null &&
-        parentId.isNotEmpty &&
-        parentTag != null &&
-        parentTag.isNotEmpty) {
-      return _imageUrl(parentId, parentTag, width);
-    }
-    final seriesId = item.seriesId;
-    final seriesTag = item.seriesPrimaryImageTag;
-    if (seriesId != null &&
-        seriesId.isNotEmpty &&
-        seriesTag != null &&
-        seriesTag.isNotEmpty) {
-      return _imageUrl(seriesId, seriesTag, width);
-    }
-    return null;
-  }
-
-  /// The first scraped backdrop, when the item has one.
-  ///
-  /// Defaults to a stable canonical [width] so resizing the detail window does
-  /// not invalidate the cached backdrop.
-  String? backdropUrl(JellyfinItem item, {int width = 1920}) {
-    if (item.backdropImageTags.isEmpty) return null;
-    final tag = item.backdropImageTags.first;
-    if (tag.isEmpty) return null;
-    return '${server.baseUrl}/Items/${item.id}/Images/Backdrop/0'
-        '?maxWidth=$width&tag=$tag';
-  }
-
-  String _imageUrl(String itemId, String tag, int width) =>
-      '${server.baseUrl}/Items/$itemId/Images/Primary?maxWidth=$width&tag=$tag';
 
   String _url(String path, {Map<String, String>? queryParameters}) =>
       Uri.parse('${server.baseUrl.replaceFirst(RegExp(r'/$'), '')}$path')
@@ -589,20 +590,20 @@ class JellyfinClient {
     return false;
   }
 
-  List<JellyfinSubtitleSource> _subtitleSources(Map<String, dynamic> source) =>
+  List<SubtitleSource> _subtitleSources(Map<String, dynamic> source) =>
       (source['MediaStreams'] as List? ?? const [])
           .whereType<Map<String, dynamic>>()
           .where((stream) => stream['Type'] == 'Subtitle')
           .map((stream) {
             final deliveryUrl = stream['DeliveryUrl'] as String?;
             if (deliveryUrl == null || deliveryUrl.isEmpty) return null;
-            return JellyfinSubtitleSource(
+            return SubtitleSource(
               url: _absoluteUrl(deliveryUrl),
               title: (stream['DisplayTitle'] ?? stream['Title']) as String?,
               language: stream['Language'] as String?,
             );
           })
-          .whereType<JellyfinSubtitleSource>()
+          .whereType<SubtitleSource>()
           .toList();
 
   static const _mpvDeviceProfile = <String, dynamic>{
@@ -638,61 +639,4 @@ class JellyfinClient {
       {'Format': 'dvdsub', 'Method': 'External'},
     ],
   };
-}
-
-class JellyfinPlaybackSource {
-  const JellyfinPlaybackSource({
-    required this.url,
-    required this.headers,
-    required this.session,
-    this.startPosition = Duration.zero,
-    Duration? initialPosition,
-    this.positionOffset = Duration.zero,
-    this.subtitles = const [],
-  }) : initialPosition = initialPosition ?? startPosition;
-
-  final String url;
-  final Map<String, String> headers;
-  final JellyfinPlaybackSession session;
-
-  /// Position requested during playback negotiation, in the original item.
-  final Duration initialPosition;
-
-  /// Added to a zero-based transcoded stream position when reporting progress.
-  final Duration positionOffset;
-
-  /// Position to seek in the opened stream. Transcoded URLs already encode it.
-  final Duration startPosition;
-  final List<JellyfinSubtitleSource> subtitles;
-}
-
-enum JellyfinPlayMethod {
-  directPlay('DirectPlay'),
-  directStream('DirectStream'),
-  transcode('Transcode');
-
-  const JellyfinPlayMethod(this.apiValue);
-  final String apiValue;
-}
-
-class JellyfinPlaybackSession {
-  const JellyfinPlaybackSession({
-    required this.itemId,
-    required this.mediaSourceId,
-    required this.playSessionId,
-    required this.playMethod,
-  });
-
-  final String itemId;
-  final String mediaSourceId;
-  final String playSessionId;
-  final JellyfinPlayMethod playMethod;
-}
-
-class JellyfinSubtitleSource {
-  const JellyfinSubtitleSource({required this.url, this.title, this.language});
-
-  final String url;
-  final String? title;
-  final String? language;
 }

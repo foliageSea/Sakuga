@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/settings/settings.dart';
-import '../../data/jellyfin/jellyfin_models.dart';
+import '../../data/media_server/media_models.dart';
 
 abstract interface class PlaybackProgressRepository {
   Future<int?> load({
@@ -118,8 +118,8 @@ extension PlaybackProgressOverlay on PlaybackProgressRepository {
     }
   }
 
-  Future<JellyfinItem> overlayItem(
-    JellyfinItem item, {
+  Future<MediaItem> overlayItem(
+    MediaItem item, {
     required String serverId,
     required String userId,
   }) async {
@@ -128,11 +128,13 @@ extension PlaybackProgressOverlay on PlaybackProgressRepository {
       userId: userId,
       itemId: item.id,
     );
-    return ticks == null ? item : item.withPlaybackPosition(ticks);
+    return ticks == null
+        ? item
+        : item.withPlaybackPosition(Duration(microseconds: ticks ~/ 10));
   }
 
-  Future<List<JellyfinItem>> overlayItems(
-    List<JellyfinItem> items, {
+  Future<List<MediaItem>> overlayItems(
+    List<MediaItem> items, {
     required String serverId,
     required String userId,
   }) async {
@@ -142,7 +144,7 @@ extension PlaybackProgressOverlay on PlaybackProgressRepository {
     return [
       for (final item in items)
         if (pending[item.id] case final ticks?)
-          item.withPlaybackPosition(ticks)
+          item.withPlaybackPosition(Duration(microseconds: ticks ~/ 10))
         else
           item,
     ];

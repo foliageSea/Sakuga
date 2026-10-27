@@ -7,9 +7,8 @@ import 'package:forui/forui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:sakuga/app/theme.dart';
 import 'package:sakuga/core/settings/settings.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_client.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_models.dart';
-import 'package:sakuga/data/jellyfin/server_profile.dart';
+import 'package:sakuga/data/media_server/media_models.dart';
+import 'package:sakuga/data/media_server/server_profile.dart';
 import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/library/library_providers.dart';
 import 'package:sakuga/features/player/player_controls.dart';
@@ -18,11 +17,10 @@ import 'package:sakuga/l10n/generated/app_localizations.dart';
 
 import 'fakes.dart';
 
-JellyfinItem episode(String id, int season, int number) => JellyfinItem(
+MediaItem episode(String id, int season, int number) => MediaItem(
   id: id,
   name: id,
-  type: 'Episode',
-  imageTags: const {},
+  type: MediaType.episode,
   parentIndexNumber: season,
   indexNumber: number,
   seriesId: 'series',
@@ -69,7 +67,7 @@ void main() {
           ),
           libraryViewsProvider.overrideWith(
             (ref) async => LibraryData(
-              client: JellyfinClient(
+              client: FakeMediaServerClient(
                 server: const ServerProfile(
                   id: 'server',
                   name: 'Server',
@@ -248,8 +246,8 @@ void main() {
     'retained buttons appear after metadata loads and follow episode changes',
     (tester) async {
       final library = Completer<LibraryData>();
-      final item = Completer<JellyfinItem>();
-      final episodes = Completer<List<JellyfinItem>>();
+      final item = Completer<MediaItem>();
+      final episodes = Completer<List<MediaItem>>();
       final currentId = ValueNotifier<String?>('first');
       final switching = ValueNotifier(false);
       final selected = <String>[];
@@ -308,7 +306,7 @@ void main() {
       expect(find.byKey(nextKey), findsNothing);
       library.complete(
         LibraryData(
-          client: JellyfinClient(
+          client: FakeMediaServerClient(
             server: const ServerProfile(
               id: 'server',
               name: 'Server',

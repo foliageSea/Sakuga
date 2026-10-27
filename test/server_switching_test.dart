@@ -6,8 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 import 'package:sakuga/app/app.dart';
 import 'package:sakuga/app/router.dart';
-import 'package:sakuga/data/jellyfin/server_profile.dart';
-import 'package:sakuga/data/jellyfin/server_repository.dart';
+import 'package:sakuga/data/media_server/server_profile.dart';
+import 'package:sakuga/data/media_server/server_repository.dart';
 import 'package:sakuga/features/library/library_providers.dart';
 
 import 'fakes.dart';

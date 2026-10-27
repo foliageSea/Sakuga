@@ -14,10 +14,9 @@ import 'package:sakuga/app/shell.dart';
 import 'package:sakuga/app/theme.dart';
 import 'package:sakuga/core/settings/settings.dart';
 import 'package:sakuga/core/window/desktop_window.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_client.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_models.dart';
-import 'package:sakuga/data/jellyfin/server_profile.dart';
-import 'package:sakuga/data/jellyfin/server_repository.dart';
+import 'package:sakuga/data/media_server/media_models.dart';
+import 'package:sakuga/data/media_server/server_profile.dart';
+import 'package:sakuga/data/media_server/server_repository.dart';
 import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/home/home_page.dart';
 import 'package:sakuga/features/home/home_providers.dart';
@@ -34,33 +33,31 @@ const _server = ServerProfile(
   apiKey: 'test-key',
 );
 
-JellyfinItem _resumableEpisode() => const JellyfinItem(
+MediaItem _resumableEpisode() => const MediaItem(
   id: 'episode-1',
   name: 'Pilot',
-  type: 'Episode',
-  imageTags: {},
+  type: MediaType.episode,
   seriesId: 'series-1',
   seriesName: 'Resumed Series',
   seasonId: 'season-1',
   indexNumber: 1,
   parentIndexNumber: 1,
-  userData: {'PlayedPercentage': 42.0},
+  reportedPlayedPercentage: 42.0,
 );
 
-JellyfinItem _series() => const JellyfinItem(
+MediaItem _series() => const MediaItem(
   id: 'series-2',
   name: 'Recent Series',
-  type: 'Series',
-  imageTags: {},
+  type: MediaType.series,
 );
 
 /// Pumps the home page behind a router whose destination routes are stubs, so
 /// the test only checks where a card tap navigates.
 Future<void> pumpHome(
   WidgetTester tester, {
-  List<JellyfinItem>? carousel,
-  List<JellyfinItem>? resume,
-  List<JellyfinItem>? latest,
+  List<MediaItem>? carousel,
+  List<MediaItem>? resume,
+  List<MediaItem>? latest,
   Size size = const Size(1280, 1200),
 }) async {
   tester.view.devicePixelRatio = 1;
@@ -91,13 +88,13 @@ Future<void> pumpHome(
       serverRepositoryProvider.overrideWithValue(servers),
       libraryViewsProvider.overrideWith(
         (ref) async => LibraryData(
-          client: JellyfinClient(server: _server),
+          client: FakeMediaServerClient(server: _server),
           userId: 'user-1',
           views: const [],
         ),
       ),
       randomItemsProvider.overrideWith(
-        (ref) async => carousel ?? const <JellyfinItem>[],
+        (ref) async => carousel ?? const <MediaItem>[],
       ),
       resumeItemsProvider.overrideWith(
         (ref) async => resume ?? [_resumableEpisode()],
@@ -342,22 +339,31 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
 
       const carouselItems = [
-        JellyfinItem(
+        MediaItem(
           id: 'featured-1',
           name: 'Sunflower Circus',
-          type: 'Series',
-          imageTags: {'Primary': 'poster-a'},
-          backdropImageTags: ['backdrop-a'],
+          type: MediaType.series,
+          poster: MediaImageResource(
+            urlTemplate: 'http://127.0.0.1:8096/Items/featured-1/Images/Primary?maxWidth={width}&tag=poster-a',
+            cacheKey: 'featured-1:poster-a',
+          ),
+          backdrop: MediaImageResource(
+            urlTemplate: 'http://127.0.0.1:8096/Items/featured-1/Images/Backdrop/0?maxWidth={width}&tag=backdrop-a',
+            cacheKey: 'featured-1:backdrop-a',
+          ),
           overview: 'A troupe of performers travelling across Japan.',
           genres: ['Animation', 'Drama'],
           productionYear: 2026,
           officialRating: 'PG-13',
         ),
-        JellyfinItem(
+        MediaItem(
           id: 'featured-2',
           name: 'Starlight Sonata',
-          type: 'Movie',
-          imageTags: {'Primary': 'poster-b'},
+          type: MediaType.movie,
+          poster: MediaImageResource(
+            urlTemplate: 'http://127.0.0.1:8096/Items/featured-2/Images/Primary?maxWidth={width}&tag=poster-b',
+            cacheKey: 'featured-2:poster-b',
+          ),
           overview: 'An orchestral fantasy film.',
           genres: ['Fantasy'],
           productionYear: 2025,
@@ -377,7 +383,7 @@ void main() {
           serverRepositoryProvider.overrideWithValue(servers),
           libraryViewsProvider.overrideWith(
             (ref) async => LibraryData(
-              client: JellyfinClient(server: _server),
+              client: FakeMediaServerClient(server: _server),
               userId: 'user-1',
               views: const [],
             ),

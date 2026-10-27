@@ -5,7 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/jellyfin/jellyfin_client.dart';
+import '../../data/media_server/media_server_client.dart';
+import '../../data/media_server/media_server_factory.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/responsive_button.dart';
@@ -71,7 +72,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         ],
       );
     }
-    if (server.apiKey.isEmpty) {
+    if (!ref.watch(mediaServerClientProvider(server)).isConfigured) {
       return PageContent(
         children: [
           PageHeading(l.search, hideTitleOnMobile: true),
@@ -118,7 +119,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 class _SearchResults extends ConsumerWidget {
   const _SearchResults({required this.client, required this.term});
 
-  final JellyfinClient client;
+  final MediaServerClient client;
   final String term;
 
   @override

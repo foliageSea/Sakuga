@@ -5,8 +5,28 @@ import 'package:sakuga/core/logging/log_export_service.dart';
 import 'package:sakuga/core/logging/runtime_environment_report.dart';
 import 'package:sakuga/core/settings/settings.dart';
 import 'package:sakuga/core/window/desktop_window.dart';
-import 'package:sakuga/data/jellyfin/server_profile.dart';
-import 'package:sakuga/data/jellyfin/server_repository.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:sakuga/data/media_server/media_server_client.dart';
+import 'package:sakuga/data/media_server/media_models.dart';
+import 'package:sakuga/data/media_server/server_profile.dart';
+import 'package:sakuga/data/media_server/server_repository.dart';
+
+class FakeMediaServerClient extends Fake implements MediaServerClient {
+  FakeMediaServerClient({required this.server});
+  @override
+  final ServerProfile server;
+
+  @override
+  bool get isConfigured => true;
+
+  @override
+  Future<List<MediaUser>> users() async => const [
+    MediaUser(id: 'user-1', name: 'User'),
+  ];
+
+  @override
+  Future<List<MediaLibrary>> views(String userId) async => const [];
+}
 
 class FakeLogExporter implements LogExportService {
   LogExportResult result = LogExportResult.empty;

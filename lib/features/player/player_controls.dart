@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 
 import '../../core/settings/settings.dart';
-import '../../data/jellyfin/jellyfin_models.dart';
+import '../../data/media_server/media_models.dart';
 import '../../shared/localization.dart';
 import '../../shared/widgets.dart';
 import '../detail/detail_providers.dart';
@@ -19,7 +19,7 @@ import 'player_controls_controller.dart';
 import 'player_slider.dart';
 import 'player_shortcuts.dart';
 
-JellyfinItem? nextPlayerEpisode(List<JellyfinItem> episodes, String? itemId) {
+MediaItem? nextPlayerEpisode(List<MediaItem> episodes, String? itemId) {
   final index = episodes.indexWhere((episode) => episode.id == itemId);
   return index >= 0 && index + 1 < episodes.length ? episodes[index + 1] : null;
 }
@@ -46,7 +46,7 @@ class PlayerControls extends ConsumerStatefulWidget {
   final Widget header;
   final ValueListenable<String?> itemId;
   final ValueListenable<bool> switching;
-  final Future<void> Function(JellyfinItem) onSelectEpisode;
+  final Future<void> Function(MediaItem) onSelectEpisode;
   final Future<void> Function()? onScreenshot;
   final Widget? topLeftOverlay;
 
@@ -667,7 +667,7 @@ class PlayerEpisodeButton extends StatelessWidget {
 
   final ValueListenable<String?> itemId;
   final ValueListenable<bool> switching;
-  final Future<void> Function(JellyfinItem) onSelectEpisode;
+  final Future<void> Function(MediaItem) onSelectEpisode;
   final bool menu;
   final double iconSize;
 
@@ -730,10 +730,10 @@ class _EpisodeMenu extends StatelessWidget {
     required this.onRetry,
   });
 
-  final AsyncValue<List<JellyfinItem>> episodes;
+  final AsyncValue<List<MediaItem>> episodes;
   final String? currentId;
   final bool busy;
-  final Future<void> Function(JellyfinItem) onSelect;
+  final Future<void> Function(MediaItem) onSelect;
   final VoidCallback onRetry;
 
   @override

@@ -15,10 +15,9 @@ import 'package:sakuga/app/theme.dart';
 import 'package:sakuga/core/app_exception.dart';
 import 'package:sakuga/core/settings/settings.dart';
 import 'package:sakuga/core/window/desktop_window.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_client.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_models.dart';
-import 'package:sakuga/data/jellyfin/server_profile.dart';
-import 'package:sakuga/data/jellyfin/server_repository.dart';
+import 'package:sakuga/data/media_server/media_models.dart';
+import 'package:sakuga/data/media_server/server_profile.dart';
+import 'package:sakuga/data/media_server/server_repository.dart';
 import 'package:sakuga/features/detail/detail_page.dart';
 import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/home/home_providers.dart';
@@ -40,11 +39,10 @@ const _title = 'A Long Movie Title For The Detail Page';
 
 /// A movie tall enough that the detail page always scrolls, with no image tags
 /// so the test never touches the network or the on-disk image cache.
-JellyfinItem _movie() => JellyfinItem(
+MediaItem _movie() => MediaItem(
   id: 'movie-1',
   name: _title,
-  type: 'Movie',
-  imageTags: const {},
+  type: MediaType.movie,
   overview: List.filled(
     24,
     'An animated feature about a travelling theatre troupe.',
@@ -55,7 +53,7 @@ JellyfinItem _movie() => JellyfinItem(
   productionYear: 2026,
   people: [
     for (var i = 0; i < 12; i++)
-      JellyfinPerson(
+      MediaPerson(
         id: 'person-$i',
         name: 'Person $i',
         role: 'Role $i',
@@ -64,28 +62,22 @@ JellyfinItem _movie() => JellyfinItem(
   ],
 );
 
-JellyfinItem _series() => const JellyfinItem(
+MediaItem _series() => const MediaItem(
   id: 'series-1',
   name: 'A Series With Episodes',
-  type: 'Series',
-  imageTags: {},
+  type: MediaType.series,
   overview: 'A short synopsis.',
   genres: ['Animation'],
   productionYear: 2026,
 );
 
-JellyfinItem _season() => const JellyfinItem(
-  id: 'season-1',
-  name: 'Season 1',
-  type: 'Season',
-  imageTags: {},
-);
+MediaItem _season() =>
+    const MediaItem(id: 'season-1', name: 'Season 1', type: MediaType.season);
 
-JellyfinItem _episode() => const JellyfinItem(
+MediaItem _episode() => const MediaItem(
   id: 'episode-1',
   name: 'Pilot',
-  type: 'Episode',
-  imageTags: {},
+  type: MediaType.episode,
   seriesId: 'series-1',
   seriesName: 'A Series With Episodes',
   seasonId: 'season-1',
@@ -96,12 +88,12 @@ JellyfinItem _episode() => const JellyfinItem(
 /// Pumps the real detail route behind a router so the back button can pop.
 Future<GoRouter> pumpDetailPage(
   WidgetTester tester, {
-  required FutureOr<JellyfinItem> Function() item,
+  required FutureOr<MediaItem> Function() item,
   Size size = const Size(1280, 800),
   bool settle = true,
   bool withPlayerRoute = false,
-  List<JellyfinItem>? seasons,
-  List<JellyfinItem>? episodes,
+  List<MediaItem>? seasons,
+  List<MediaItem>? episodes,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -140,7 +132,7 @@ Future<GoRouter> pumpDetailPage(
         seriesEpisodesProvider.overrideWith((ref, query) => episodes),
       libraryViewsProvider.overrideWith(
         (ref) async => LibraryData(
-          client: JellyfinClient(server: _server),
+          client: FakeMediaServerClient(server: _server),
           userId: 'user-1',
           views: const [],
         ),
@@ -250,7 +242,7 @@ void main() {
   testWidgets('the back button is available while the item loads', (
     tester,
   ) async {
-    final completer = Completer<JellyfinItem>();
+    final completer = Completer<MediaItem>();
     await pumpDetailPage(tester, item: () => completer.future, settle: false);
 
     expect(_backButton, findsOneWidget);
@@ -294,18 +286,17 @@ void main() {
   testWidgets('episode tiles echo watch progress bar for resumed episodes', (
     tester,
   ) async {
-    const partialEpisode = JellyfinItem(
+    const partialEpisode = MediaItem(
       id: 'episode-1',
       name: 'Pilot',
-      type: 'Episode',
-      imageTags: {},
+      type: MediaType.episode,
       seriesId: 'series-1',
       seriesName: 'A Series With Episodes',
       seasonId: 'season-1',
       indexNumber: 1,
       parentIndexNumber: 1,
-      runTimeTicks: 1000000000,
-      userData: {'PlaybackPositionTicks': 450000000},
+      runtime: Duration(seconds: 100),
+      playbackPosition: Duration(seconds: 45),
     );
     await pumpDetailPage(
       tester,
@@ -314,11 +305,10 @@ void main() {
       seasons: [_season()],
       episodes: [
         partialEpisode,
-        const JellyfinItem(
+        const MediaItem(
           id: 'episode-2',
           name: 'Second',
-          type: 'Episode',
-          imageTags: {},
+          type: MediaType.episode,
           seriesId: 'series-1',
           indexNumber: 2,
           parentIndexNumber: 1,
@@ -340,16 +330,19 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.view.resetPhysicalSize);
 
-      const taggedSeries = JellyfinItem(
+      const taggedSeries = MediaItem(
         id: 'series-bg',
         name: 'Circus Troupe',
-        type: 'Series',
-        imageTags: {'Primary': 'poster-tag-1'},
+        type: MediaType.series,
+        poster: MediaImageResource(
+          urlTemplate: 'http://127.0.0.1:8096/Items/series-bg/Images/Primary?maxWidth={width}&tag=poster-tag-1',
+          cacheKey: 'series-bg:poster-tag-1',
+        ),
         overview: 'A travelling circus story.',
         genres: ['Animation'],
         productionYear: 2026,
       );
-      final detailCompleter = Completer<JellyfinItem>();
+      final detailCompleter = Completer<MediaItem>();
       final servers = MemoryServerRepository()..items = [_server];
       final container = ProviderContainer(
         overrides: [
@@ -366,13 +359,13 @@ void main() {
           latestItemsProvider.overrideWith((ref) async => const []),
           libraryViewsProvider.overrideWith(
             (ref) async => LibraryData(
-              client: JellyfinClient(server: _server),
+              client: FakeMediaServerClient(server: _server),
               userId: 'user-1',
               views: const [
-                JellyfinView(
+                MediaLibrary(
                   id: 'view',
                   name: 'Shows',
-                  collectionType: 'tvshows',
+                  type: MediaLibraryType.tvShows,
                 ),
               ],
             ),
@@ -478,11 +471,14 @@ class _TaggedLibraryItems extends LibraryItemsController {
   @override
   Future<LibraryItemsState> build() async => const LibraryItemsState(
     items: [
-      JellyfinItem(
+      MediaItem(
         id: 'series-bg',
         name: 'Circus Troupe',
-        type: 'Series',
-        imageTags: {'Primary': 'poster-tag-1'},
+        type: MediaType.series,
+        poster: MediaImageResource(
+          urlTemplate: 'http://127.0.0.1:8096/Items/series-bg/Images/Primary?maxWidth={width}&tag=poster-tag-1',
+          cacheKey: 'series-bg:poster-tag-1',
+        ),
       ),
     ],
     totalRecordCount: 1,

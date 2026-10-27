@@ -11,10 +11,9 @@ import 'package:sakuga/app/router.dart';
 import 'package:sakuga/app/theme.dart';
 import 'package:sakuga/core/settings/settings.dart';
 import 'package:sakuga/core/window/desktop_window.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_client.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_models.dart';
-import 'package:sakuga/data/jellyfin/server_profile.dart';
-import 'package:sakuga/data/jellyfin/server_repository.dart';
+import 'package:sakuga/data/media_server/media_models.dart';
+import 'package:sakuga/data/media_server/server_profile.dart';
+import 'package:sakuga/data/media_server/server_repository.dart';
 import 'package:sakuga/features/detail/detail_page.dart';
 import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/home/home_providers.dart';
@@ -32,11 +31,10 @@ const _server = ServerProfile(
   apiKey: 'test-key',
 );
 
-JellyfinItem _item(String id, double ratio) => JellyfinItem(
+MediaItem _item(String id, double ratio) => MediaItem(
   id: id,
   name: 'Series $id',
-  type: 'Series',
-  imageTags: const {},
+  type: MediaType.series,
   primaryImageAspectRatio: ratio,
 );
 
@@ -67,10 +65,14 @@ Future<void> _pumpLibrary(WidgetTester tester, Size size) async {
       serverRepositoryProvider.overrideWithValue(servers),
       libraryViewsProvider.overrideWith(
         (ref) async => LibraryData(
-          client: JellyfinClient(server: _server),
+          client: FakeMediaServerClient(server: _server),
           userId: 'user-1',
           views: const [
-            JellyfinView(id: 'view', name: 'Shows', collectionType: 'tvshows'),
+            MediaLibrary(
+              id: 'view',
+              name: 'Shows',
+              type: MediaLibraryType.tvShows,
+            ),
           ],
         ),
       ),
@@ -206,13 +208,16 @@ void main() {
       baseUrl: 'http://127.0.0.1:8096',
       apiKey: 'test-key',
     );
-    const taggedItem = JellyfinItem(
+    const taggedItem = MediaItem(
       id: 'tagged-1',
       name: 'Tagged Series',
-      type: 'Series',
-      imageTags: {'Primary': 'tag-123'},
+      type: MediaType.series,
+      poster: MediaImageResource(
+        urlTemplate: 'http://127.0.0.1:8096/Items/tagged-1/Images/Primary?maxWidth={width}&tag=tag-123',
+        cacheKey: 'tagged-1:tag-123',
+      ),
     );
-    final jellyfin = JellyfinClient(server: client);
+    final jellyfin = FakeMediaServerClient(server: client);
     String? capturedUrl;
 
     for (final width in [1440.0, 1265.0, 980.0, 390.0]) {
@@ -256,7 +261,7 @@ void main() {
   testWidgets(
     'desktop library poster flies into detail page and flies back on return',
     (tester) async {
-      final detailCompleter = Completer<JellyfinItem>();
+      final detailCompleter = Completer<MediaItem>();
       await _pumpRoutedLibrary(
         tester,
         size: const Size(1280, 900),
@@ -304,11 +309,10 @@ void main() {
 
       // Resolving the full item metadata must not shift the landed poster.
       detailCompleter.complete(
-        const JellyfinItem(
+        const MediaItem(
           id: 'b',
           name: 'Series b',
-          type: 'Movie',
-          imageTags: {},
+          type: MediaType.movie,
           overview: 'Full metadata loaded.',
           genres: ['Animation', 'Drama'],
           productionYear: 2026,
@@ -352,11 +356,10 @@ void main() {
       await _pumpRoutedLibrary(
         tester,
         size: const Size(390, 900),
-        loadItem: (id) async => JellyfinItem(
+        loadItem: (id) async => MediaItem(
           id: id,
           name: 'Series $id',
-          type: 'Movie',
-          imageTags: const {},
+          type: MediaType.movie,
           primaryImageAspectRatio: 1.2,
           overview: 'Mobile detail view.',
         ),
@@ -416,24 +419,23 @@ void main() {
           latestItemsProvider.overrideWith((ref) async => const []),
           libraryViewsProvider.overrideWith(
             (ref) async => LibraryData(
-              client: JellyfinClient(server: _server),
+              client: FakeMediaServerClient(server: _server),
               userId: 'user-1',
               views: const [
-                JellyfinView(
+                MediaLibrary(
                   id: 'view',
                   name: 'Shows',
-                  collectionType: 'tvshows',
+                  type: MediaLibraryType.tvShows,
                 ),
               ],
             ),
           ),
           libraryItemsProvider.overrideWith2(_FakeItems.new),
           libraryItemProvider.overrideWith(
-            (ref, query) async => JellyfinItem(
+            (ref, query) async => MediaItem(
               id: query.itemId,
               name: 'Series ${query.itemId}',
-              type: 'Movie',
-              imageTags: const {},
+              type: MediaType.movie,
             ),
           ),
         ],
@@ -510,24 +512,23 @@ void main() {
           latestItemsProvider.overrideWith((ref) async => const []),
           libraryViewsProvider.overrideWith(
             (ref) async => LibraryData(
-              client: JellyfinClient(server: _server),
+              client: FakeMediaServerClient(server: _server),
               userId: 'user-1',
               views: const [
-                JellyfinView(
+                MediaLibrary(
                   id: 'view',
                   name: 'Shows',
-                  collectionType: 'tvshows',
+                  type: MediaLibraryType.tvShows,
                 ),
               ],
             ),
           ),
           libraryItemsProvider.overrideWith2(_FakeItems.new),
           libraryItemProvider.overrideWith(
-            (ref, query) async => JellyfinItem(
+            (ref, query) async => MediaItem(
               id: query.itemId,
               name: 'Series ${query.itemId}',
-              type: 'Movie',
-              imageTags: const {},
+              type: MediaType.movie,
               overview: List.filled(20, 'A long mobile synopsis.').join(' '),
             ),
           ),
@@ -607,7 +608,7 @@ bool _isStrictlyBetween(double value, double a, double b) {
 Future<void> _pumpRoutedLibrary(
   WidgetTester tester, {
   required Size size,
-  required FutureOr<JellyfinItem> Function(String itemId) loadItem,
+  required FutureOr<MediaItem> Function(String itemId) loadItem,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -637,10 +638,14 @@ Future<void> _pumpRoutedLibrary(
       serverRepositoryProvider.overrideWithValue(servers),
       libraryViewsProvider.overrideWith(
         (ref) async => LibraryData(
-          client: JellyfinClient(server: _server),
+          client: FakeMediaServerClient(server: _server),
           userId: 'user-1',
           views: const [
-            JellyfinView(id: 'view', name: 'Shows', collectionType: 'tvshows'),
+            MediaLibrary(
+              id: 'view',
+              name: 'Shows',
+              type: MediaLibraryType.tvShows,
+            ),
           ],
         ),
       ),

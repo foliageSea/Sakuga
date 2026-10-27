@@ -1,12 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/jellyfin/jellyfin_models.dart';
-import '../../data/jellyfin/server_repository.dart';
+import '../../data/media_server/media_models.dart';
+import '../../data/media_server/server_repository.dart';
 import '../../shared/poster_background.dart';
 import '../library/library_providers.dart';
 import '../player/playback_progress_repository.dart';
 
-final resumeItemsProvider = FutureProvider.autoDispose<List<JellyfinItem>>((
+final resumeItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   ref,
 ) async {
   final library = await ref.watch(libraryViewsProvider.future);
@@ -24,13 +24,17 @@ final resumeItemsProvider = FutureProvider.autoDispose<List<JellyfinItem>>((
     }
     final item = byId[entry.key];
     if (item != null) {
-      byId[entry.key] = item.withPlaybackPosition(entry.value);
+      byId[entry.key] = item.withPlaybackPosition(
+        Duration(microseconds: entry.value ~/ 10),
+      );
       continue;
     }
     try {
       final fetched = await library.client.item(library.userId, entry.key);
       if (fetched.id.isNotEmpty) {
-        byId[entry.key] = fetched.withPlaybackPosition(entry.value);
+        byId[entry.key] = fetched.withPlaybackPosition(
+          Duration(microseconds: entry.value ~/ 10),
+        );
       }
     } catch (_) {
       // Keep the server-provided row usable if one pending item cannot load.
@@ -39,21 +43,19 @@ final resumeItemsProvider = FutureProvider.autoDispose<List<JellyfinItem>>((
   return byId.values.toList();
 });
 
-final latestItemsProvider = FutureProvider.autoDispose<List<JellyfinItem>>((
+final latestItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   ref,
 ) async {
   final library = await ref.watch(libraryViewsProvider.future);
   return library.client.latest(library.userId);
 });
 
-final randomItemsProvider = FutureProvider.autoDispose<List<JellyfinItem>>((
+final randomItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   ref,
 ) async {
   final library = await ref.watch(libraryViewsProvider.future);
   final items = await library.client.randomItems(library.userId);
-  final withPosters = items
-      .where((item) => library.client.imageUrl(item) != null)
-      .toList();
+  final withPosters = items.where((item) => item.poster != null).toList();
   return withPosters.isNotEmpty ? withPosters : items;
 });
 
@@ -76,7 +78,7 @@ final homeCarouselIndexProvider =
 /// background shared by the home and library root routes.
 PosterBackground? watchHomePosterBackground(WidgetRef ref) {
   final servers = ref.watch(serversProvider).value;
-  if (servers == null || servers.isEmpty || servers.first.apiKey.isEmpty) {
+  if (servers == null || servers.isEmpty) {
     return null;
   }
   final library = ref.watch(libraryViewsProvider).value;
@@ -84,7 +86,10 @@ PosterBackground? watchHomePosterBackground(WidgetRef ref) {
   final items = ref.watch(randomItemsProvider).value;
   if (items == null || items.isEmpty) return null;
   final index = ref.watch(homeCarouselIndexProvider).clamp(0, items.length - 1);
-  final url = library.client.imageUrl(items[index]);
+  final url = items[index].poster?.url();
   if (url == null) return null;
-  return PosterBackground(url: url, headers: library.client.authHeaders);
+  return PosterBackground(
+    url: url,
+    headers: items[index].poster?.headers ?? const {},
+  );
 }

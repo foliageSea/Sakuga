@@ -1,21 +1,10 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_exception.dart';
+import '../media_server/server_probe.dart';
 
-class ServerProbeResult {
-  const ServerProbeResult({
-    required this.name,
-    required this.version,
-    required this.id,
-  });
-
-  final String name;
-  final String version;
-  final String id;
-}
-
-class JellyfinProbe {
+class JellyfinProbe implements ServerProbe {
+  @override
   Future<ServerProbeResult> probe(String rawUrl, {String apiKey = ''}) async {
     final baseUrl = normalizeBaseUrl(rawUrl);
     final key = apiKey.trim();
@@ -59,20 +48,3 @@ class JellyfinProbe {
     }
   }
 }
-
-String normalizeBaseUrl(String input) {
-  var value = input.trim();
-  if (value.isEmpty) throw const FormatException('empty URL');
-  if (!value.startsWith('http://') && !value.startsWith('https://')) {
-    value = 'http://$value';
-  }
-  final uri = Uri.tryParse(value);
-  if (uri == null ||
-      uri.host.isEmpty ||
-      (uri.scheme != 'http' && uri.scheme != 'https')) {
-    throw const FormatException('invalid URL');
-  }
-  return value.replaceAll(RegExp(r'/+$'), '');
-}
-
-final jellyfinProbeProvider = Provider<JellyfinProbe>((ref) => JellyfinProbe());

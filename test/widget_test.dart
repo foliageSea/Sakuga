@@ -8,7 +8,7 @@ import 'package:sakuga/core/logging/log_export_service.dart';
 import 'package:sakuga/core/runtime_environment.dart';
 import 'package:sakuga/core/settings/settings.dart';
 import 'package:sakuga/core/window/desktop_window.dart';
-import 'package:sakuga/data/jellyfin/server_repository.dart';
+import 'package:sakuga/data/media_server/server_repository.dart';
 import 'package:sakuga/features/settings/settings_page.dart';
 
 import 'fakes.dart';

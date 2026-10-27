@@ -4,7 +4,10 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sakuga/data/jellyfin/jellyfin_client.dart';
-import 'package:sakuga/data/jellyfin/server_profile.dart';
+import 'package:sakuga/data/jellyfin/jellyfin_playback_session.dart';
+import 'package:sakuga/data/media_server/playback_models.dart';
+import 'package:sakuga/data/media_server/media_models.dart';
+import 'package:sakuga/data/media_server/server_profile.dart';
 
 void main() {
   const server = ServerProfile(
@@ -13,6 +16,24 @@ void main() {
     baseUrl: 'https://media.example/jellyfin/',
     apiKey: 'secret',
   );
+
+  test('maps typed browse options to Jellyfin query parameters', () async {
+    final adapter = _PlaybackAdapter({'Items': [], 'TotalRecordCount': 90});
+    final client = JellyfinClient(server: server, dio: _dio(adapter));
+    final page = await client.items(
+      'user-1',
+      'library-1',
+      startIndex: 60,
+      limit: 30,
+      types: {MediaType.movie, MediaType.video},
+      sort: MediaSort.random,
+    );
+    expect(adapter.lastQuery['includeItemTypes'], 'Movie,Video');
+    expect(adapter.lastQuery['sortBy'], 'Random');
+    expect(adapter.lastQuery['startIndex'], 60);
+    expect(adapter.lastQuery['limit'], 30);
+    expect(page.totalRecordCount, 90);
+  });
 
   test('negotiates a direct-play URL with auth and resume position', () async {
     final adapter = _PlaybackAdapter({
@@ -38,7 +59,7 @@ void main() {
     final source = await client.playbackSource(
       'user-1',
       'item-1',
-      startTimeTicks: 150000000,
+      startPosition: const Duration(seconds: 15),
     );
 
     expect(
@@ -77,7 +98,7 @@ void main() {
     final source = await client.playbackSource(
       'user-1',
       'item-1',
-      startTimeTicks: 150000000,
+      startPosition: const Duration(seconds: 15),
     );
 
     expect(
@@ -88,7 +109,10 @@ void main() {
     expect(source.startPosition, const Duration(seconds: 15));
     expect(source.initialPosition, const Duration(seconds: 15));
     expect(source.positionOffset, Duration.zero);
-    expect(source.session.playMethod, JellyfinPlayMethod.transcode);
+    expect(
+      (source.session as JellyfinPlaybackSession).playMethod,
+      PlayMethod.transcode,
+    );
     expect(adapter.lastBody['StartTimeTicks'], 150000000);
   });
 
@@ -108,7 +132,7 @@ void main() {
     final source = await client.playbackSource(
       'user-1',
       'item-1',
-      startTimeTicks: 90000000,
+      startPosition: const Duration(seconds: 9),
     );
 
     expect(source.startPosition, Duration.zero);
@@ -130,26 +154,26 @@ void main() {
 
       await client.reportPlaybackStarted(
         source.session,
-        positionTicks: 10000000,
+        position: const Duration(seconds: 1),
         isPaused: false,
         volume: 75,
       );
       await client.reportPlaybackProgress(
         source.session,
-        positionTicks: 20000000,
+        position: const Duration(seconds: 2),
         isPaused: true,
         volume: 0,
       );
       await client.reportPlaybackStopped(
         source.session,
-        positionTicks: 30000000,
+        position: const Duration(seconds: 3),
         failed: false,
         volume: 50,
       );
       await client.updatePlaybackPosition(
         'user-1',
         'item-1',
-        positionTicks: 30000000,
+        position: const Duration(seconds: 3),
       );
 
       expect(
@@ -203,7 +227,7 @@ void main() {
       await client.updatePlaybackPosition(
         'user-1',
         'item-1',
-        positionTicks: 0,
+        position: Duration.zero,
         played: true,
       );
 
@@ -253,12 +277,13 @@ class _PlaybackAdapter implements HttpClientAdapter {
     if (notFoundPaths.contains(options.path)) {
       return ResponseBody.fromString('', 404);
     }
-    final playbackInfo = options.path.endsWith('/PlaybackInfo');
+    final hasResponse =
+        options.method == 'GET' || options.path.endsWith('/PlaybackInfo');
     return ResponseBody.fromString(
-      playbackInfo ? jsonEncode(response) : '',
-      playbackInfo ? 200 : 204,
+      hasResponse ? jsonEncode(response) : '',
+      hasResponse ? 200 : 204,
       headers: {
-        if (playbackInfo) Headers.contentTypeHeader: [Headers.jsonContentType],
+        if (hasResponse) Headers.contentTypeHeader: [Headers.jsonContentType],
       },
     );
   }

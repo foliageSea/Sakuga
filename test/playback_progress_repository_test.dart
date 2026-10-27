@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
-import 'package:sakuga/data/jellyfin/jellyfin_models.dart';
+import 'package:sakuga/data/media_server/media_models.dart';
 import 'package:sakuga/features/player/playback_progress_repository.dart';
 
 void main() {
@@ -124,35 +124,30 @@ void main() {
 
     final overlaid = await repository.overlayItems(
       const [
-        JellyfinItem(
+        MediaItem(
           id: 'ep-partial',
           name: 'Ep 1',
-          type: 'Episode',
-          imageTags: {},
-          runTimeTicks: 600000000,
+          type: MediaType.episode,
+          runtime: Duration(seconds: 60),
         ),
-        JellyfinItem(
+        MediaItem(
           id: 'ep-done',
           name: 'Ep 2',
-          type: 'Episode',
-          imageTags: {},
-          runTimeTicks: 600000000,
-          userData: {
-            'PlaybackPositionTicks': 500000000,
-            'PlayedPercentage': 83.3,
-            'Played': false,
-          },
+          type: MediaType.episode,
+          runtime: Duration(seconds: 60),
+          playbackPosition: Duration(seconds: 50),
+          reportedPlayedPercentage: 83.3,
         ),
       ],
       serverId: 'server-1',
       userId: 'user-1',
     );
 
-    expect(overlaid[0].playbackPositionTicks, 300000000);
+    expect(overlaid[0].playbackPosition, const Duration(seconds: 30));
     expect(overlaid[0].progressFraction, closeTo(0.5, 0.001));
     expect(overlaid[0].played, isFalse);
 
-    expect(overlaid[1].playbackPositionTicks, 0);
+    expect(overlaid[1].playbackPosition, Duration.zero);
     expect(overlaid[1].progressFraction, isNull);
     expect(overlaid[1].played, isTrue);
   });
