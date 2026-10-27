@@ -202,5 +202,13 @@
   "logsExported": "日志压缩包已保存。",
   "logsShared": "日志压缩包已分享。",
   "logShareOpened": "已打开日志分享，请在系统分享面板中完成导出。",
-  "logExportError": "无法导出日志，请检查可用存储空间后重试。"
+  "logExportError": "无法导出日志，请检查可用存储空间后重试。",
+  "playbackShortcuts": "播放快捷键",
+  "seekBackwardSeconds": "后退秒数（←）",
+  "seekForwardSeconds": "前进秒数（→）",
+  "seekSecondsInvalid": "请输入 1 到 600 之间的整数。",
+  "screenshotShortcut": "S：复制带字幕截图",
+  "copyScreenshot": "复制带字幕截图（S）",
+  "screenshotCopied": "截图已复制到剪贴板。",
+  "screenshotFailed": "截图复制失败，请重试。"
 }

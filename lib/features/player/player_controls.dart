@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 
+import '../../core/settings/settings.dart';
 import '../../data/jellyfin/jellyfin_models.dart';
 import '../../shared/localization.dart';
 import '../../shared/widgets.dart';
@@ -15,13 +16,14 @@ import '../library/library_providers.dart';
 import 'player_subtitles.dart';
 import 'player_controls_controller.dart';
 import 'player_slider.dart';
+import 'player_shortcuts.dart';
 
 JellyfinItem? nextPlayerEpisode(List<JellyfinItem> episodes, String? itemId) {
   final index = episodes.indexWhere((episode) => episode.id == itemId);
   return index >= 0 && index + 1 < episodes.length ? episodes[index + 1] : null;
 }
 
-class PlayerControls extends StatefulWidget {
+class PlayerControls extends ConsumerStatefulWidget {
   const PlayerControls({
     required this.controller,
     required this.onToggleFullscreen,
@@ -31,6 +33,7 @@ class PlayerControls extends StatefulWidget {
     required this.itemId,
     required this.switching,
     required this.onSelectEpisode,
+    this.onScreenshot,
     super.key,
   });
 
@@ -42,12 +45,13 @@ class PlayerControls extends StatefulWidget {
   final ValueListenable<String?> itemId;
   final ValueListenable<bool> switching;
   final Future<void> Function(JellyfinItem) onSelectEpisode;
+  final Future<void> Function()? onScreenshot;
 
   @override
-  State<PlayerControls> createState() => _PlayerControlsState();
+  ConsumerState<PlayerControls> createState() => _PlayerControlsState();
 }
 
-class _PlayerControlsState extends State<PlayerControls> {
+class _PlayerControlsState extends ConsumerState<PlayerControls> {
   Timer? _hideTimer;
   bool _visible = true;
   bool _hoveringBar = false;
@@ -140,6 +144,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final settings = ref.watch(settingsProvider);
     Widget episodeButton({bool menu = false}) => PlayerEpisodeButton(
       itemId: widget.itemId,
       switching: widget.switching,
@@ -150,8 +155,16 @@ class _PlayerControlsState extends State<PlayerControls> {
       bindings: {
         const SingleActivator(LogicalKeyboardKey.space): () =>
             _perform(widget.controller.playOrPause),
-        const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _seekBy(-5),
-        const SingleActivator(LogicalKeyboardKey.arrowRight): () => _seekBy(5),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            _seekBy(-settings.seekBackwardSeconds),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            _seekBy(settings.seekForwardSeconds),
+        if (widget.onScreenshot case final screenshot?)
+          const SingleActivator(
+            LogicalKeyboardKey.keyS,
+            includeRepeats: false,
+          ): () =>
+              unawaited(screenshot()),
         const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
             _changeVolume(widget.controller.volume + 5),
         const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
@@ -464,6 +477,28 @@ class _PlayerControlsState extends State<PlayerControls> {
                                                         context,
                                                       ),
                                                 ),
+                                                PlayerControlButton(
+                                                  key: const ValueKey(
+                                                    'player-shortcuts',
+                                                  ),
+                                                  label: l.playbackShortcuts,
+                                                  icon: FLucideIcons.keyboard,
+                                                  onPress: () =>
+                                                      showPlayerShortcutDialog(
+                                                        context,
+                                                      ),
+                                                ),
+                                                if (widget.onScreenshot
+                                                    case final screenshot?)
+                                                  PlayerControlButton(
+                                                    key: const ValueKey(
+                                                      'player-screenshot',
+                                                    ),
+                                                    label: l.copyScreenshot,
+                                                    icon: FLucideIcons.camera,
+                                                    onPress: () =>
+                                                        unawaited(screenshot()),
+                                                  ),
                                                 PlayerControlButton(
                                                   key: const ValueKey(
                                                     'player-fullscreen',

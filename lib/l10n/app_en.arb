@@ -202,5 +202,13 @@
   "logsExported": "Log archive saved.",
   "logsShared": "Log archive shared.",
   "logShareOpened": "Log sharing opened. Complete the export in the system share sheet.",
-  "logExportError": "Could not export logs. Check available storage and try again."
+  "logExportError": "Could not export logs. Check available storage and try again.",
+  "playbackShortcuts": "Playback shortcuts",
+  "seekBackwardSeconds": "Backward seconds (←)",
+  "seekForwardSeconds": "Forward seconds (→)",
+  "seekSecondsInvalid": "Enter a whole number from 1 to 600.",
+  "screenshotShortcut": "S: copy screenshot with subtitles",
+  "copyScreenshot": "Copy screenshot with subtitles (S)",
+  "screenshotCopied": "Screenshot copied to clipboard.",
+  "screenshotFailed": "Could not copy the screenshot. Please try again."
 }

@@ -19,10 +19,14 @@ class AppSettings {
     this.fontScale = 1,
     this.subtitleFontSize = 32,
     this.subtitleBackgroundOpacity = 2 / 3,
+    this.seekBackwardSeconds = 5,
+    this.seekForwardSeconds = 5,
   }) : assert(radiusScale >= 0 && radiusScale <= 2),
        assert(fontScale >= 0.8 && fontScale <= 1.2),
        assert(subtitleFontSize >= 16 && subtitleFontSize <= 64),
-       assert(subtitleBackgroundOpacity >= 0 && subtitleBackgroundOpacity <= 1);
+       assert(subtitleBackgroundOpacity >= 0 && subtitleBackgroundOpacity <= 1),
+       assert(seekBackwardSeconds >= 1 && seekBackwardSeconds <= 600),
+       assert(seekForwardSeconds >= 1 && seekForwardSeconds <= 600);
   final ThemeMode themeMode;
   final String language;
   final bool compactSidebar;
@@ -31,6 +35,8 @@ class AppSettings {
   final double fontScale;
   final double subtitleFontSize;
   final double subtitleBackgroundOpacity;
+  final int seekBackwardSeconds;
+  final int seekForwardSeconds;
   Locale? get locale => language == 'system' ? null : Locale(language);
   AppSettings copyWith({
     ThemeMode? themeMode,
@@ -41,6 +47,8 @@ class AppSettings {
     double? fontScale,
     double? subtitleFontSize,
     double? subtitleBackgroundOpacity,
+    int? seekBackwardSeconds,
+    int? seekForwardSeconds,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     language: language ?? this.language,
@@ -51,6 +59,8 @@ class AppSettings {
     subtitleFontSize: subtitleFontSize ?? this.subtitleFontSize,
     subtitleBackgroundOpacity:
         subtitleBackgroundOpacity ?? this.subtitleBackgroundOpacity,
+    seekBackwardSeconds: seekBackwardSeconds ?? this.seekBackwardSeconds,
+    seekForwardSeconds: seekForwardSeconds ?? this.seekForwardSeconds,
   );
   Map<String, Object> toJson() => {
     'theme': themeMode.name,
@@ -61,6 +71,8 @@ class AppSettings {
     'fontScale': fontScale,
     'subtitleFontSize': subtitleFontSize,
     'subtitleBackgroundOpacity': subtitleBackgroundOpacity,
+    'seekBackwardSeconds': seekBackwardSeconds,
+    'seekForwardSeconds': seekForwardSeconds,
   };
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
     themeMode: ThemeMode.values.firstWhere(
@@ -94,6 +106,14 @@ class AppSettings {
       num value when value.isFinite && value >= 0 && value <= 1 =>
         value.toDouble(),
       _ => 2 / 3,
+    },
+    seekBackwardSeconds: switch (json['seekBackwardSeconds']) {
+      int value when value >= 1 && value <= 600 => value,
+      _ => 5,
+    },
+    seekForwardSeconds: switch (json['seekForwardSeconds']) {
+      int value when value >= 1 && value <= 600 => value,
+      _ => 5,
     },
   );
 }

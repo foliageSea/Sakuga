@@ -21,6 +21,7 @@ import 'player_controls.dart';
 import 'player_controls_controller.dart';
 import 'player_exit.dart';
 import 'player_subtitles.dart';
+import 'player_screenshot.dart';
 
 // This provider outlives the route so pending saves can refresh the library
 // after the player is disposed, while still respecting container disposal.
@@ -655,24 +656,23 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 subtitleViewConfiguration: const SubtitleViewConfiguration(
                   visible: false,
                 ),
-                controls: (state) => Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    PlayerSubtitles(player: _player),
-                    PlayerControls(
-                      controller: _controlsController,
-                      onToggleFullscreen: state.toggleFullscreen,
-                      onExitFullscreen: state.exitFullscreen,
-                      fullscreen: state.isFullscreen(),
-                      header: _buildHeader(item, () async {
-                        if (state.isFullscreen()) await state.exitFullscreen();
-                        await _exitPlayer();
-                      }),
-                      itemId: _currentItemId,
-                      switching: _switchingEpisode,
-                      onSelectEpisode: _selectEpisode,
-                    ),
-                  ],
+                controls: (state) => PlayerScreenshotSurface(
+                  captureFrame: () => _player.screenshot(format: 'image/png'),
+                  subtitles: PlayerSubtitles(player: _player),
+                  controlsBuilder: (context, copyScreenshot) => PlayerControls(
+                    onScreenshot: copyScreenshot,
+                    controller: _controlsController,
+                    onToggleFullscreen: state.toggleFullscreen,
+                    onExitFullscreen: state.exitFullscreen,
+                    fullscreen: state.isFullscreen(),
+                    header: _buildHeader(item, () async {
+                      if (state.isFullscreen()) await state.exitFullscreen();
+                      await _exitPlayer();
+                    }),
+                    itemId: _currentItemId,
+                    switching: _switchingEpisode,
+                    onSelectEpisode: _selectEpisode,
+                  ),
                 ),
               ),
             ),

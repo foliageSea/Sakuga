@@ -15,6 +15,7 @@ import '../../app/theme.dart';
 import '../../shared/language_options.dart';
 import '../../shared/localization.dart';
 import '../../shared/widgets.dart';
+import '../player/player_shortcuts.dart';
 import 'runtime_environment_section.dart';
 import 'live_logs_section.dart';
 import 'servers_section.dart';
@@ -206,6 +207,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             for (final (value, label) in options)
                               FSelectItem(title: Text(label), value: value),
                           ],
+                        ),
+                        const SizedBox(height: 20),
+                        FButton(
+                          key: const ValueKey('player-shortcuts-settings'),
+                          builder: responsiveButtonContent,
+                          variant: .outline,
+                          onPress: () => showPlayerShortcutDialog(context),
+                          child: Text(l.playbackShortcuts),
                         ),
                       ],
                     ),

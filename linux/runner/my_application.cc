@@ -10,9 +10,80 @@
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
+  FlMethodChannel* image_clipboard_channel;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+
+static void image_clipboard_get(GtkClipboard* clipboard,
+                               GtkSelectionData* selection_data,
+                               guint info,
+                               gpointer user_data) {
+  gtk_selection_data_set_pixbuf(selection_data, GDK_PIXBUF(user_data));
+}
+
+static void image_clipboard_clear(GtkClipboard* clipboard, gpointer user_data) {
+  g_object_unref(user_data);
+}
+
+static void image_clipboard_method_call(FlMethodChannel* channel,
+                                       FlMethodCall* method_call,
+                                       gpointer user_data) {
+  g_autoptr(FlMethodResponse) response = nullptr;
+  if (g_strcmp0(fl_method_call_get_name(method_call), "writePng") != 0) {
+    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+  } else {
+    FlValue* args = fl_method_call_get_args(method_call);
+    g_autoptr(GError) error = nullptr;
+    g_autoptr(GdkPixbufLoader) loader = nullptr;
+    if (fl_value_get_type(args) != FL_VALUE_TYPE_UINT8_LIST ||
+        fl_value_get_length(args) == 0) {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new(
+          "invalid_png", "Expected PNG image bytes.", nullptr));
+    } else if ((loader = gdk_pixbuf_loader_new_with_type("png", &error)) ==
+                   nullptr ||
+               !gdk_pixbuf_loader_write(loader, fl_value_get_uint8_list(args),
+                                       fl_value_get_length(args), &error) ||
+               !gdk_pixbuf_loader_close(loader, &error) ||
+               gdk_pixbuf_loader_get_pixbuf(loader) == nullptr) {
+      // Close a loader even when decoding fails, releasing its decoder state.
+      if (loader != nullptr) gdk_pixbuf_loader_close(loader, nullptr);
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new(
+          "invalid_png", error != nullptr ? error->message : "Could not decode PNG.",
+          nullptr));
+    } else if (gdk_display_get_default() == nullptr) {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new(
+          "clipboard_write_failed", "No desktop display is available.", nullptr));
+    } else {
+      GtkClipboard* clipboard = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+      GdkPixbuf* image = gdk_pixbuf_loader_get_pixbuf(loader);
+      g_autoptr(GtkTargetList) targets = gtk_target_list_new(nullptr, 0);
+      gtk_target_list_add_image_targets(targets, 0, TRUE);
+      gint target_count = 0;
+      GtkTargetEntry* entries =
+          gtk_target_table_new_from_list(targets, &target_count);
+      g_object_ref(image);
+      const gboolean copied = gtk_clipboard_set_with_data(
+          clipboard, entries, target_count, image_clipboard_get,
+          image_clipboard_clear, image);
+      gtk_target_table_free(entries, target_count);
+      if (copied) {
+        // Let a desktop clipboard manager retain the image after application exit.
+        gtk_clipboard_set_can_store(clipboard, nullptr, 0);
+        gtk_clipboard_store(clipboard);
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+      } else {
+        g_object_unref(image);
+        response = FL_METHOD_RESPONSE(fl_method_error_response_new(
+            "clipboard_write_failed", "Could not claim the image clipboard.", nullptr));
+      }
+    }
+  }
+  g_autoptr(GError) response_error = nullptr;
+  if (!fl_method_call_respond(method_call, response, &response_error)) {
+    g_warning("Image clipboard response failed: %s", response_error->message);
+  }
+}
 
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
@@ -78,6 +149,15 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
+  g_autoptr(FlStandardMethodCodec) clipboard_codec = fl_standard_method_codec_new();
+  g_clear_object(&self->image_clipboard_channel);
+  self->image_clipboard_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "com.foliage.sakuga/image_clipboard", FL_METHOD_CODEC(clipboard_codec));
+  fl_method_channel_set_method_call_handler(self->image_clipboard_channel,
+                                          image_clipboard_method_call, nullptr,
+                                          nullptr);
+
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
 
@@ -123,6 +203,7 @@ static void my_application_shutdown(GApplication* application) {
 // Implements GObject::dispose.
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
+  g_clear_object(&self->image_clipboard_channel);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }

@@ -16,6 +16,8 @@ import 'package:sakuga/features/player/player_controls.dart';
 import 'package:sakuga/features/player/player_controls_controller.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
 
+import 'fakes.dart';
+
 JellyfinItem episode(String id, int season, int number) => JellyfinItem(
   id: id,
   name: id,
@@ -57,8 +59,14 @@ void main() {
       addTearDown(currentId.dispose);
       addTearDown(switching.dispose);
       var fullscreen = false;
+      var screenshots = 0;
+      final repository = MemorySettings();
       final container = ProviderContainer(
         overrides: [
+          settingsRepositoryProvider.overrideWithValue(repository),
+          initialSettingsProvider.overrideWithValue(
+            const AppSettings(seekBackwardSeconds: 7, seekForwardSeconds: 13),
+          ),
           libraryViewsProvider.overrideWith(
             (ref) async => LibraryData(
               client: JellyfinClient(
@@ -113,6 +121,7 @@ void main() {
               itemId: currentId,
               switching: switching,
               onSelectEpisode: (_) async {},
+              onScreenshot: () async => screenshots++,
             ),
           ),
         ),
@@ -125,6 +134,30 @@ void main() {
       );
       expect(find.byType(FSlider), findsWidgets);
       expect(tester.takeException(), isNull);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(controller.position.inSeconds, 23);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(controller.position.inSeconds, 36);
+      await container
+          .read(settingsProvider.notifier)
+          .update((settings) => settings.copyWith(seekForwardSeconds: 20));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(controller.position.inSeconds, 56);
+      await controller.seek(const Duration(seconds: 119));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(controller.position, controller.duration);
+      await controller.seek(const Duration(seconds: 2));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(controller.position, Duration.zero);
+      await controller.seek(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
 
       // Exercise actual pointer dragging, including FSlider's onEnd callback.
       final seek = find.byKey(const ValueKey('player-seek'));
@@ -157,6 +190,18 @@ void main() {
       expect(controller.playing, isTrue);
       await tester.pump(const Duration(seconds: 4));
       await tester.pump(const Duration(milliseconds: 200));
+      expect(
+        tester
+            .widget<AnimatedOpacity>(find.byType(AnimatedOpacity).first)
+            .opacity,
+        0,
+      );
+      // S works while controls are hidden and does not reveal them.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyS);
+      await tester.pump();
+      expect(screenshots, 1);
       expect(
         tester
             .widget<AnimatedOpacity>(find.byType(AnimatedOpacity).first)

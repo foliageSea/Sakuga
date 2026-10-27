@@ -1297,6 +1297,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not export logs. Check available storage and try again.'**
   String get logExportError;
+
+  /// No description provided for @playbackShortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback shortcuts'**
+  String get playbackShortcuts;
+
+  /// No description provided for @seekBackwardSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Backward seconds (←)'**
+  String get seekBackwardSeconds;
+
+  /// No description provided for @seekForwardSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward seconds (→)'**
+  String get seekForwardSeconds;
+
+  /// No description provided for @seekSecondsInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a whole number from 1 to 600.'**
+  String get seekSecondsInvalid;
+
+  /// No description provided for @screenshotShortcut.
+  ///
+  /// In en, this message translates to:
+  /// **'S: copy screenshot with subtitles'**
+  String get screenshotShortcut;
+
+  /// No description provided for @copyScreenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy screenshot with subtitles (S)'**
+  String get copyScreenshot;
+
+  /// No description provided for @screenshotCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot copied to clipboard.'**
+  String get screenshotCopied;
+
+  /// No description provided for @screenshotFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy the screenshot. Please try again.'**
+  String get screenshotFailed;
 }
 
 class _AppLocalizationsDelegate

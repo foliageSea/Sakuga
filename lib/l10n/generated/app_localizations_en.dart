@@ -621,4 +621,29 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get logExportError =>
       'Could not export logs. Check available storage and try again.';
+
+  @override
+  String get playbackShortcuts => 'Playback shortcuts';
+
+  @override
+  String get seekBackwardSeconds => 'Backward seconds (←)';
+
+  @override
+  String get seekForwardSeconds => 'Forward seconds (→)';
+
+  @override
+  String get seekSecondsInvalid => 'Enter a whole number from 1 to 600.';
+
+  @override
+  String get screenshotShortcut => 'S: copy screenshot with subtitles';
+
+  @override
+  String get copyScreenshot => 'Copy screenshot with subtitles (S)';
+
+  @override
+  String get screenshotCopied => 'Screenshot copied to clipboard.';
+
+  @override
+  String get screenshotFailed =>
+      'Could not copy the screenshot. Please try again.';
 }

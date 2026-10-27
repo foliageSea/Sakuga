@@ -611,4 +611,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get logExportError => '无法导出日志，请检查可用存储空间后重试。';
+
+  @override
+  String get playbackShortcuts => '播放快捷键';
+
+  @override
+  String get seekBackwardSeconds => '后退秒数（←）';
+
+  @override
+  String get seekForwardSeconds => '前进秒数（→）';
+
+  @override
+  String get seekSecondsInvalid => '请输入 1 到 600 之间的整数。';
+
+  @override
+  String get screenshotShortcut => 'S：复制带字幕截图';
+
+  @override
+  String get copyScreenshot => '复制带字幕截图（S）';
+
+  @override
+  String get screenshotCopied => '截图已复制到剪贴板。';
+
+  @override
+  String get screenshotFailed => '截图复制失败，请重试。';
 }
