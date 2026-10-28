@@ -161,8 +161,12 @@ class _EpisodeListState extends State<_EpisodeList> {
               children: [
                 FItem(
                   key: ValueKey('player-episode-${episode.id}'),
-                  style: const .delta(
-                    contentStyle: .delta(
+                  style: .delta(
+                    backgroundColor: .delta([.all(const Color(0x00000000))]),
+                    contentDecoration: .delta([
+                      .all(const .shapeDelta(color: Color(0x00000000))),
+                    ]),
+                    contentStyle: const .delta(
                       suffixedPadding: .value(
                         EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       ),

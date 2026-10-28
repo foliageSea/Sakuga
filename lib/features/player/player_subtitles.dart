@@ -7,7 +7,6 @@ import 'package:media_kit/media_kit.dart';
 
 import '../../core/settings/settings.dart';
 import '../../shared/localization.dart';
-import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import 'player_slider.dart';
 
@@ -175,9 +174,25 @@ class _SubtitleStyleSettingsState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(l.subtitleStyle, style: context.theme.typography.body.lg),
-          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l.subtitleStyle,
+                  style: context.theme.typography.body.lg,
+                ),
+              ),
+              FButton.icon(
+                variant: .ghost,
+                onPress: () => Navigator.of(context).pop(),
+                semanticsLabel: l.close,
+                child: const Icon(FLucideIcons.x, size: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
           Text('${l.fontSize} · ${_fontSize.round()}'),
+          const SizedBox(height: 8),
           PlayerSlider(
             key: const ValueKey('subtitle-font-size'),
             value: (_fontSize - 16) / 48,
@@ -186,27 +201,25 @@ class _SubtitleStyleSettingsState
                 setState(() => _fontSize = (16 + value * 48).roundToDouble()),
             onEnd: (_) => _save(),
           ),
+          const SizedBox(height: 16),
           Text('${l.subtitleBackgroundOpacity} · ${(_opacity * 100).round()}%'),
+          const SizedBox(height: 8),
           PlayerSlider(
             key: const ValueKey('subtitle-background-opacity'),
             value: _opacity,
             onChange: (value) => setState(() => _opacity = value),
             onEnd: (_) => _save(),
           ),
+          const SizedBox(height: 16),
           Text(
             '${l.subtitleVerticalPosition} · ${(_verticalPosition * 100).round()}%',
           ),
+          const SizedBox(height: 8),
           PlayerSlider(
             key: const ValueKey('subtitle-vertical-position'),
             value: _verticalPosition,
             onChange: (value) => setState(() => _verticalPosition = value),
             onEnd: (_) => _save(),
-          ),
-          const SizedBox(height: 12),
-          FButton(
-            builder: responsiveButtonContent,
-            onPress: () => Navigator.of(context).pop(),
-            child: Text(l.close),
           ),
         ],
       ),
