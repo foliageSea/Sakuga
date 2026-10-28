@@ -17,6 +17,8 @@ import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import '../detail/detail_page.dart';
 import 'library_providers.dart';
+import 'library_filters.dart';
+import 'library_toolbar.dart';
 
 class LibraryPage extends ConsumerStatefulWidget {
   const LibraryPage({super.key});
@@ -33,11 +35,29 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   Timer? _searchDebounce;
   String _searchTerm = '';
   String? _selectedViewId;
+  String? _selectedGenre;
+  bool? _isPlayed;
+  int? _selectedYear;
+  MediaSort _sort = MediaSort.name;
+  bool _descending = false;
+  bool _showFilters = true;
+  bool _listView = false;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_scheduleSearch);
+  }
+
+  bool _initializedLayout = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedLayout) {
+      _showFilters = !isMobileLayout(context);
+      _initializedLayout = true;
+    }
   }
 
   @override
@@ -71,14 +91,57 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   void _selectView(String id) {
     if (_selectedViewId == id) return;
-    setState(() => _selectedViewId = id);
+    setState(() {
+      _selectedViewId = id;
+      _selectedGenre = null;
+      _isPlayed = null;
+      _selectedYear = null;
+    });
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
   }
 
+  void _selectGenre(String? genre) {
+    if (_selectedGenre == genre) return;
+    setState(() => _selectedGenre = genre);
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+  }
+
+  void _updateView(VoidCallback update) {
+    setState(update);
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  }
+
+  void _clearFilters() => _updateView(() {
+    _selectedGenre = null;
+    _isPlayed = null;
+    _selectedYear = null;
+  });
+
+  LibraryQuery _query(LibraryData library, String viewId) => LibraryQuery(
+    userId: library.userId,
+    viewId: viewId,
+    genre: _selectedGenre,
+    isPlayed: _isPlayed,
+    year: _selectedYear,
+    sort: _sort,
+    descending: _descending,
+  );
+
   @override
   Widget build(BuildContext context) {
+    ref.listen(activeServerProvider, (previous, next) {
+      if (previous?.id == next?.id) return;
+      setState(() {
+        _selectedViewId = null;
+        _selectedGenre = null;
+        _isPlayed = null;
+        _selectedYear = null;
+      });
+    });
     final l = context.l10n;
     final server = ref.watch(activeServerProvider);
     if (server == null) {
@@ -125,43 +188,73 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     final mobileShell =
         isMobileLayout(context) &&
         WindowPosterBackgroundScope.hasShell(context);
+    final query = activeViewId == null
+        ? null
+        : _query(data.requireValue, activeViewId);
     final viewChips = hasViews && _searchTerm.isEmpty
         ? Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 4,
+            runSpacing: 4,
             children: [
               for (final view in views)
                 FButton(
                   builder: responsiveButtonContent,
                   mainAxisSize: MainAxisSize.min,
-                  variant: view.id == activeViewId ? .primary : .outline,
+                  variant: view.id == activeViewId ? .secondary : .ghost,
+                  selected: view.id == activeViewId,
                   onPress: () => _selectView(view.id),
                   child: Text(view.name),
                 ),
             ],
           )
         : null;
+    final toolbar = LibraryToolbar(
+      filtersVisible: _showFilters,
+      hasFilters:
+          _selectedGenre != null || _isPlayed != null || _selectedYear != null,
+      listView: _listView,
+      sort: _sort,
+      descending: _descending,
+      onToggleFilters: () => setState(() => _showFilters = !_showFilters),
+      onView: (value) => _updateView(() => _listView = value),
+      onSort: (sort, descending) => _updateView(() {
+        _sort = sort;
+        _descending = descending;
+      }),
+      onClear: _clearFilters,
+    );
 
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
       child: PageScrollView(
         controller: _scrollController,
-        headerGap: mobileShell ? 16 : 20,
+        headerGap: 12,
         header: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (!mobileShell)
-              PageHeading(
-                l.library,
-                hideTitleOnMobile: true,
-                action: FButton.icon(
-                  key: const ValueKey('library-refresh'),
-                  variant: .outline,
-                  size: .sm,
-                  semanticsLabel: l.refresh,
-                  onPress: () => ref.invalidate(libraryViewsProvider),
-                  child: const Icon(FLucideIcons.refreshCw),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l.library,
+                        style: context.theme.typography.body.xl.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    FButton.icon(
+                      key: const ValueKey('library-refresh'),
+                      variant: .outline,
+                      size: .sm,
+                      semanticsLabel: l.refresh,
+                      onPress: () => ref.invalidate(libraryViewsProvider),
+                      child: const Icon(FLucideIcons.refreshCw),
+                    ),
+                  ],
                 ),
               ),
             FTextField(
@@ -175,7 +268,46 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               // input; the default forui style fills it with the card color.
               style: .delta(color: .delta([.base(const Color(0x00000000))])),
             ),
-            if (viewChips != null) ...[const SizedBox(height: 12), viewChips],
+            if (viewChips != null) ...[
+              const SizedBox(height: 16),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final count = query == null
+                      ? const SizedBox.shrink()
+                      : _LibraryCount(query: query);
+                  if (constraints.maxWidth >= 760) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Flexible(child: viewChips),
+                              const SizedBox(width: 12),
+                              count,
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        toolbar,
+                      ],
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      viewChips,
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: count),
+                          toolbar,
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ],
         ),
         slivers: data.when(
@@ -205,10 +337,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         : library.views.first.id;
     unawaited(
       ref
-          .read(
-            libraryItemsProvider((userId: library.userId, viewId: viewId))
-                .notifier,
-          )
+          .read(libraryItemsProvider(_query(library, viewId)).notifier)
           .loadMore(),
     );
     return false;
@@ -223,22 +352,35 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       return [
         SliverPadding(
           padding: const EdgeInsets.only(top: 24),
-          sliver: _SearchGrid(client: library.client, term: _searchTerm),
+          sliver: _SearchGrid(
+            client: library.client,
+            term: _searchTerm,
+            listView: _listView,
+          ),
         ),
       ];
     }
     if (library.views.isEmpty || viewId == null) {
-      return [
-        SliverToBoxAdapter(child: EmptyNotice(context.l10n.emptyLibrary)),
-      ];
+      return [const _LibraryEmptyState()];
     }
     return [
+      if (_showFilters)
+        SliverToBoxAdapter(
+          child: LibraryFilterPanel(
+            key: ValueKey((library.client.server.id, viewId)),
+            query: _query(library, viewId),
+            onGenre: _selectGenre,
+            onPlayed: (value) => _updateView(() => _isPlayed = value),
+            onYear: (value) => _updateView(() => _selectedYear = value),
+          ),
+        ),
       SliverPadding(
         // Leave room inside the viewport for the first row's 3D hover effect.
         padding: const EdgeInsets.only(top: 24),
         sliver: _PagedGrid(
           client: library.client,
-          query: (userId: library.userId, viewId: viewId),
+          query: _query(library, viewId),
+          listView: _listView,
           onTap: (item, posterUrl) => context.go(
             '/library/${item.id}',
             extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
@@ -249,6 +391,25 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   }
 }
 
+class _LibraryCount extends ConsumerWidget {
+  const _LibraryCount({required this.query});
+  final LibraryQuery query;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(libraryItemsProvider(query));
+    final count = state.value?.totalRecordCount;
+    return Text(
+      count == null ? '—' : context.l10n.libraryCount(count),
+      key: const ValueKey('library-count'),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: context.theme.typography.body.sm.copyWith(
+        color: context.theme.colors.mutedForeground,
+      ),
+    );
+  }
+}
+
 typedef _OpenLibraryItem = void Function(MediaItem item, String? posterUrl);
 
 class _PagedGrid extends ConsumerWidget {
@@ -256,11 +417,13 @@ class _PagedGrid extends ConsumerWidget {
     required this.client,
     required this.query,
     required this.onTap,
+    this.listView = false,
   });
 
   final MediaServerClient client;
   final LibraryQuery query;
   final _OpenLibraryItem onTap;
+  final bool listView;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -271,8 +434,8 @@ class _PagedGrid extends ConsumerWidget {
           _LibraryGrid(
             client: client,
             items: value.items,
+            listView: listView,
             onTap: onTap,
-            emptyMessage: context.l10n.noItems,
           ),
           SliverToBoxAdapter(
             child: _PageFooter(query: query, state: value),
@@ -293,42 +456,29 @@ class _PagedGrid extends ConsumerWidget {
 }
 
 class _SearchGrid extends ConsumerWidget {
-  const _SearchGrid({required this.client, required this.term});
+  const _SearchGrid({
+    required this.client,
+    required this.term,
+    this.listView = false,
+  });
 
   final MediaServerClient client;
   final String term;
+  final bool listView;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => ref
       .watch(searchResultsProvider(term))
       .when(
-        data: (items) => items.isEmpty
-            ? SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        FLucideIcons.inbox,
-                        size: 32,
-                        color: context.theme.colors.mutedForeground,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(context.l10n.noResults, textAlign: TextAlign.center),
-                    ],
-                  ),
-                ),
-              )
-            : _LibraryGrid(
-                client: client,
-                items: items,
-                emptyMessage: context.l10n.noResults,
-                onTap: (item, posterUrl) => context.go(
-                  '/library/${item.id}',
-                  extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
-                ),
-              ),
+        data: (items) => _LibraryGrid(
+          client: client,
+          items: items,
+          listView: listView,
+          onTap: (item, posterUrl) => context.go(
+            '/library/${item.id}',
+            extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
+          ),
+        ),
         loading: () => const SliverToBoxAdapter(child: LoadingNotice()),
         error: (error, _) => SliverToBoxAdapter(
           child: ErrorNotice(
@@ -339,63 +489,100 @@ class _SearchGrid extends ConsumerWidget {
       );
 }
 
+class _LibraryEmptyState extends StatelessWidget {
+  const _LibraryEmptyState();
+
+  @override
+  Widget build(BuildContext context) => SliverFillRemaining(
+    hasScrollBody: false,
+    child: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            FLucideIcons.inbox,
+            size: 32,
+            color: context.theme.colors.mutedForeground,
+          ),
+          const SizedBox(height: 16),
+          Text(context.l10n.noResults, textAlign: TextAlign.center),
+        ],
+      ),
+    ),
+  );
+}
+
 class _LibraryGrid extends StatelessWidget {
   const _LibraryGrid({
     required this.client,
     required this.items,
     required this.onTap,
-    required this.emptyMessage,
+    this.listView = false,
   });
 
   final MediaServerClient client;
   final List<MediaItem> items;
   final _OpenLibraryItem onTap;
-  final String emptyMessage;
+  final bool listView;
 
   @override
   Widget build(BuildContext context) {
     if (this.items.isEmpty) {
-      return SliverToBoxAdapter(child: EmptyNotice(emptyMessage));
+      return const _LibraryEmptyState();
     }
     final items = _uniqueItems(this.items);
+    if (listView) {
+      return SliverList.builder(
+        itemCount: items.length,
+        itemBuilder: (context, index) => _LibraryListItem(
+          key: ValueKey('library-list-item-${items[index].id}'),
+          client: client,
+          item: items[index],
+          onTap: onTap,
+        ),
+      );
+    }
     if (isMobileLayout(context)) {
       return SliverToBoxAdapter(
         child: _MobileMasonryGrid(client: client, items: items, onTap: onTap),
       );
     }
-    final columns = _columns(context);
-    final rows = (items.length / columns).ceil();
-    return SliverList(
-      delegate: SliverChildBuilderDelegate((context, row) {
-        final start = row * columns;
-        final end = math.min(start + columns, items.length);
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var column = 0; column < columns; column++) ...[
-                if (column > 0) const SizedBox(width: 16),
-                Expanded(
-                  child: start + column < end
-                      ? MediaPosterCard(
-                          key: ValueKey(
-                            'library-desktop-card-${items[start + column].id}',
-                          ),
-                          client: client,
-                          item: items[start + column],
-                          progress: items[start + column].progressFraction,
-                          heroTag: posterHeroTag(items[start + column].id),
-                          onPosterTap: (posterUrl) =>
-                              onTap(items[start + column], posterUrl),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
-            ],
-          ),
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final columns = ((constraints.crossAxisExtent + 20) / 240)
+            .floor()
+            .clamp(2, 6);
+        final rows = (items.length / columns).ceil();
+        return SliverList(
+          delegate: SliverChildBuilderDelegate((context, row) {
+            final start = row * columns;
+            final end = math.min(start + columns, items.length);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var column = 0; column < columns; column++) ...[
+                    if (column > 0) const SizedBox(width: 20),
+                    Expanded(
+                      child: start + column < end
+                          ? _LibraryPoster(
+                              cardKey: ValueKey(
+                                'library-desktop-card-${items[start + column].id}',
+                              ),
+                              client: client,
+                              item: items[start + column],
+                              onTap: onTap,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }, childCount: rows),
         );
-      }, childCount: rows),
+      },
     );
   }
 
@@ -405,13 +592,6 @@ class _LibraryGrid extends StatelessWidget {
       for (final item in items)
         if (seen.add(item.id)) item,
     ];
-  }
-
-  int _columns(BuildContext context) {
-    final width =
-        math.min(MediaQuery.sizeOf(context).width, 1440) -
-        pagePadding(context) * 2;
-    return ((width + 16) / (280 + 16)).floor().clamp(1, 4);
   }
 }
 
@@ -456,17 +636,14 @@ class _MobileMasonryGrid extends StatelessWidget {
                     index++
                   ) ...[
                     if (index > 0) const SizedBox(height: _spacing),
-                    MediaPosterCard(
-                      key: ValueKey(
+                    _LibraryPoster(
+                      cardKey: ValueKey(
                         'library-mobile-card-${columns[column][index].id}',
                       ),
                       client: client,
                       item: columns[column][index],
-                      progress: columns[column][index].progressFraction,
                       aspectRatio: columns[column][index].posterAspectRatio,
-                      heroTag: posterHeroTag(columns[column][index].id),
-                      onPosterTap: (posterUrl) =>
-                          onTap(columns[column][index], posterUrl),
+                      onTap: onTap,
                     ),
                   ],
                 ],
@@ -477,6 +654,165 @@ class _MobileMasonryGrid extends StatelessWidget {
       );
     },
   );
+}
+
+String? _libraryMetadata(BuildContext context, MediaItem item) {
+  final parts = <String>[
+    if (item.productionYear != null) '${item.productionYear}',
+    if (item.isSeries &&
+        item.recursiveItemCount != null &&
+        item.recursiveItemCount! > 0)
+      context.l10n.libraryEpisodeCount(item.recursiveItemCount!)
+    else if (item.isSeries && item.childCount != null && item.childCount! > 0)
+      context.l10n.librarySeasonCount(item.childCount!),
+    if (!item.isSeries && item.runtime != null)
+      context.l10n.libraryDuration(item.runtime!.inMinutes),
+  ];
+  return parts.isEmpty ? null : parts.join(' · ');
+}
+
+class _LibraryPoster extends StatelessWidget {
+  const _LibraryPoster({
+    required this.cardKey,
+    required this.client,
+    required this.item,
+    required this.onTap,
+    this.aspectRatio,
+  });
+  final Key cardKey;
+  final MediaServerClient client;
+  final MediaItem item;
+  final _OpenLibraryItem onTap;
+  final double? aspectRatio;
+
+  @override
+  Widget build(BuildContext context) {
+    final metadata = _libraryMetadata(context, item);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        MediaPosterCard(
+          key: cardKey,
+          client: client,
+          item: item,
+          framed: false,
+          textAlign: TextAlign.center,
+          showRating: true,
+          aspectRatio: aspectRatio,
+          progress: item.progressFraction,
+          heroTag: posterHeroTag(item.id),
+          onPosterTap: (posterUrl) => onTap(item, posterUrl),
+        ),
+        if (metadata != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            metadata,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: context.theme.typography.body.xs.copyWith(
+              color: context.theme.colors.mutedForeground,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _LibraryListItem extends StatelessWidget {
+  const _LibraryListItem({
+    required this.client,
+    required this.item,
+    required this.onTap,
+    super.key,
+  });
+  final MediaServerClient client;
+  final MediaItem item;
+  final _OpenLibraryItem onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    final metadata = _libraryMetadata(context, item);
+    final rating = item.communityRating;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.colors.border)),
+      ),
+      child: FButton(
+        variant: .ghost,
+        builder: responsiveButtonContent,
+        onPress: () => onTap(item, item.poster?.url()),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 56,
+              height: 84,
+              child: PosterHero(
+                tag: posterHeroTag(item.id),
+                borderRadius: theme.style.borderRadius.md,
+                child: MediaImage(
+                  url: item.poster?.url(),
+                  headers: item.poster?.headers ?? const {},
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.displayTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.typography.body.sm.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (metadata != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      metadata,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.typography.body.xs.copyWith(
+                        color: theme.colors.mutedForeground,
+                      ),
+                    ),
+                  ],
+                  if (item.progressFraction != null) ...[
+                    const SizedBox(height: 8),
+                    MediaProgressBar(value: item.progressFraction!),
+                  ],
+                ],
+              ),
+            ),
+            if (rating != null && rating.isFinite && rating > 0) ...[
+              const SizedBox(width: 12),
+              Text(
+                rating.toStringAsFixed(1),
+                style: theme.typography.body.sm.copyWith(
+                  color: const Color(0xFFE2BB6A),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            if (item.played) ...[
+              const SizedBox(width: 12),
+              Icon(
+                FLucideIcons.circleCheck,
+                size: 18,
+                color: theme.colors.mutedForeground,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _PageFooter extends ConsumerWidget {

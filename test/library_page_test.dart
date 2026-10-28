@@ -20,6 +20,7 @@ import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/home/home_providers.dart';
 import 'package:sakuga/features/library/library_page.dart';
 import 'package:sakuga/features/library/library_providers.dart';
+import 'package:sakuga/features/player/playback_progress_repository.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
 import 'package:sakuga/shared/media_widgets.dart';
 
@@ -37,6 +38,9 @@ MediaItem _item(String id, double ratio) => MediaItem(
   name: 'Series $id',
   type: MediaType.series,
   primaryImageAspectRatio: ratio,
+  productionYear: 2023,
+  communityRating: 8.4,
+  recursiveItemCount: 12,
 );
 
 class _FakeItems extends LibraryItemsController {
@@ -72,10 +76,80 @@ class _SearchClient extends FakeMediaServerClient {
   }
 }
 
-Future<void> _pumpLibrary(
+class _Progress extends Fake implements PlaybackProgressRepository {
+  @override
+  Future<Map<String, int>> loadAll({
+    required String serverId,
+    required String userId,
+  }) async => {};
+}
+
+class _GenreClient extends FakeMediaServerClient {
+  _GenreClient() : super(server: _server);
+
+  final requests = <({String viewId, String? genre, int startIndex})>[];
+  bool failGenres = false;
+  bool failYears = false;
+  List<int> availableYears = [2026, 2025, 2023];
+  final filters = <LibraryQuery>[];
+
+  @override
+  Future<List<int>> years(String userId, String parentId) async {
+    if (failYears) throw const AppException(FailureKind.network);
+    return availableYears;
+  }
+
+  @override
+  Future<List<String>> genres(String userId, String parentId) async {
+    if (failGenres) throw const AppException(FailureKind.network);
+    return parentId == 'view' ? ['Animation', 'Drama'] : ['Comedy'];
+  }
+
+  @override
+  Future<MediaItemsPage> items(
+    String userId,
+    String parentId, {
+    int startIndex = 0,
+    int limit = 60,
+    Set<MediaType> types = const {},
+    MediaSort sort = MediaSort.name,
+    String? genre,
+    bool? isPlayed,
+    int? year,
+    bool descending = false,
+  }) async {
+    requests.add((viewId: parentId, genre: genre, startIndex: startIndex));
+    filters.add(
+      LibraryQuery(
+        userId: userId,
+        viewId: parentId,
+        genre: genre,
+        isPlayed: isPlayed,
+        year: year,
+        sort: sort,
+        descending: descending,
+      ),
+    );
+    return MediaItemsPage(
+      items: [
+        MediaItem(
+          id: '$parentId-${genre ?? 'all'}-$startIndex',
+          name: '${genre ?? 'All'} title $startIndex',
+          type: MediaType.series,
+        ),
+      ],
+      totalRecordCount: 1,
+    );
+  }
+}
+
+Future<ProviderContainer> _pumpLibrary(
   WidgetTester tester,
   Size size, {
   FakeMediaServerClient? client,
+  bool useRealItems = false,
+  bool expandFilters = false,
+  List<MediaLibrary>? views,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -91,16 +165,19 @@ Future<void> _pumpLibrary(
         (ref) async => LibraryData(
           client: client ?? FakeMediaServerClient(server: _server),
           userId: 'user-1',
-          views: const [
-            MediaLibrary(
-              id: 'view',
-              name: 'Shows',
-              type: MediaLibraryType.tvShows,
-            ),
-          ],
+          views:
+              views ??
+              const [
+                MediaLibrary(
+                  id: 'view',
+                  name: 'Shows',
+                  type: MediaLibraryType.tvShows,
+                ),
+              ],
         ),
       ),
-      libraryItemsProvider.overrideWith2(_FakeItems.new),
+      playbackProgressRepositoryProvider.overrideWithValue(_Progress()),
+      if (!useRealItems) libraryItemsProvider.overrideWith2(_FakeItems.new),
     ],
   );
   addTearDown(container.dispose);
@@ -128,9 +205,249 @@ Future<void> _pumpLibrary(
     ),
   );
   await tester.pumpAndSettle();
+  if (expandFilters && size.width < 600) {
+    await tester.tap(find.byKey(const ValueKey('library-toggle-filters')));
+    await tester.pumpAndSettle();
+  }
+  return container;
 }
 
 void main() {
+  testWidgets(
+    'older selected year remains visible after collapsing year options',
+    (tester) async {
+      final client = _GenreClient()
+        ..availableYears = [for (var year = 2026; year >= 2010; year--) year];
+      await _pumpLibrary(
+        tester,
+        const Size(1280, 900),
+        client: client,
+        useRealItems: true,
+      );
+      expect(find.byKey(const ValueKey('library-year-2010')), findsNothing);
+      await tester.tap(find.text('More years'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('library-year-2010')));
+      await tester.pumpAndSettle();
+      expect(client.filters.last.year, 2010);
+      await tester.tap(find.text('Fewer years'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('library-year-2010')), findsOneWidget);
+      expect(client.filters.last.year, 2010);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('library posters show ratings and metadata without card frames', (
+    tester,
+  ) async {
+    await _pumpLibrary(tester, const Size(1280, 900));
+    final cards = tester.widgetList<MediaPosterCard>(
+      find.byType(MediaPosterCard),
+    );
+    expect(cards, isNotEmpty);
+    expect(
+      cards.every(
+        (card) =>
+            !card.framed &&
+            card.showRating &&
+            card.textAlign == TextAlign.center,
+      ),
+      isTrue,
+    );
+    expect(find.text('8.4'), findsNWidgets(4));
+    expect(find.text('2023 · 12 episodes'), findsNWidgets(4));
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final size in [const Size(320, 760), const Size(1280, 900)]) {
+    testWidgets(
+      'library combines filters, sorts and switches views at ${size.width}',
+      (tester) async {
+        final client = _GenreClient();
+        await _pumpLibrary(
+          tester,
+          size,
+          client: client,
+          useRealItems: true,
+          expandFilters: true,
+        );
+        expect(find.text('1 title'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('library-progress-false')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('library-genre-Animation')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('library-year-2025')));
+        await tester.pumpAndSettle();
+        expect(client.filters.last.genre, 'Animation');
+        expect(client.filters.last.isPlayed, false);
+        expect(client.filters.last.year, 2025);
+        await tester.tap(find.byKey(const ValueKey('library-toggle-filters')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('library-filter-panel')),
+          findsNothing,
+        );
+        expect(find.text('Animation title 0'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('library-list-view')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('library-list-item-view-Animation-0')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('library-sort')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('library-sort-rating')));
+        await tester.pumpAndSettle();
+        expect(client.filters.last.sort, MediaSort.rating);
+        expect(client.filters.last.descending, true);
+        expect(client.filters.last.genre, 'Animation');
+        expect(client.filters.last.isPlayed, false);
+        expect(client.filters.last.year, 2025);
+        await tester.tap(find.byKey(const ValueKey('library-clear-filters')));
+        await tester.pumpAndSettle();
+        expect(client.filters.last.genre, isNull);
+        expect(client.filters.last.isPlayed, isNull);
+        expect(client.filters.last.year, isNull);
+        expect(client.filters.last.sort, MediaSort.rating);
+        await tester.tap(find.byKey(const ValueKey('library-grid-view')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('library-list-item-view-all-0')),
+          findsNothing,
+        );
+        expect(find.text('All title 0'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('year options can retry without losing the selected genre', (
+    tester,
+  ) async {
+    final client = _GenreClient()..failYears = true;
+    await _pumpLibrary(
+      tester,
+      const Size(390, 900),
+      client: client,
+      useRealItems: true,
+      expandFilters: true,
+    );
+    await tester.tap(find.byKey(const ValueKey('library-genre-Drama')));
+    await tester.pumpAndSettle();
+    client.failYears = false;
+    await tester.tap(find.byKey(const ValueKey('library-years-retry')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('library-year-2026')), findsOneWidget);
+    expect(find.text('Drama title 0'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('switching server resets the selected genre', (tester) async {
+    final client = _GenreClient();
+    final container = await _pumpLibrary(
+      tester,
+      const Size(390, 900),
+      client: client,
+      useRealItems: true,
+      expandFilters: true,
+    );
+    await tester.tap(find.text('Animation').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Animation title 0'), findsOneWidget);
+    await container
+        .read(serversProvider.notifier)
+        .add(
+          const ServerProfile(
+            id: 'other',
+            name: 'Other server',
+            baseUrl: 'https://other.test',
+            apiKey: 'key',
+          ),
+        );
+    await container.read(serversProvider.notifier).setActive('other');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('library-genre-all')), findsOneWidget);
+    expect(find.text('All title 0'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final size in [const Size(390, 900), const Size(1280, 900)]) {
+    testWidgets(
+      'genre filter selects, clears and resets on view switch at ${size.width}',
+      (tester) async {
+        final client = _GenreClient();
+        await _pumpLibrary(
+          tester,
+          size,
+          client: client,
+          useRealItems: true,
+          expandFilters: true,
+          views: const [
+            MediaLibrary(
+              id: 'view',
+              name: 'Shows',
+              type: MediaLibraryType.tvShows,
+            ),
+            MediaLibrary(
+              id: 'movies',
+              name: 'Movies',
+              type: MediaLibraryType.movies,
+            ),
+          ],
+        );
+        expect(find.text('All title 0'), findsOneWidget);
+        await tester.tap(find.text('Animation').last);
+        await tester.pumpAndSettle();
+        expect(client.requests.last, (
+          viewId: 'view',
+          genre: 'Animation',
+          startIndex: 0,
+        ));
+        expect(find.text('Animation title 0'), findsOneWidget);
+        expect(find.text('All title 0'), findsNothing);
+
+        await tester.tap(find.byKey(const ValueKey('library-genre-all')));
+        await tester.pumpAndSettle();
+        expect(find.text('All title 0'), findsOneWidget);
+
+        await tester.tap(find.text('Drama').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Movies'));
+        await tester.pumpAndSettle();
+        expect(client.requests.last, (
+          viewId: 'movies',
+          genre: null,
+          startIndex: 0,
+        ));
+        expect(find.byKey(const ValueKey('library-genre-all')), findsOneWidget);
+        expect(find.text('Comedy'), findsOneWidget);
+        expect(find.text('Animation'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('genre loading failure keeps library usable and can retry', (
+    tester,
+  ) async {
+    final client = _GenreClient()..failGenres = true;
+    await _pumpLibrary(
+      tester,
+      const Size(390, 900),
+      client: client,
+      useRealItems: true,
+      expandFilters: true,
+    );
+    expect(find.text('All title 0'), findsOneWidget);
+    expect(find.byKey(const ValueKey('library-genres-retry')), findsOneWidget);
+    client.failGenres = false;
+    await tester.tap(find.byKey(const ValueKey('library-genres-retry')));
+    await tester.pumpAndSettle();
+    expect(find.text('Animation'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final size in [const Size(390, 900), const Size(1280, 900)]) {
     testWidgets('library searches and clears at width ${size.width}', (
       tester,
@@ -319,7 +636,12 @@ void main() {
     );
 
     expect(refreshRect.center.dy, closeTo(headingRect.center.dy, 1.0));
-    expect(refreshRect.right, closeTo(fourthCardRect.right, 1.0));
+    expect(refreshRect.right, greaterThan(fourthCardRect.right));
+    final firstCardRect = tester.getRect(
+      find.byKey(const ValueKey('library-desktop-card-a')),
+    );
+    expect(firstCardRect.top, fourthCardRect.top);
+    expect(firstCardRect.width, closeTo(fourthCardRect.width, 0.01));
     expect(tester.takeException(), isNull);
   });
 

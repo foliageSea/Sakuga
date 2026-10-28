@@ -7,6 +7,8 @@ abstract interface class MediaServerClient {
   bool get isConfigured;
   Future<List<MediaUser>> users();
   Future<List<MediaLibrary>> views(String userId);
+  Future<List<String>> genres(String userId, String parentId);
+  Future<List<int>> years(String userId, String parentId);
   Future<MediaItemsPage> items(
     String userId,
     String parentId, {
@@ -20,6 +22,10 @@ abstract interface class MediaServerClient {
       MediaType.musicVideo,
     },
     MediaSort sort = MediaSort.name,
+    String? genre,
+    bool? isPlayed,
+    int? year,
+    bool descending = false,
   });
   Future<MediaItem> item(String userId, String itemId);
   Future<List<MediaItem>> seasons(String userId, String seriesId);

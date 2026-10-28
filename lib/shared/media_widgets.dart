@@ -114,6 +114,9 @@ class MediaPosterCard extends StatefulWidget {
     this.progress,
     this.aspectRatio,
     this.translucent = true,
+    this.framed = true,
+    this.textAlign = TextAlign.start,
+    this.showRating = false,
     super.key,
   }) : assert(onTap != null || onPosterTap != null);
 
@@ -136,6 +139,15 @@ class MediaPosterCard extends StatefulWidget {
 
   /// Whether the card surface is semi-transparent over an ambient background.
   final bool translucent;
+
+  /// Whether to include the card surface, border and outer padding.
+  final bool framed;
+
+  /// Alignment of the title and subtitle below the poster.
+  final TextAlign textAlign;
+
+  /// Whether to overlay a valid community rating on the poster.
+  final bool showRating;
 
   @override
   State<MediaPosterCard> createState() => _MediaPosterCardState();
@@ -165,6 +177,15 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
     final posterUrl = widget.item.poster?.url();
     final subtitle = widget.item.displaySubtitle;
     final watched = widget.progress;
+    final rating = widget.item.communityRating;
+    final ratingLabel =
+        widget.showRating && rating != null && rating.isFinite && rating > 0
+        ? rating.toStringAsFixed(1)
+        : null;
+    final image = MediaImage(
+      url: posterUrl,
+      headers: widget.item.poster?.headers ?? const {},
+    );
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -226,9 +247,7 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
                 widget.onTap?.call();
               }
             },
-            child: Surface(
-              padding: 10,
-              translucent: widget.translucent,
+            child: _buildFrame(
               hoverProgress: hoverProgress,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -238,10 +257,48 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
                     child: PosterHero(
                       tag: widget.heroTag,
                       borderRadius: theme.style.borderRadius.md,
-                      child: MediaImage(
-                        url: posterUrl,
-                        headers: widget.item.poster?.headers ?? const {},
-                      ),
+                      child: ratingLabel != null
+                          ? Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                image,
+                                Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  child: DecoratedBox(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Color(0x00000000),
+                                          Color(0xB3000000),
+                                        ],
+                                      ),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        10,
+                                        24,
+                                        10,
+                                        8,
+                                      ),
+                                      child: Text(
+                                        ratingLabel,
+                                        textAlign: TextAlign.right,
+                                        style: theme.typography.body.sm
+                                            .copyWith(
+                                              color: const Color(0xFFE2BB6A),
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : image,
                     ),
                   ),
                   if (watched != null && watched > 0) ...[
@@ -251,6 +308,7 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
                   const SizedBox(height: 8),
                   Text(
                     widget.item.displayTitle,
+                    textAlign: widget.textAlign,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.typography.body.sm,
@@ -259,6 +317,7 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
+                      textAlign: widget.textAlign,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.typography.body.xs.copyWith(
@@ -274,6 +333,16 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
       ),
     );
   }
+
+  Widget _buildFrame({required double hoverProgress, required Widget child}) =>
+      widget.framed
+      ? Surface(
+          padding: 10,
+          translucent: widget.translucent,
+          hoverProgress: hoverProgress,
+          child: child,
+        )
+      : child;
 }
 
 /// A thin pill-shaped progress bar indicating watched fraction (`0.0..1.0`).

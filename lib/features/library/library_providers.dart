@@ -10,7 +10,42 @@ import '../../data/media_server/server_profile.dart';
 import '../../data/media_server/server_repository.dart';
 import '../player/playback_progress_repository.dart';
 
-typedef LibraryQuery = ({String userId, String viewId});
+typedef LibraryViewQuery = ({String userId, String viewId});
+
+class LibraryQuery {
+  const LibraryQuery({
+    required this.userId,
+    required this.viewId,
+    this.genre,
+    this.isPlayed,
+    this.year,
+    this.sort = MediaSort.name,
+    this.descending = false,
+  });
+
+  final String userId;
+  final String viewId;
+  final String? genre;
+  final bool? isPlayed;
+  final int? year;
+  final MediaSort sort;
+  final bool descending;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LibraryQuery &&
+      userId == other.userId &&
+      viewId == other.viewId &&
+      genre == other.genre &&
+      isPlayed == other.isPlayed &&
+      year == other.year &&
+      sort == other.sort &&
+      descending == other.descending;
+
+  @override
+  int get hashCode =>
+      Object.hash(userId, viewId, genre, isPlayed, year, sort, descending);
+}
 
 class LibraryData {
   const LibraryData({
@@ -50,6 +85,18 @@ final libraryViewsProvider = FutureProvider.autoDispose<LibraryData>((
   debugPrint('LIB_VIEWS ${views.length}');
   return LibraryData(client: client, userId: users.first.id, views: views);
 });
+
+final libraryGenresProvider = FutureProvider.autoDispose
+    .family<List<String>, LibraryViewQuery>((ref, query) async {
+      final library = await ref.watch(libraryViewsProvider.future);
+      return library.client.genres(query.userId, query.viewId);
+    });
+
+final libraryYearsProvider = FutureProvider.autoDispose
+    .family<List<int>, LibraryViewQuery>((ref, query) async {
+      final library = await ref.watch(libraryViewsProvider.future);
+      return library.client.years(query.userId, query.viewId);
+    });
 
 class LibraryItemsState {
   const LibraryItemsState({
@@ -153,6 +200,11 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
       startIndex: startIndex,
       limit: pageSize,
       types: _itemTypes(view),
+      genre: query.genre,
+      isPlayed: query.isPlayed,
+      year: query.year,
+      sort: query.sort,
+      descending: query.descending,
     );
     final items = await ref
         .read(playbackProgressRepositoryProvider)

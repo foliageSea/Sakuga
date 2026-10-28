@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'package:sakuga/data/jellyfin/jellyfin_client.dart';
 import 'package:sakuga/data/jellyfin/jellyfin_mapper.dart';
 import 'package:sakuga/data/media_server/media_models.dart';
 import 'package:sakuga/data/media_server/media_server_client.dart';
@@ -24,7 +27,241 @@ class _Factory extends MediaServerFactory {
   }
 }
 
+const _server = ServerProfile(
+  id: 'jellyfin',
+  name: 'Jellyfin',
+  baseUrl: 'https://media.test',
+  apiKey: 'test-key',
+);
+
+MediaServerClient _browseClient(_BrowseAdapter adapter) {
+  final dio = Dio(BaseOptions(baseUrl: _server.baseUrl))
+    ..httpClientAdapter = adapter;
+  addTearDown(dio.close);
+  return JellyfinClient(server: _server, dio: dio);
+}
+
+class _BrowseAdapter implements HttpClientAdapter {
+  _BrowseAdapter(this.response);
+
+  final Map<String, dynamic> response;
+  final requests = <RequestOptions>[];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests.add(options);
+    return ResponseBody.fromString(
+      jsonEncode(response),
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
+  test(
+    'genres requests the recursive library scope and returns every name',
+    () async {
+      final names = [
+        '科幻 & Fantasy',
+        ...List.generate(75, (index) => 'Genre $index'),
+      ];
+      final adapter = _BrowseAdapter({
+        'Items': [
+          for (final name in names) {'Name': name},
+          {'Id': 'missing-name'},
+          {'Name': null},
+        ],
+        'TotalRecordCount': names.length,
+      });
+      final client = _browseClient(adapter);
+
+      expect(await client.genres('user-1', 'library-1'), names);
+      final request = adapter.requests.single;
+      expect(request.method, 'GET');
+      expect(request.path, '/Genres');
+      expect(request.queryParameters, {
+        'UserId': 'user-1',
+        'ParentId': 'library-1',
+        'Recursive': true,
+        'IncludeItemTypes': 'Movie,Series,Episode,Video,MusicVideo',
+      });
+      expect(request.uri.queryParameters.containsKey('Limit'), isFalse);
+    },
+  );
+
+  test('genres returns an empty list when the library has no genres', () async {
+    for (final response in <Map<String, dynamic>>[
+      {'Items': [], 'TotalRecordCount': 0},
+      {},
+    ]) {
+      final client = _browseClient(_BrowseAdapter(response));
+      expect(await client.genres('user-1', 'library-1'), isEmpty);
+    }
+  });
+
+  test(
+    'years requests library filters and normalizes positive integers',
+    () async {
+      final adapter = _BrowseAdapter({
+        'Years': [2020, 1998, 2025, 2020, 0, -1, null, '2024', 2023.5, true],
+      });
+      final client = _browseClient(adapter);
+
+      expect(await client.years('user-1', 'library-1'), [2025, 2020, 1998]);
+      final request = adapter.requests.single;
+      expect(request.method, 'GET');
+      expect(request.path, '/Items/Filters');
+      expect(request.queryParameters, {
+        'userId': 'user-1',
+        'parentId': 'library-1',
+        'includeItemTypes': 'Movie,Series,Video,MusicVideo',
+      });
+    },
+  );
+
+  test('years returns an empty list for absent or unusable years', () async {
+    for (final response in <Map<String, dynamic>>[
+      {},
+      {'Years': null},
+      {'Years': []},
+      {
+        'Years': [0, -2020, null, 'unknown', 2020.5],
+      },
+    ]) {
+      final client = _browseClient(_BrowseAdapter(response));
+      expect(await client.years('user-1', 'library-1'), isEmpty);
+    }
+  });
+
+  test(
+    'items combines genre, year and played filters with paging and sorting',
+    () async {
+      final adapter = _BrowseAdapter({
+        'Items': [
+          {'Id': 'series-1', 'Name': 'A show', 'Type': 'Series'},
+        ],
+        'TotalRecordCount': 42,
+      });
+      final client = _browseClient(adapter);
+      const genre = '科幻 & Fantasy';
+
+      final page = await client.items(
+        'user-1',
+        'library-1',
+        startIndex: 30,
+        limit: 30,
+        types: {MediaType.series},
+        sort: MediaSort.random,
+        genre: genre,
+        isPlayed: false,
+        year: 2024,
+        descending: true,
+      );
+
+      final request = adapter.requests.single;
+      expect(request.method, 'GET');
+      expect(request.path, '/Items');
+      expect(request.uri.queryParameters['Genres'], genre);
+      expect(request.queryParameters, containsPair('userId', 'user-1'));
+      expect(request.queryParameters, containsPair('parentId', 'library-1'));
+      expect(request.queryParameters, containsPair('recursive', true));
+      expect(
+        request.queryParameters,
+        containsPair('includeItemTypes', 'Series'),
+      );
+      expect(request.queryParameters, containsPair('isPlayed', false));
+      expect(request.queryParameters, containsPair('years', 2024));
+      expect(request.uri.queryParameters['isPlayed'], 'false');
+      expect(request.uri.queryParameters['years'], '2024');
+      expect(request.queryParameters, containsPair('sortBy', 'Random'));
+      expect(request.queryParameters, containsPair('sortOrder', 'Descending'));
+      expect(request.queryParameters, containsPair('startIndex', 30));
+      expect(request.queryParameters, containsPair('limit', 30));
+      expect(page.items.single.id, 'series-1');
+      expect(page.items.single.type, MediaType.series);
+      expect(page.totalRecordCount, 42);
+    },
+  );
+
+  test(
+    'items omits unset filters and defaults to ascending name order',
+    () async {
+      final adapter = _BrowseAdapter({'Items': [], 'TotalRecordCount': 0});
+      final client = _browseClient(adapter);
+
+      await client.items('user-1', 'library-1');
+      await client.items('user-1', 'library-1', genre: '');
+
+      expect(adapter.requests, hasLength(2));
+      for (final request in adapter.requests) {
+        expect(request.uri.queryParameters.containsKey('Genres'), isFalse);
+        expect(request.uri.queryParameters.containsKey('isPlayed'), isFalse);
+        expect(request.uri.queryParameters.containsKey('years'), isFalse);
+        expect(request.queryParameters, containsPair('sortBy', 'SortName'));
+        expect(request.queryParameters, containsPair('sortOrder', 'Ascending'));
+        expect(request.queryParameters, containsPair('startIndex', 0));
+        expect(request.queryParameters, containsPair('limit', 60));
+      }
+    },
+  );
+
+  test('items sends the played filter when selecting watched media', () async {
+    final adapter = _BrowseAdapter({'Items': [], 'TotalRecordCount': 0});
+    final client = _browseClient(adapter);
+
+    await client.items('user-1', 'library-1', isPlayed: true);
+
+    final request = adapter.requests.single;
+    expect(request.queryParameters, containsPair('isPlayed', true));
+    expect(request.uri.queryParameters['isPlayed'], 'true');
+    expect(request.queryParameters.containsKey('years'), isFalse);
+  });
+
+  for (final (sort, field) in [
+    (MediaSort.name, 'SortName'),
+    (MediaSort.random, 'Random'),
+    (MediaSort.dateAdded, 'DateCreated'),
+    (MediaSort.year, 'ProductionYear'),
+    (MediaSort.rating, 'CommunityRating'),
+  ]) {
+    for (final descending in [false, true]) {
+      test('items maps $sort with descending=$descending', () async {
+        final adapter = _BrowseAdapter({'Items': [], 'TotalRecordCount': 0});
+        final client = _browseClient(adapter);
+
+        await client.items(
+          'user-1',
+          'library-1',
+          sort: sort,
+          descending: descending,
+        );
+
+        final request = adapter.requests.single;
+        expect(request.queryParameters, containsPair('sortBy', field));
+        expect(
+          request.queryParameters,
+          containsPair('sortOrder', descending ? 'Descending' : 'Ascending'),
+        );
+      });
+    }
+  }
+
+  test('fake clients provide empty genre and year lists by default', () async {
+    final MediaServerClient client = FakeMediaServerClient(server: _server);
+    expect(await client.genres('user-1', 'library-1'), isEmpty);
+    expect(await client.years('user-1', 'library-1'), isEmpty);
+  });
+
   test(
     'reads legacy profiles and persists type without changing storage keys',
     () async {

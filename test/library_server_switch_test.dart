@@ -23,6 +23,8 @@ class _Client extends FakeMediaServerClient {
 
   final pageStarted = Completer<void>();
   final nextPage = Completer<MediaItemsPage>();
+  final requests = <({String? genre, int startIndex})>[];
+  final queries = <LibraryQuery>[];
 
   @override
   Future<MediaItemsPage> items(
@@ -38,7 +40,23 @@ class _Client extends FakeMediaServerClient {
       MediaType.musicVideo,
     },
     MediaSort sort = MediaSort.name,
+    String? genre,
+    bool? isPlayed,
+    int? year,
+    bool descending = false,
   }) async {
+    requests.add((genre: genre, startIndex: startIndex));
+    queries.add(
+      LibraryQuery(
+        userId: userId,
+        viewId: parentId,
+        genre: genre,
+        isPlayed: isPlayed,
+        year: year,
+        sort: sort,
+        descending: descending,
+      ),
+    );
     if (startIndex > 0) {
       pageStarted.complete();
       return nextPage.future;
@@ -53,6 +71,86 @@ class _Client extends FakeMediaServerClient {
 }
 
 void main() {
+  test('genre pagination retains the filter and isolates late pages', () async {
+    const server = ServerProfile(
+      id: 'server',
+      name: 'Server',
+      baseUrl: 'https://media.test',
+    );
+    final client = _Client(server);
+    final container = ProviderContainer(
+      overrides: [
+        playbackProgressRepositoryProvider.overrideWithValue(_Progress()),
+        libraryViewsProvider.overrideWith(
+          (ref) async => LibraryData(
+            client: client,
+            userId: 'user',
+            views: const [
+              MediaLibrary(
+                id: 'view',
+                name: 'Movies',
+                type: MediaLibraryType.movies,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    final drama = libraryItemsProvider(
+      LibraryQuery(
+        userId: 'user',
+        viewId: 'view',
+        genre: 'Drama',
+        isPlayed: false,
+        year: 2025,
+        sort: MediaSort.rating,
+        descending: true,
+      ),
+    );
+    final comedy = libraryItemsProvider(
+      LibraryQuery(userId: 'user', viewId: 'view', genre: 'Comedy'),
+    );
+    final dramaSubscription = container.listen(drama, (_, _) {});
+    await container.read(drama.future);
+    final oldPage = container.read(drama.notifier).loadMore();
+    await client.pageStarted.future;
+    expect(client.requests, [
+      (genre: 'Drama', startIndex: 0),
+      (genre: 'Drama', startIndex: 1),
+    ]);
+    expect(
+      client.queries
+          .take(2)
+          .every(
+            (query) =>
+                query.isPlayed == false &&
+                query.year == 2025 &&
+                query.sort == MediaSort.rating &&
+                query.descending,
+          ),
+      isTrue,
+    );
+    final comedySubscription = container.listen(comedy, (_, _) {});
+    addTearDown(comedySubscription.close);
+    dramaSubscription.close();
+    await container.pump();
+    await container.read(comedy.future);
+    expect(client.requests.last, (genre: 'Comedy', startIndex: 0));
+    client.nextPage.complete(
+      const MediaItemsPage(
+        items: [
+          MediaItem(id: 'old-page', name: 'Old drama', type: MediaType.movie),
+        ],
+        totalRecordCount: 2,
+      ),
+    );
+    await oldPage;
+    expect(container.read(comedy).requireValue.items.map((item) => item.id), [
+      'same-item-id',
+    ]);
+  });
+
   for (final failOldRequest in [false, true]) {
     test(
       'old pagination cannot replace new server data (error: $failOldRequest)',
@@ -83,10 +181,9 @@ void main() {
         );
         addTearDown(container.dispose);
         await container.read(serversProvider.future);
-        final items = libraryItemsProvider((
-          userId: 'same-user',
-          viewId: 'same-view',
-        ));
+        final items = libraryItemsProvider(
+          LibraryQuery(userId: 'same-user', viewId: 'same-view', genre: null),
+        );
         final subscription = container.listen(items, (_, _) {});
         addTearDown(subscription.close);
         expect((await container.read(items.future)).items.single.name, 'A');

@@ -26,6 +26,12 @@ class FakeMediaServerClient extends Fake implements MediaServerClient {
 
   @override
   Future<List<MediaLibrary>> views(String userId) async => const [];
+
+  @override
+  Future<List<String>> genres(String userId, String parentId) async => const [];
+
+  @override
+  Future<List<int>> years(String userId, String parentId) async => const [];
 }
 
 class FakeLogExporter implements LogExportService {

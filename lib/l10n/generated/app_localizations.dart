@@ -242,6 +242,150 @@ abstract class AppLocalizations {
   /// **'Search movies and series'**
   String get searchHint;
 
+  /// No description provided for @libraryFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get libraryFilters;
+
+  /// No description provided for @libraryProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get libraryProgress;
+
+  /// No description provided for @libraryUnwatched.
+  ///
+  /// In en, this message translates to:
+  /// **'Unwatched'**
+  String get libraryUnwatched;
+
+  /// No description provided for @libraryWatched.
+  ///
+  /// In en, this message translates to:
+  /// **'Watched'**
+  String get libraryWatched;
+
+  /// No description provided for @libraryDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min'**
+  String libraryDuration(int count);
+
+  /// No description provided for @libraryYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get libraryYear;
+
+  /// No description provided for @librarySort.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get librarySort;
+
+  /// No description provided for @librarySortName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get librarySortName;
+
+  /// No description provided for @librarySortNewest.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently added'**
+  String get librarySortNewest;
+
+  /// No description provided for @librarySortYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Release year'**
+  String get librarySortYear;
+
+  /// No description provided for @librarySortRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get librarySortRating;
+
+  /// No description provided for @librarySortAscending.
+  ///
+  /// In en, this message translates to:
+  /// **'Ascending'**
+  String get librarySortAscending;
+
+  /// No description provided for @librarySortDescending.
+  ///
+  /// In en, this message translates to:
+  /// **'Descending'**
+  String get librarySortDescending;
+
+  /// No description provided for @libraryGridView.
+  ///
+  /// In en, this message translates to:
+  /// **'Poster view'**
+  String get libraryGridView;
+
+  /// No description provided for @libraryListView.
+  ///
+  /// In en, this message translates to:
+  /// **'List view'**
+  String get libraryListView;
+
+  /// No description provided for @libraryCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 title} other{{count} titles}}'**
+  String libraryCount(int count);
+
+  /// No description provided for @librarySeasonCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 season} other{{count} seasons}}'**
+  String librarySeasonCount(int count);
+
+  /// No description provided for @libraryEpisodeCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 episode} other{{count} episodes}}'**
+  String libraryEpisodeCount(int count);
+
+  /// No description provided for @libraryYearsLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load years. Try again'**
+  String get libraryYearsLoadError;
+
+  /// No description provided for @libraryMoreYears.
+  ///
+  /// In en, this message translates to:
+  /// **'More years'**
+  String get libraryMoreYears;
+
+  /// No description provided for @libraryFewerYears.
+  ///
+  /// In en, this message translates to:
+  /// **'Fewer years'**
+  String get libraryFewerYears;
+
+  /// No description provided for @genre.
+  ///
+  /// In en, this message translates to:
+  /// **'Genre'**
+  String get genre;
+
+  /// No description provided for @allGenres.
+  ///
+  /// In en, this message translates to:
+  /// **'All genres'**
+  String get allGenres;
+
+  /// No description provided for @genresLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load genres. Try again'**
+  String get genresLoadError;
+
   /// No description provided for @synopsis.
   ///
   /// In en, this message translates to:

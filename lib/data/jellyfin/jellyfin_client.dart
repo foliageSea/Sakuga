@@ -41,7 +41,7 @@ class JellyfinClient implements MediaServerClient {
   /// Fields shared by every browse request: scraped image metadata plus the
   /// per-user playback state.
   static const _itemFields =
-      'RunTimeTicks,PrimaryImageAspectRatio,ImageTags,UserData';
+      'RunTimeTicks,PrimaryImageAspectRatio,ImageTags,UserData,ChildCount,RecursiveItemCount';
   static const _itemImageTypes = 'Primary,Backdrop,Logo';
 
   Map<String, String> get authHeaders => _headers(server.apiKey);
@@ -338,6 +338,42 @@ class JellyfinClient implements MediaServerClient {
     }
   }
 
+  @override
+  Future<List<String>> genres(String userId, String parentId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/Genres',
+      queryParameters: {
+        'UserId': userId,
+        'ParentId': parentId,
+        'Recursive': true,
+        'IncludeItemTypes': 'Movie,Series,Episode,Video,MusicVideo',
+      },
+    );
+    return (response.data?['Items'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map((item) => item['Name'])
+        .whereType<String>()
+        .toList();
+  }
+
+  @override
+  Future<List<int>> years(String userId, String parentId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/Items/Filters',
+      queryParameters: {
+        'userId': userId,
+        'parentId': parentId,
+        'includeItemTypes': 'Movie,Series,Video,MusicVideo',
+      },
+    );
+    return (response.data?['Years'] as List? ?? const [])
+        .whereType<int>()
+        .where((year) => year > 0)
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+  }
+
   /// One page of a library view.
   ///
   /// [types] decides what the page contains: TV libraries should ask
@@ -356,6 +392,10 @@ class JellyfinClient implements MediaServerClient {
       MediaType.musicVideo,
     },
     MediaSort sort = MediaSort.name,
+    String? genre,
+    bool? isPlayed,
+    int? year,
+    bool descending = false,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/Items',
@@ -364,11 +404,17 @@ class JellyfinClient implements MediaServerClient {
         'parentId': parentId,
         'recursive': true,
         'includeItemTypes': types.map(JellyfinMapper.itemType).join(','),
+        if (genre != null && genre.isNotEmpty) 'Genres': genre,
+        'isPlayed': ?isPlayed,
+        'years': ?year,
         'sortBy': switch (sort) {
           MediaSort.name => 'SortName',
           MediaSort.random => 'Random',
+          MediaSort.dateAdded => 'DateCreated',
+          MediaSort.year => 'ProductionYear',
+          MediaSort.rating => 'CommunityRating',
         },
-        'sortOrder': 'Ascending',
+        'sortOrder': descending ? 'Descending' : 'Ascending',
         'fields': _itemFields,
         'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,

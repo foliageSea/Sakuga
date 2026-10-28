@@ -2,7 +2,7 @@ enum MediaType { movie, series, season, episode, video, musicVideo, unknown }
 
 enum MediaLibraryType { movies, tvShows, musicVideos, homeVideos, unknown }
 
-enum MediaSort { name, random }
+enum MediaSort { name, random, dateAdded, year, rating }
 
 class MediaUser {
   const MediaUser({required this.id, required this.name});

@@ -82,6 +82,86 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchHint => '搜索影片或剧集';
 
   @override
+  String get libraryFilters => '筛选';
+
+  @override
+  String get libraryProgress => '进度';
+
+  @override
+  String get libraryUnwatched => '未观看';
+
+  @override
+  String get libraryWatched => '已观看';
+
+  @override
+  String libraryDuration(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String get libraryYear => '年份';
+
+  @override
+  String get librarySort => '排序';
+
+  @override
+  String get librarySortName => '名称';
+
+  @override
+  String get librarySortNewest => '最近添加';
+
+  @override
+  String get librarySortYear => '上映年份';
+
+  @override
+  String get librarySortRating => '评分';
+
+  @override
+  String get librarySortAscending => '升序';
+
+  @override
+  String get librarySortDescending => '降序';
+
+  @override
+  String get libraryGridView => '海报视图';
+
+  @override
+  String get libraryListView => '列表视图';
+
+  @override
+  String libraryCount(int count) {
+    return '$count 部';
+  }
+
+  @override
+  String librarySeasonCount(int count) {
+    return '$count 季';
+  }
+
+  @override
+  String libraryEpisodeCount(int count) {
+    return '$count 集';
+  }
+
+  @override
+  String get libraryYearsLoadError => '年份加载失败，点击重试';
+
+  @override
+  String get libraryMoreYears => '更多年份';
+
+  @override
+  String get libraryFewerYears => '收起年份';
+
+  @override
+  String get genre => '类型';
+
+  @override
+  String get allGenres => '全部类型';
+
+  @override
+  String get genresLoadError => '类型加载失败，点击重试';
+
+  @override
   String get synopsis => '简介';
 
   @override

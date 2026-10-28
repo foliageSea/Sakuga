@@ -82,6 +82,104 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchHint => 'Search movies and series';
 
   @override
+  String get libraryFilters => 'Filters';
+
+  @override
+  String get libraryProgress => 'Progress';
+
+  @override
+  String get libraryUnwatched => 'Unwatched';
+
+  @override
+  String get libraryWatched => 'Watched';
+
+  @override
+  String libraryDuration(int count) {
+    return '$count min';
+  }
+
+  @override
+  String get libraryYear => 'Year';
+
+  @override
+  String get librarySort => 'Sort';
+
+  @override
+  String get librarySortName => 'Name';
+
+  @override
+  String get librarySortNewest => 'Recently added';
+
+  @override
+  String get librarySortYear => 'Release year';
+
+  @override
+  String get librarySortRating => 'Rating';
+
+  @override
+  String get librarySortAscending => 'Ascending';
+
+  @override
+  String get librarySortDescending => 'Descending';
+
+  @override
+  String get libraryGridView => 'Poster view';
+
+  @override
+  String get libraryListView => 'List view';
+
+  @override
+  String libraryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count titles',
+      one: '1 title',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String librarySeasonCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count seasons',
+      one: '1 season',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryEpisodeCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count episodes',
+      one: '1 episode',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryYearsLoadError => 'Could not load years. Try again';
+
+  @override
+  String get libraryMoreYears => 'More years';
+
+  @override
+  String get libraryFewerYears => 'Fewer years';
+
+  @override
+  String get genre => 'Genre';
+
+  @override
+  String get allGenres => 'All genres';
+
+  @override
+  String get genresLoadError => 'Could not load genres. Try again';
+
+  @override
   String get synopsis => 'Synopsis';
 
   @override
