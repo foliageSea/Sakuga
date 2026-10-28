@@ -14,6 +14,8 @@ import '../../shared/widgets.dart';
 import '../detail/detail_providers.dart';
 import '../library/library_providers.dart';
 import 'player_button_style.dart';
+import 'player_episode_dialog.dart';
+import 'player_gestures.dart';
 import 'player_subtitles.dart';
 import 'player_controls_controller.dart';
 import 'player_slider.dart';
@@ -36,6 +38,7 @@ class PlayerControls extends ConsumerStatefulWidget {
     required this.onSelectEpisode,
     this.onScreenshot,
     this.topLeftOverlay,
+    this.gesturesEnabled = true,
     super.key,
   });
 
@@ -49,6 +52,7 @@ class PlayerControls extends ConsumerStatefulWidget {
   final Future<void> Function(MediaItem) onSelectEpisode;
   final Future<void> Function()? onScreenshot;
   final Widget? topLeftOverlay;
+  final bool gesturesEnabled;
 
   @override
   ConsumerState<PlayerControls> createState() => _PlayerControlsState();
@@ -59,6 +63,7 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
   bool _visible = true;
   bool _hoveringBar = false;
   bool _overlayFocused = false;
+  bool _interacting = false;
   Duration? _scrubPosition;
   double _unmutedVolume = 100;
 
@@ -93,6 +98,7 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
     if (!widget.controller.playing ||
         _hoveringBar ||
         _overlayFocused ||
+        _interacting ||
         _scrubPosition != null) {
       return;
     }
@@ -198,18 +204,25 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                GestureDetector(
-                  key: const ValueKey('player-control-surface'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    if (_visible) {
-                      setState(() => _visible = false);
-                      _hideTimer?.cancel();
-                    } else {
-                      _reveal();
-                    }
-                  },
-                  onDoubleTap: () => _perform(widget.onToggleFullscreen),
+                ValueListenableBuilder<bool>(
+                  valueListenable: widget.switching,
+                  builder: (context, switching, _) => PlayerGestureSurface(
+                    controller: widget.controller,
+                    enabled: widget.gesturesEnabled && !switching,
+                    onToggleFullscreen: widget.onToggleFullscreen,
+                    onInteractionChanged: (active) {
+                      _interacting = active;
+                      _scheduleHide();
+                    },
+                    onTap: () {
+                      if (_visible) {
+                        setState(() => _visible = false);
+                        _hideTimer?.cancel();
+                      } else {
+                        _reveal();
+                      }
+                    },
+                  ),
                 ),
                 IgnorePointer(
                   ignoring: !_visible,
@@ -697,12 +710,22 @@ class PlayerEpisodeButton extends StatelessWidget {
           );
           final episodes = ref.watch(seriesEpisodesProvider(query));
           if (menu) {
-            return _EpisodeMenu(
-              episodes: episodes,
-              currentId: currentId,
-              busy: busy,
-              onSelect: onSelectEpisode,
-              onRetry: () => ref.invalidate(seriesEpisodesProvider(query)),
+            return PlayerControlButton(
+              key: const ValueKey('player-episodes-menu'),
+              label: context.l10n.selectEpisode,
+              onPress: busy
+                  ? null
+                  : () => unawaited(
+                      showPlayerEpisodeDialog(
+                        context,
+                        userId: userId,
+                        seriesId: seriesId,
+                        itemId: itemId,
+                        switching: switching,
+                        onSelect: onSelectEpisode,
+                      ),
+                    ),
+              icon: FLucideIcons.listVideo,
             );
           }
           final next = nextPlayerEpisode(episodes.value ?? const [], currentId);
@@ -717,71 +740,6 @@ class PlayerEpisodeButton extends StatelessWidget {
           );
         },
       ),
-    ),
-  );
-}
-
-class _EpisodeMenu extends StatelessWidget {
-  const _EpisodeMenu({
-    required this.episodes,
-    required this.currentId,
-    required this.busy,
-    required this.onSelect,
-    required this.onRetry,
-  });
-
-  final AsyncValue<List<MediaItem>> episodes;
-  final String? currentId;
-  final bool busy;
-  final Future<void> Function(MediaItem) onSelect;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => FPopoverMenu(
-    maxHeight: 360,
-    menuAnchor: .bottomRight,
-    childAnchor: .topRight,
-    menuBuilder: (context, controller, _) => [
-      FItemGroup(
-        children: episodes.when(
-          loading: () => [FItem(title: Text(context.l10n.loading))],
-          error: (_, _) => [
-            FItem(title: Text(context.l10n.retry), onPress: onRetry),
-          ],
-          data: (values) => values.isEmpty
-              ? [FItem(title: Text(context.l10n.noItems))]
-              : [
-                  for (final episode in values)
-                    FItem(
-                      key: ValueKey('player-episode-${episode.id}'),
-                      title: SizedBox(
-                        width: 260,
-                        child: Text(
-                          episode.displaySubtitle ?? episode.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      selected: episode.id == currentId,
-                      suffix: episode.id == currentId
-                          ? const Icon(FLucideIcons.check, size: 16)
-                          : null,
-                      onPress: busy
-                          ? null
-                          : () {
-                              controller.hide();
-                              unawaited(onSelect(episode));
-                            },
-                    ),
-                ],
-        ),
-      ),
-    ],
-    builder: (context, controller, _) => PlayerControlButton(
-      key: const ValueKey('player-episodes-menu'),
-      label: context.l10n.selectEpisode,
-      onPress: busy ? null : controller.toggle,
-      icon: FLucideIcons.listVideo,
     ),
   );
 }

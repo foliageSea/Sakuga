@@ -35,18 +35,13 @@ class PlayerSubtitles extends ConsumerWidget {
                 (constraints.maxWidth * constraints.maxHeight / (1920 * 1080))
                     .clamp(0.0, 1.0),
               );
-              return SafeArea(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 88),
-                    child: SubtitleCaption(
-                      text: text,
-                      fontSize: settings.subtitleFontSize,
-                      backgroundOpacity: settings.subtitleBackgroundOpacity,
-                      textScaler: TextScaler.linear(scale),
-                    ),
-                  ),
+              return SubtitlePlacement(
+                position: settings.subtitleVerticalPosition,
+                child: SubtitleCaption(
+                  text: text,
+                  fontSize: settings.subtitleFontSize,
+                  backgroundOpacity: settings.subtitleBackgroundOpacity,
+                  textScaler: TextScaler.linear(scale),
                 ),
               );
             },
@@ -55,6 +50,28 @@ class PlayerSubtitles extends ConsumerWidget {
       ),
     );
   }
+}
+
+class SubtitlePlacement extends StatelessWidget {
+  const SubtitlePlacement({
+    required this.position,
+    required this.child,
+    super.key,
+  });
+
+  final double position;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    minimum: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+    child: ClipRect(
+      child: Align(
+        alignment: Alignment(0, position.clamp(0, 1) * 2 - 1),
+        child: child,
+      ),
+    ),
+  );
 }
 
 class SubtitleCaption extends StatelessWidget {
@@ -119,6 +136,7 @@ class _SubtitleStyleSettingsState
     extends ConsumerState<_SubtitleStyleSettings> {
   late double _fontSize;
   late double _opacity;
+  late double _verticalPosition;
 
   @override
   void initState() {
@@ -126,11 +144,13 @@ class _SubtitleStyleSettingsState
     final settings = ref.read(settingsProvider);
     _fontSize = settings.subtitleFontSize;
     _opacity = settings.subtitleBackgroundOpacity;
+    _verticalPosition = settings.subtitleVerticalPosition;
   }
 
   Future<void> _save() async {
     final fontSize = _fontSize;
     final opacity = _opacity;
+    final verticalPosition = _verticalPosition;
     try {
       await ref
           .read(settingsProvider.notifier)
@@ -138,6 +158,7 @@ class _SubtitleStyleSettingsState
             (settings) => settings.copyWith(
               subtitleFontSize: fontSize,
               subtitleBackgroundOpacity: opacity,
+              subtitleVerticalPosition: verticalPosition,
             ),
           );
     } catch (error) {
@@ -156,17 +177,22 @@ class _SubtitleStyleSettingsState
         children: [
           Text(l.subtitleStyle, style: context.theme.typography.body.lg),
           const SizedBox(height: 20),
-          Container(
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF475569),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: SubtitleCaption(
-              text: l.subtitles,
-              fontSize: _fontSize,
-              backgroundOpacity: _opacity,
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF475569),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SubtitlePlacement(
+                position: _verticalPosition,
+                child: SubtitleCaption(
+                  text: l.subtitles,
+                  fontSize: _fontSize,
+                  backgroundOpacity: _opacity,
+                  textScaler: const TextScaler.linear(0.6),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -184,6 +210,15 @@ class _SubtitleStyleSettingsState
             key: const ValueKey('subtitle-background-opacity'),
             value: _opacity,
             onChange: (value) => setState(() => _opacity = value),
+            onEnd: (_) => _save(),
+          ),
+          Text(
+            '${l.subtitleVerticalPosition} · ${(_verticalPosition * 100).round()}%',
+          ),
+          PlayerSlider(
+            key: const ValueKey('subtitle-vertical-position'),
+            value: _verticalPosition,
+            onChange: (value) => setState(() => _verticalPosition = value),
             onEnd: (_) => _save(),
           ),
           const SizedBox(height: 12),

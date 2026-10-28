@@ -300,6 +300,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get superResolutionQuality => 'Quality';
 
   @override
+  String get superResolutionEfficiencyActive => 'SR · Efficiency';
+
+  @override
+  String get superResolutionQualityActive => 'SR · Quality';
+
+  @override
   String get superResolutionError => 'Could not change super resolution mode.';
 
   @override
@@ -425,10 +431,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playbackPosition => 'Playback position';
 
   @override
+  String get playerBrightness => 'Brightness';
+
+  @override
+  String get playerVolume => 'Volume';
+
+  @override
+  String get playerAdjustmentError => 'Could not adjust playback settings.';
+
+  @override
   String get subtitleStyle => 'Subtitle style';
 
   @override
   String get subtitleBackgroundOpacity => 'Background opacity';
+
+  @override
+  String get subtitleVerticalPosition => 'Vertical position';
 
   @override
   String get selected => 'Selected';

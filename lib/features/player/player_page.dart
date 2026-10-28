@@ -694,6 +694,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                   controlsBuilder: (context, copyScreenshot) => PlayerControls(
                     onScreenshot: copyScreenshot,
                     controller: _controlsController,
+                    gesturesEnabled: !_loading && !_exiting && _error == null,
                     onToggleFullscreen: state.toggleFullscreen,
                     onExitFullscreen: state.exitFullscreen,
                     fullscreen: state.isFullscreen(),
@@ -788,7 +789,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         ] else
           const Spacer(),
         const SizedBox(width: 8),
-        _SuperResolutionMenu(
+        PlayerSuperResolutionMenu(
           mode: _superResolutionMode,
           onChanged: _setSuperResolution,
         ),
@@ -829,8 +830,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 }
 
-class _SuperResolutionMenu extends StatelessWidget {
-  const _SuperResolutionMenu({required this.mode, required this.onChanged});
+class PlayerSuperResolutionMenu extends StatelessWidget {
+  const PlayerSuperResolutionMenu({
+    required this.mode,
+    required this.onChanged,
+    super.key,
+  });
 
   final SuperResolutionMode mode;
   final Future<void> Function(SuperResolutionMode mode) onChanged;
@@ -858,19 +863,36 @@ class _SuperResolutionMenu extends StatelessWidget {
         ],
       ),
     ],
-    builder: (context, controller, _) => FButton.icon(
+    builder: (context, controller, _) => FButton(
       key: const ValueKey('super-resolution-menu'),
       variant: .ghost,
       style: playerOverlayButtonStyle,
       size: .sm,
       onPress: controller.toggle,
       semanticsLabel: context.l10n.superResolution,
-      child: Icon(
-        FLucideIcons.sparkles,
-        size: 18,
-        color: mode == SuperResolutionMode.off
-            ? const Color(0xFFFFFFFF)
-            : context.theme.colors.primary,
+      mainAxisSize: MainAxisSize.min,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            FLucideIcons.sparkles,
+            size: 18,
+            color: mode == SuperResolutionMode.off
+                ? const Color(0xFFFFFFFF)
+                : context.theme.colors.primary,
+          ),
+          if (mode != SuperResolutionMode.off) ...[
+            const SizedBox(width: 6),
+            Text(
+              mode == SuperResolutionMode.efficiency
+                  ? context.l10n.superResolutionEfficiencyActive
+                  : context.l10n.superResolutionQualityActive,
+              style: context.theme.typography.body.xs.copyWith(
+                color: const Color(0xFFFFFFFF),
+              ),
+            ),
+          ],
+        ],
       ),
     ),
   );

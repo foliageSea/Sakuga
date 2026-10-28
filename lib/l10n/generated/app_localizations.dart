@@ -674,6 +674,18 @@ abstract class AppLocalizations {
   /// **'Quality'**
   String get superResolutionQuality;
 
+  /// No description provided for @superResolutionEfficiencyActive.
+  ///
+  /// In en, this message translates to:
+  /// **'SR · Efficiency'**
+  String get superResolutionEfficiencyActive;
+
+  /// No description provided for @superResolutionQualityActive.
+  ///
+  /// In en, this message translates to:
+  /// **'SR · Quality'**
+  String get superResolutionQualityActive;
+
   /// No description provided for @superResolutionError.
   ///
   /// In en, this message translates to:
@@ -920,6 +932,24 @@ abstract class AppLocalizations {
   /// **'Playback position'**
   String get playbackPosition;
 
+  /// No description provided for @playerBrightness.
+  ///
+  /// In en, this message translates to:
+  /// **'Brightness'**
+  String get playerBrightness;
+
+  /// No description provided for @playerVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get playerVolume;
+
+  /// No description provided for @playerAdjustmentError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not adjust playback settings.'**
+  String get playerAdjustmentError;
+
   /// No description provided for @subtitleStyle.
   ///
   /// In en, this message translates to:
@@ -931,6 +961,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Background opacity'**
   String get subtitleBackgroundOpacity;
+
+  /// No description provided for @subtitleVerticalPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical position'**
+  String get subtitleVerticalPosition;
 
   /// No description provided for @selected.
   ///

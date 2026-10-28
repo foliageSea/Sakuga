@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -11,8 +12,46 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity : FlutterActivity() {
+    private var originalScreenBrightness: Float? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.foliage.sakuga/window_brightness",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "read" -> {
+                    val brightness = window.attributes.screenBrightness
+                    val current = if (brightness >= 0f) brightness else {
+                        Settings.System.getInt(
+                            contentResolver, Settings.System.SCREEN_BRIGHTNESS, 128,
+                        ) / 255f
+                    }
+                    result.success(current.coerceIn(0f, 1f).toDouble())
+                }
+                "set" -> {
+                    val value = (call.arguments as? Number)?.toFloat()
+                    if (value == null || !value.isFinite() || value !in 0f..1f) {
+                        result.error("invalid_brightness", "Expected brightness between 0 and 1.", null)
+                    } else {
+                        if (originalScreenBrightness == null) {
+                            originalScreenBrightness = window.attributes.screenBrightness
+                        }
+                        window.attributes = window.attributes.apply { screenBrightness = value }
+                        result.success(null)
+                    }
+                }
+                "reset" -> {
+                    originalScreenBrightness?.let { original ->
+                        window.attributes = window.attributes.apply { screenBrightness = original }
+                        originalScreenBrightness = null
+                    }
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.foliage.sakuga/image_clipboard",

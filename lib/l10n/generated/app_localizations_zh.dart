@@ -298,6 +298,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get superResolutionQuality => '质量模式';
 
   @override
+  String get superResolutionEfficiencyActive => '超分 · 效率';
+
+  @override
+  String get superResolutionQualityActive => '超分 · 质量';
+
+  @override
   String get superResolutionError => '无法切换视频超分模式。';
 
   @override
@@ -423,10 +429,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playbackPosition => '播放进度';
 
   @override
+  String get playerBrightness => '亮度';
+
+  @override
+  String get playerVolume => '音量';
+
+  @override
+  String get playerAdjustmentError => '无法调整播放设置。';
+
+  @override
   String get subtitleStyle => '字幕样式';
 
   @override
   String get subtitleBackgroundOpacity => '遮罩不透明度';
+
+  @override
+  String get subtitleVerticalPosition => '垂直位置';
 
   @override
   String get selected => '已选择';

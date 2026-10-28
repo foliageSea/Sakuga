@@ -19,12 +19,14 @@ class AppSettings {
     this.fontScale = 1,
     this.subtitleFontSize = 32,
     this.subtitleBackgroundOpacity = 2 / 3,
+    this.subtitleVerticalPosition = 0.9,
     this.seekBackwardSeconds = 5,
     this.seekForwardSeconds = 5,
   }) : assert(radiusScale >= 0 && radiusScale <= 2),
        assert(fontScale >= 0.8 && fontScale <= 1.2),
        assert(subtitleFontSize >= 16 && subtitleFontSize <= 64),
        assert(subtitleBackgroundOpacity >= 0 && subtitleBackgroundOpacity <= 1),
+       assert(subtitleVerticalPosition >= 0 && subtitleVerticalPosition <= 1),
        assert(seekBackwardSeconds >= 1 && seekBackwardSeconds <= 600),
        assert(seekForwardSeconds >= 1 && seekForwardSeconds <= 600);
   final ThemeMode themeMode;
@@ -35,6 +37,7 @@ class AppSettings {
   final double fontScale;
   final double subtitleFontSize;
   final double subtitleBackgroundOpacity;
+  final double subtitleVerticalPosition;
   final int seekBackwardSeconds;
   final int seekForwardSeconds;
   Locale? get locale => language == 'system' ? null : Locale(language);
@@ -47,6 +50,7 @@ class AppSettings {
     double? fontScale,
     double? subtitleFontSize,
     double? subtitleBackgroundOpacity,
+    double? subtitleVerticalPosition,
     int? seekBackwardSeconds,
     int? seekForwardSeconds,
   }) => AppSettings(
@@ -59,6 +63,8 @@ class AppSettings {
     subtitleFontSize: subtitleFontSize ?? this.subtitleFontSize,
     subtitleBackgroundOpacity:
         subtitleBackgroundOpacity ?? this.subtitleBackgroundOpacity,
+    subtitleVerticalPosition:
+        subtitleVerticalPosition ?? this.subtitleVerticalPosition,
     seekBackwardSeconds: seekBackwardSeconds ?? this.seekBackwardSeconds,
     seekForwardSeconds: seekForwardSeconds ?? this.seekForwardSeconds,
   );
@@ -71,6 +77,7 @@ class AppSettings {
     'fontScale': fontScale,
     'subtitleFontSize': subtitleFontSize,
     'subtitleBackgroundOpacity': subtitleBackgroundOpacity,
+    'subtitleVerticalPosition': subtitleVerticalPosition,
     'seekBackwardSeconds': seekBackwardSeconds,
     'seekForwardSeconds': seekForwardSeconds,
   };
@@ -106,6 +113,11 @@ class AppSettings {
       num value when value.isFinite && value >= 0 && value <= 1 =>
         value.toDouble(),
       _ => 2 / 3,
+    },
+    subtitleVerticalPosition: switch (json['subtitleVerticalPosition']) {
+      num value when value.isFinite && value >= 0 && value <= 1 =>
+        value.toDouble(),
+      _ => 0.9,
     },
     seekBackwardSeconds: switch (json['seekBackwardSeconds']) {
       int value when value >= 1 && value <= 600 => value,

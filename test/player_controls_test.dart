@@ -13,6 +13,7 @@ import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/library/library_providers.dart';
 import 'package:sakuga/features/player/player_controls.dart';
 import 'package:sakuga/features/player/player_controls_controller.dart';
+import 'package:sakuga/features/player/player_episode_dialog.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
 
 import 'fakes.dart';
@@ -363,6 +364,86 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'episode dialog locates current item after loading and on every opening',
+    (tester) async {
+      final loading = Completer<List<MediaItem>>();
+      final currentId = ValueNotifier<String?>('episode-90');
+      final switching = ValueNotifier(false);
+      final values = List.generate(120, (i) => episode('episode-$i', 1, i + 1));
+      final selected = <String>[];
+      addTearDown(currentId.dispose);
+      addTearDown(switching.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            seriesEpisodesProvider.overrideWith((ref, query) => loading.future),
+          ],
+          child: MaterialApp(
+            locale: const Locale('en'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              ...FLocalizations.localizationsDelegates,
+            ],
+            builder: (context, child) => FTheme(
+              data: createAppTheme(
+                const AppSettings(),
+                brightness: Brightness.dark,
+                touch: true,
+              ),
+              child: child!,
+            ),
+            home: Builder(
+              builder: (context) => Center(
+                child: FButton(
+                  onPress: () => showPlayerEpisodeDialog(
+                    context,
+                    userId: 'user',
+                    seriesId: 'series',
+                    itemId: currentId,
+                    switching: switching,
+                    onSelect: (item) async => selected.add(item.id),
+                  ),
+                  child: const Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(FCircularProgress), findsOneWidget);
+      loading.complete(values);
+      await tester.pumpAndSettle();
+      final list = find.byKey(const ValueKey('player-episodes-list'));
+      var current = find.byKey(const ValueKey('player-episode-episode-90'));
+      expect(current.hitTestable(), findsOneWidget);
+      expect(
+        (tester.getCenter(current).dy - tester.getCenter(list).dy).abs(),
+        lessThan(40),
+      );
+      await tester.tap(find.byKey(const ValueKey('player-episode-episode-91')));
+      await tester.pumpAndSettle();
+      expect(selected, ['episode-91']);
+      expect(
+        find.byKey(const ValueKey('player-episodes-dialog')),
+        findsNothing,
+      );
+
+      currentId.value = 'episode-119';
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      current = find.byKey(const ValueKey('player-episode-episode-119'));
+      expect(current.hitTestable(), findsOneWidget);
+      await tester.tap(current);
+      await tester.pumpAndSettle();
+      expect(selected, ['episode-91']);
+      expect(tester.takeException(), isNull);
     },
   );
 
