@@ -66,6 +66,7 @@ class HomePage extends ConsumerWidget {
                   _MediaSection(
                     client: data.client,
                     title: l.continueWatching,
+                    compact: true,
                     items: ref.watch(resumeItemsProvider),
                     onRetry: () => ref.invalidate(resumeItemsProvider),
                     onTap: (item, posterUrl) =>
@@ -621,6 +622,7 @@ class _MediaSection extends StatelessWidget {
     required this.items,
     required this.onRetry,
     required this.onTap,
+    this.compact = false,
   });
 
   final MediaServerClient client;
@@ -628,6 +630,7 @@ class _MediaSection extends StatelessWidget {
   final AsyncValue<List<MediaItem>> items;
   final VoidCallback onRetry;
   final void Function(MediaItem item, String? posterUrl) onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -668,16 +671,18 @@ class _MediaSection extends StatelessWidget {
                         Builder(
                           builder: (context) {
                             final item = values[index];
-                            final landscape = item.isEpisode;
+                            final landscape = compact || item.isEpisode;
                             return SizedBox(
-                              width: landscape ? 260 : 160,
+                              width: compact ? 220 : (landscape ? 260 : 160),
                               child: MediaPosterCard(
                                 client: client,
                                 item: item,
                                 progress: item.progressFraction,
-                                aspectRatio: landscape
-                                    ? item.thumbnailAspectRatio
-                                    : null,
+                                aspectRatio: compact
+                                    ? 16 / 9
+                                    : (landscape
+                                          ? item.thumbnailAspectRatio
+                                          : null),
                                 onPosterTap: (posterUrl) =>
                                     onTap(item, posterUrl),
                               ),
