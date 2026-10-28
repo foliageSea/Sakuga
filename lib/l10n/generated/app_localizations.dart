@@ -398,6 +398,36 @@ abstract class AppLocalizations {
   /// **'Cast'**
   String get cast;
 
+  /// No description provided for @seasons.
+  ///
+  /// In en, this message translates to:
+  /// **'Seasons'**
+  String get seasons;
+
+  /// No description provided for @season.
+  ///
+  /// In en, this message translates to:
+  /// **'Season'**
+  String get season;
+
+  /// No description provided for @specials.
+  ///
+  /// In en, this message translates to:
+  /// **'Specials'**
+  String get specials;
+
+  /// No description provided for @seasonNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Season {number}'**
+  String seasonNumber(int number);
+
+  /// No description provided for @episodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{number}. {title}'**
+  String episodeTitle(int number, String title);
+
   /// No description provided for @episodes.
   ///
   /// In en, this message translates to:

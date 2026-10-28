@@ -71,8 +71,15 @@ MediaItem _series() => const MediaItem(
   productionYear: 2026,
 );
 
-MediaItem _season() =>
-    const MediaItem(id: 'season-1', name: 'Season 1', type: MediaType.season);
+MediaItem _season() => const MediaItem(
+  id: 'season-1',
+  name: 'Season 1',
+  type: MediaType.season,
+  seriesId: 'series-1',
+  seriesName: 'A Series With Episodes',
+  indexNumber: 1,
+  childCount: 13,
+);
 
 MediaItem _episode() => const MediaItem(
   id: 'episode-1',
@@ -83,6 +90,8 @@ MediaItem _episode() => const MediaItem(
   seasonId: 'season-1',
   indexNumber: 1,
   parentIndexNumber: 1,
+  runtime: Duration(minutes: 24),
+  overview: 'The troupe arrives in a new town for its first performance.',
 );
 
 /// Pumps the real detail route behind a router so the back button can pop.
@@ -94,6 +103,9 @@ Future<GoRouter> pumpDetailPage(
   bool withPlayerRoute = false,
   List<MediaItem>? seasons,
   List<MediaItem>? episodes,
+  FutureOr<MediaItem> Function(String id)? itemById,
+  FutureOr<List<MediaItem>> Function(SeriesQuery query)? loadSeasons,
+  FutureOr<List<MediaItem>> Function(EpisodesQuery query)? loadEpisodes,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -109,8 +121,7 @@ Future<GoRouter> pumpDetailPage(
         routes: [
           GoRoute(
             path: ':itemId',
-            builder: (_, state) =>
-                DetailPage(itemId: state.pathParameters['itemId']!),
+            pageBuilder: (_, state) => buildDetailTransitionPage(state),
           ),
         ],
       ),
@@ -125,11 +136,16 @@ Future<GoRouter> pumpDetailPage(
   addTearDown(router.dispose);
 
   final container = ProviderContainer(
+    retry: (_, _) => null,
     overrides: [
-      if (seasons != null)
-        seriesSeasonsProvider.overrideWith((ref, query) => seasons),
-      if (episodes != null)
-        seriesEpisodesProvider.overrideWith((ref, query) => episodes),
+      if (seasons != null || loadSeasons != null)
+        seriesSeasonsProvider.overrideWith(
+          (ref, query) => loadSeasons?.call(query) ?? seasons!,
+        ),
+      if (episodes != null || loadEpisodes != null)
+        seriesEpisodesProvider.overrideWith(
+          (ref, query) => loadEpisodes?.call(query) ?? episodes!,
+        ),
       libraryViewsProvider.overrideWith(
         (ref) async => LibraryData(
           client: FakeMediaServerClient(server: _server),
@@ -137,7 +153,9 @@ Future<GoRouter> pumpDetailPage(
           views: const [],
         ),
       ),
-      libraryItemProvider.overrideWith((ref, query) => item()),
+      libraryItemProvider.overrideWith(
+        (ref, query) => itemById?.call(query.itemId) ?? item(),
+      ),
     ],
   );
   addTearDown(container.dispose);
@@ -214,6 +232,285 @@ Future<void> expectBackButtonPinned(
 }
 
 void main() {
+  for (final size in [const Size(320, 760), const Size(1280, 1000)]) {
+    testWidgets(
+      'single season stays visible and opens numbered episode details at ${size.width}',
+      (tester) async {
+        final queries = <EpisodesQuery>[];
+        await pumpDetailPage(
+          tester,
+          item: _series,
+          size: size,
+          withPlayerRoute: true,
+          itemById: (id) => id == 'season-1' ? _season() : _series(),
+          seasons: [_season()],
+          loadEpisodes: (query) {
+            queries.add(query);
+            return [_episode()];
+          },
+        );
+        final season = find.byKey(const ValueKey('detail-season-season-1'));
+        expect(season, findsOneWidget);
+        expect(find.text('13 episodes'), findsOneWidget);
+        expect(queries, isEmpty);
+        await tester.ensureVisible(season);
+        await tester.tap(season);
+        await tester.pumpAndSettle();
+        expect(queries, [
+          (userId: 'user-1', seriesId: 'series-1', seasonId: 'season-1'),
+        ]);
+        expect(find.text('Season 1'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('detail-series-name')),
+          findsOneWidget,
+        );
+        final episode = find.byKey(const ValueKey('detail-episode-episode-1'));
+        await tester.ensureVisible(episode);
+        await tester.pumpAndSettle();
+        expect(find.text('1. Pilot'), findsOneWidget);
+        expect(find.text('S01E01 · 24 min'), findsOneWidget);
+        expect(find.text(_episode().overview!), findsOneWidget);
+        await tester.tap(episode);
+        await tester.pumpAndSettle();
+        expect(find.text('player:episode-1'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'detail shows a valid rating on movie and series metadata at ${size.width}',
+      (tester) async {
+        await pumpDetailPage(
+          tester,
+          size: size,
+          seasons: const [],
+          episodes: const [],
+          item: () => MediaItem(
+            id: 'movie-1',
+            name: 'Rated title',
+            type: size.width < 600 ? MediaType.movie : MediaType.series,
+            communityRating: 8.6,
+          ),
+        );
+        final rating = find.byKey(const ValueKey('detail-rating'));
+        expect(rating, findsOneWidget);
+        expect(
+          find.descendant(of: rating, matching: find.text('8.6')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: rating, matching: find.byIcon(FLucideIcons.star)),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'seasons and specials open their own episodes and back returns to the series',
+    (tester) async {
+      const secondSeason = MediaItem(
+        id: 'season-2',
+        name: 'Season 2',
+        type: MediaType.season,
+        seriesId: 'series-1',
+        indexNumber: 2,
+        childCount: 8,
+      );
+      const specials = MediaItem(
+        id: 'specials',
+        name: '',
+        type: MediaType.season,
+        seriesId: 'series-1',
+        indexNumber: 0,
+        childCount: 2,
+      );
+      final queries = <EpisodesQuery>[];
+      await pumpDetailPage(
+        tester,
+        item: _series,
+        size: const Size(1280, 1000),
+        seasons: [specials, _season(), secondSeason],
+        itemById: (id) => switch (id) {
+          'season-2' => secondSeason,
+          'specials' => specials,
+          'season-1' => _season(),
+          _ => _series(),
+        },
+        loadEpisodes: (query) {
+          queries.add(query);
+          return [
+            MediaItem(
+              id: 'episode-${query.seasonId}',
+              name: 'From ${query.seasonId}',
+              type: MediaType.episode,
+              indexNumber: 1,
+            ),
+          ];
+        },
+      );
+      expect(find.text('Specials'), findsOneWidget);
+      for (final id in ['season-2', 'specials', 'season-1']) {
+        final season = find.byKey(ValueKey('detail-season-$id'));
+        await tester.ensureVisible(season);
+        await tester.tap(season);
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Text>(find.byKey(const ValueKey('detail-title'))).data,
+          id == 'specials'
+              ? 'Specials'
+              : id == 'season-2'
+              ? 'Season 2'
+              : 'Season 1',
+        );
+        expect(queries.last.seasonId, id);
+        expect(queries.last.seriesId, 'series-1');
+        expect(find.text('1. From $id'), findsOneWidget);
+        await tester.tap(_backButton);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('detail-season-season-1')),
+          findsOneWidget,
+        );
+        expect(find.text('A Series With Episodes'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'season requests can retry and do not silently flatten the series',
+    (tester) async {
+      var attempts = 0;
+      var episodeRequests = 0;
+      await pumpDetailPage(
+        tester,
+        item: _series,
+        size: const Size(1280, 1000),
+        loadSeasons: (_) {
+          attempts++;
+          if (attempts == 1) throw const AppException(FailureKind.network);
+          return [_season()];
+        },
+        loadEpisodes: (_) {
+          episodeRequests++;
+          return [_episode()];
+        },
+      );
+      expect(find.byType(ErrorNotice), findsOneWidget);
+      expect(episodeRequests, 0);
+      await tester.ensureVisible(find.text('Try again'));
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      expect(attempts, 2);
+      expect(
+        find.byKey(const ValueKey('detail-season-season-1')),
+        findsOneWidget,
+      );
+      expect(episodeRequests, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('series without season records can still play its episodes', (
+    tester,
+  ) async {
+    final queries = <EpisodesQuery>[];
+    await pumpDetailPage(
+      tester,
+      item: _series,
+      size: const Size(1280, 1000),
+      seasons: const [],
+      loadEpisodes: (query) {
+        queries.add(query);
+        return [_episode()];
+      },
+    );
+    expect(queries.single.seasonId, isNull);
+    expect(find.text('1. Pilot'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('missing episode metadata has no invented duration or summary', (
+    tester,
+  ) async {
+    await pumpDetailPage(
+      tester,
+      item: _season,
+      size: const Size(320, 760),
+      episodes: const [
+        MediaItem(id: 'plain', name: 'Plain episode', type: MediaType.episode),
+      ],
+    );
+    final tile = find.byKey(const ValueKey('detail-episode-plain'));
+    await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
+    expect(find.text('Plain episode'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('detail-episode-metadata-plain')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('detail-episode-overview-plain')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('detail-rating')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'late episode response from a previous season cannot replace the current season',
+    (tester) async {
+      final lateEpisodes = Completer<List<MediaItem>>();
+      const secondSeason = MediaItem(
+        id: 'season-2',
+        name: 'Season 2',
+        type: MediaType.season,
+        seriesId: 'series-1',
+      );
+      await pumpDetailPage(
+        tester,
+        item: _series,
+        size: const Size(1280, 1000),
+        seasons: [_season(), secondSeason],
+        itemById: (id) => id == 'season-1'
+            ? _season()
+            : id == 'season-2'
+            ? secondSeason
+            : _series(),
+        loadEpisodes: (query) => query.seasonId == 'season-1'
+            ? lateEpisodes.future
+            : const [
+                MediaItem(
+                  id: 'current',
+                  name: 'Current season episode',
+                  type: MediaType.episode,
+                  indexNumber: 1,
+                ),
+              ],
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('detail-season-season-1')),
+      );
+      await tester.tap(find.byKey(const ValueKey('detail-season-season-1')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(_backButton);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('detail-season-season-2')),
+      );
+      await tester.tap(find.byKey(const ValueKey('detail-season-season-2')));
+      await tester.pumpAndSettle();
+      lateEpisodes.complete([_episode()]);
+      await tester.pumpAndSettle();
+      expect(find.text('1. Current season episode'), findsOneWidget);
+      expect(find.text('1. Pilot'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final size in [const Size(390, 844), const Size(1280, 800)]) {
     testWidgets(
       'detail uses header title and banner logo at width ${size.width}',
@@ -308,13 +605,20 @@ void main() {
       item: _series,
       size: const Size(1280, 1000),
       withPlayerRoute: true,
+      itemById: (id) => id == 'season-1' ? _season() : _series(),
       seasons: [_season()],
       episodes: [episode],
     );
 
-    await tester.ensureVisible(find.text(episode.name));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('detail-season-season-1')),
+    );
+    await tester.tap(find.byKey(const ValueKey('detail-season-season-1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(episode.name));
+    final tile = find.byKey(ValueKey('detail-episode-${episode.id}'));
+    await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
+    await tester.tap(tile);
     await tester.pumpAndSettle();
 
     expect(find.text('player:${episode.id}'), findsOneWidget);
@@ -338,9 +642,8 @@ void main() {
     );
     await pumpDetailPage(
       tester,
-      item: _series,
+      item: _season,
       size: const Size(1280, 1000),
-      seasons: [_season()],
       episodes: [
         partialEpisode,
         const MediaItem(

@@ -186,6 +186,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cast => 'Cast';
 
   @override
+  String get seasons => 'Seasons';
+
+  @override
+  String get season => 'Season';
+
+  @override
+  String get specials => 'Specials';
+
+  @override
+  String seasonNumber(int number) {
+    return 'Season $number';
+  }
+
+  @override
+  String episodeTitle(int number, String title) {
+    return '$number. $title';
+  }
+
+  @override
   String get episodes => 'Episodes';
 
   @override

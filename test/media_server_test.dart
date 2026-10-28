@@ -256,6 +256,148 @@ void main() {
     }
   }
 
+  test(
+    'seasons requests one series and maps season numbers and counts',
+    () async {
+      final adapter = _BrowseAdapter({
+        'Items': [
+          for (final number in [2, 0, 1])
+            {
+              'Id': 'season-$number',
+              'Name': 'Season $number',
+              'Type': 'Season',
+              'IndexNumber': number,
+              'SeriesId': 'series-1',
+              'SeriesName': 'A show',
+              'ChildCount': number == 0 ? 2 : 12,
+              'RecursiveItemCount': number == 0 ? 2 : 12,
+              'CommunityRating': 8.5,
+            },
+        ],
+        'TotalRecordCount': 3,
+      });
+      final client = _browseClient(adapter);
+
+      final seasons = await client.seasons('user-1', 'series-1');
+
+      final request = adapter.requests.single;
+      expect(request.method, 'GET');
+      expect(request.path, '/Shows/series-1/Seasons');
+      expect(request.queryParameters, {
+        'userId': 'user-1',
+        'fields': request.queryParameters['fields'],
+        'enableImageTypes': 'Primary,Backdrop,Logo',
+        'imageTypeLimit': 1,
+      });
+      expect(
+        (request.queryParameters['fields'] as String).split(','),
+        unorderedEquals([
+          'RunTimeTicks',
+          'PrimaryImageAspectRatio',
+          'ImageTags',
+          'UserData',
+          'ChildCount',
+          'RecursiveItemCount',
+        ]),
+      );
+      expect(seasons.map((season) => season.id), [
+        'season-0',
+        'season-1',
+        'season-2',
+      ]);
+      expect(seasons.map((season) => season.indexNumber), [0, 1, 2]);
+      expect(seasons.map((season) => season.childCount), [2, 12, 12]);
+      expect(seasons.map((season) => season.recursiveItemCount), [2, 12, 12]);
+      for (final season in seasons) {
+        expect(season.type, MediaType.season);
+        expect(season.seriesId, 'series-1');
+        expect(season.seriesName, 'A show');
+        expect(season.communityRating, 8.5);
+      }
+    },
+  );
+
+  for (final seasonId in <String?>[null, 'season-1']) {
+    test(
+      'episodes requests overview and sorts metadata with seasonId=$seasonId',
+      () async {
+        final adapter = _BrowseAdapter({
+          'Items': [
+            for (final (season, episode) in [(2, 1), (1, 10), (0, 1), (1, 2)])
+              if (seasonId == null || seasonId == 'season-$season')
+                {
+                  'Id': 'episode-$season-$episode',
+                  'Name': 'Episode $episode',
+                  'Type': 'Episode',
+                  'SeriesId': 'series-1',
+                  'SeriesName': 'A show',
+                  'SeasonId': 'season-$season',
+                  'IndexNumber': episode,
+                  'ParentIndexNumber': season,
+                  'Overview': 'Overview for episode $season-$episode',
+                  'RunTimeTicks': 14401234560,
+                  'CommunityRating': 9,
+                  'UserData': {
+                    'PlaybackPositionTicks': 600000000,
+                    'Played': false,
+                  },
+                },
+          ],
+        });
+        final client = _browseClient(adapter);
+
+        final episodes = await client.episodes(
+          'user-1',
+          'series-1',
+          seasonId: seasonId,
+        );
+
+        final request = adapter.requests.single;
+        expect(request.method, 'GET');
+        expect(request.path, '/Shows/series-1/Episodes');
+        expect(request.queryParameters, {
+          'userId': 'user-1',
+          'seasonId': ?seasonId,
+          'fields': request.queryParameters['fields'],
+          'enableImageTypes': 'Primary,Backdrop,Logo',
+          'imageTypeLimit': 1,
+        });
+        expect(request.uri.queryParameters['seasonId'], seasonId);
+        expect(
+          (request.queryParameters['fields'] as String).split(','),
+          unorderedEquals([
+            'RunTimeTicks',
+            'PrimaryImageAspectRatio',
+            'ImageTags',
+            'UserData',
+            'ChildCount',
+            'RecursiveItemCount',
+            'Overview',
+          ]),
+        );
+        expect(
+          episodes.map((episode) => episode.episodeCode),
+          seasonId == null
+              ? ['S00E01', 'S01E02', 'S01E10', 'S02E01']
+              : ['S01E02', 'S01E10'],
+        );
+        final episode = episodes.firstWhere((item) => item.id == 'episode-1-2');
+        expect(episode.type, MediaType.episode);
+        expect(episode.name, 'Episode 2');
+        expect(episode.seriesId, 'series-1');
+        expect(episode.seriesName, 'A show');
+        expect(episode.seasonId, 'season-1');
+        expect(episode.indexNumber, 2);
+        expect(episode.parentIndexNumber, 1);
+        expect(episode.overview, 'Overview for episode 1-2');
+        expect(episode.runtime, const Duration(microseconds: 1440123456));
+        expect(episode.communityRating, 9.0);
+        expect(episode.playbackPosition, const Duration(minutes: 1));
+        expect(episode.played, isFalse);
+      },
+    );
+  }
+
   test('fake clients provide empty genre and year lists by default', () async {
     final MediaServerClient client = FakeMediaServerClient(server: _server);
     expect(await client.genres('user-1', 'library-1'), isEmpty);

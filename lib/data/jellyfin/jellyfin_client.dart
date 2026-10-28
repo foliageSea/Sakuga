@@ -454,7 +454,7 @@ class JellyfinClient implements MediaServerClient {
       queryParameters: {
         'userId': userId,
         'seasonId': ?seasonId,
-        'fields': _itemFields,
+        'fields': '$_itemFields,Overview',
         'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,
       },

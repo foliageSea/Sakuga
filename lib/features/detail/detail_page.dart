@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_exception.dart';
 import '../../core/images/artwork_cache.dart';
 import '../../data/media_server/media_server_client.dart';
 import '../../data/media_server/media_server_factory.dart';
@@ -11,7 +12,6 @@ import '../../data/media_server/media_models.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/poster_background.dart';
-import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import '../library/library_providers.dart';
 import '../player/player_route.dart';
@@ -20,10 +20,11 @@ import 'detail_providers.dart';
 /// Seed data carried from a tapped poster card so the detail header and
 /// poster [Hero] render on the first frame while full metadata loads.
 class DetailRouteExtra {
-  const DetailRouteExtra({required this.item, this.posterUrl});
+  const DetailRouteExtra({required this.item, this.posterUrl, this.seriesId});
 
   final MediaItem item;
   final String? posterUrl;
+  final String? seriesId;
 }
 
 /// Builds a fade page for [DetailPage] so the poster [Hero] flies smoothly on
@@ -50,6 +51,7 @@ CustomTransitionPage<void> buildDetailTransitionPage(GoRouterState state) {
       itemId: itemId,
       initialItem: extra?.item,
       initialPosterUrl: extra?.posterUrl,
+      seriesId: extra?.seriesId,
     ),
   );
 }
@@ -77,11 +79,12 @@ PosterBackground? watchDetailPosterBackground(
       );
       final url = item.when(
         data: (value) {
+          final poster = value.poster ?? preview?.poster;
           final reusePosterUrl =
               spec.initialPosterUrl != null &&
-              value.poster?.cacheKey == preview?.poster?.cacheKey;
+              poster?.cacheKey == preview?.poster?.cacheKey;
           return (reusePosterUrl ? spec.initialPosterUrl : null) ??
-              value.poster?.url();
+              poster?.url();
         },
         loading: () => spec.initialPosterUrl ?? preview?.poster?.url(),
         error: (_, _) => spec.initialPosterUrl ?? preview?.poster?.url(),
@@ -114,12 +117,14 @@ class DetailPage extends ConsumerWidget {
     required this.itemId,
     this.initialItem,
     this.initialPosterUrl,
+    this.seriesId,
     super.key,
   });
 
   final String itemId;
   final MediaItem? initialItem;
   final String? initialPosterUrl;
+  final String? seriesId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -132,6 +137,7 @@ class DetailPage extends ConsumerWidget {
         itemId: itemId,
         initialItem: preview,
         initialPosterUrl: initialPosterUrl,
+        seriesId: seriesId,
       ),
       loading: () {
         final server = ref.watch(activeServerProvider);
@@ -192,6 +198,7 @@ class _DetailBody extends ConsumerWidget {
     required this.itemId,
     this.initialItem,
     this.initialPosterUrl,
+    this.seriesId,
   });
 
   final MediaServerClient client;
@@ -199,6 +206,7 @@ class _DetailBody extends ConsumerWidget {
   final String itemId;
   final MediaItem? initialItem;
   final String? initialPosterUrl;
+  final String? seriesId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -207,22 +215,40 @@ class _DetailBody extends ConsumerWidget {
     final preview = initialItem;
     return item.when(
       data: (value) {
+        final parentSeriesId = value.seriesId ?? preview?.seriesId ?? seriesId;
         final reusePosterUrl =
             initialPosterUrl != null &&
-            value.poster?.cacheKey == preview?.poster?.cacheKey;
+            (value.poster ?? preview?.poster)?.cacheKey ==
+                preview?.poster?.cacheKey;
         return _DetailScaffold(
-          title: value.name,
+          title: _detailItemTitle(context, value),
           slivers: [
             SliverToBoxAdapter(
               child: _Hero(
                 client: client,
                 item: value,
                 posterUrl: reusePosterUrl ? initialPosterUrl : null,
+                fallbackItem: preview,
               ),
             ),
             SliverToBoxAdapter(child: _About(item: value)),
             if (value.isSeries)
-              _Episodes(client: client, userId: userId, series: value),
+              _Seasons(client: client, userId: userId, series: value),
+            if (value.type == MediaType.season)
+              if (parentSeriesId != null)
+                _Episodes(
+                  client: client,
+                  userId: userId,
+                  seriesId: parentSeriesId,
+                  seasonId: value.id,
+                )
+              else
+                SliverToBoxAdapter(
+                  child: ErrorNotice(
+                    const AppException(FailureKind.invalidData),
+                    onRetry: () => ref.invalidate(libraryItemProvider(query)),
+                  ),
+                ),
           ],
         );
       },
@@ -340,7 +366,8 @@ class DetailHeaderTitle extends ConsumerWidget {
                 )),
               )
               .value;
-    return _DetailTitle(item?.name ?? spec.initialItem?.name ?? '');
+    final value = item ?? spec.initialItem;
+    return _DetailTitle(value == null ? '' : _detailItemTitle(context, value));
   }
 }
 
@@ -399,11 +426,17 @@ void popDetailRoute(BuildContext context) {
 }
 
 class _Hero extends StatelessWidget {
-  const _Hero({required this.client, required this.item, this.posterUrl});
+  const _Hero({
+    required this.client,
+    required this.item,
+    this.posterUrl,
+    this.fallbackItem,
+  });
 
   final MediaServerClient client;
   final MediaItem item;
   final String? posterUrl;
+  final MediaItem? fallbackItem;
 
   @override
   Widget build(BuildContext context) {
@@ -416,14 +449,14 @@ class _Hero extends StatelessWidget {
         tag: posterHeroTag(item.id),
         borderRadius: theme.style.borderRadius.md,
         child: MediaImage(
-          url: posterUrl ?? item.poster?.url(),
-          headers: item.poster?.headers ?? const {},
+          url: posterUrl ?? (item.poster ?? fallbackItem?.poster)?.url(),
+          headers: (item.poster ?? fallbackItem?.poster)?.headers ?? const {},
         ),
       ),
     );
     final backdrop = MediaImage(
-      url: item.backdrop?.url(width: 1920),
-      headers: item.backdrop?.headers ?? const {},
+      url: (item.backdrop ?? fallbackItem?.backdrop)?.url(width: 1920),
+      headers: (item.backdrop ?? fallbackItem?.backdrop)?.headers ?? const {},
     );
     if (mobile) {
       return Column(
@@ -500,6 +533,20 @@ class _TitleBlock extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (item.type == MediaType.season &&
+            item.seriesName?.trim().isNotEmpty == true) ...[
+          Text(
+            item.seriesName!,
+            key: const ValueKey('detail-series-name'),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.typography.body.lg.copyWith(
+              color: onDark ? const Color(0xFFFFFFFF) : theme.colors.foreground,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (item.logo case final logo?) ...[
           SizedBox(
             width: 420,
@@ -517,6 +564,27 @@ class _TitleBlock extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
+        ],
+        if (item.communityRating case final rating?
+            when rating.isFinite && rating > 0) ...[
+          Row(
+            key: const ValueKey('detail-rating'),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(FLucideIcons.star, size: 18, color: Color(0xFFE2BB6A)),
+              const SizedBox(width: 6),
+              Text(
+                rating.toStringAsFixed(1),
+                style: theme.typography.body.md.copyWith(
+                  color: onDark
+                      ? const Color(0xFFFFFFFF)
+                      : theme.colors.foreground,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
         ],
         Wrap(
           spacing: 8,
@@ -678,58 +746,213 @@ class _PersonChip extends StatelessWidget {
   }
 }
 
-class _Episodes extends ConsumerStatefulWidget {
-  const _Episodes({
+String _detailItemTitle(BuildContext context, MediaItem item) {
+  if (item.name.trim().isNotEmpty || item.type != MediaType.season) {
+    return item.name;
+  }
+  return switch (item.indexNumber) {
+    0 => context.l10n.specials,
+    final number? => context.l10n.seasonNumber(number),
+    null => context.l10n.season,
+  };
+}
+
+class _Seasons extends ConsumerWidget {
+  const _Seasons({
     required this.client,
     required this.userId,
     required this.series,
   });
-
   final MediaServerClient client;
   final String userId;
   final MediaItem series;
 
   @override
-  ConsumerState<_Episodes> createState() => _EpisodesState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final query = (userId: userId, seriesId: series.id);
+    final seasons = ref.watch(seriesSeasonsProvider(query));
+    final heading = SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 24, bottom: 12),
+        child: _SectionTitle(context.l10n.seasons),
+      ),
+    );
+    return seasons.when(
+      data: (values) {
+        if (values.isEmpty) {
+          return _Episodes(client: client, userId: userId, seriesId: series.id);
+        }
+        return SliverMainAxisGroup(
+          slivers: [
+            heading,
+            SliverToBoxAdapter(
+              child: Wrap(
+                spacing: 16,
+                runSpacing: 20,
+                children: [
+                  for (final season in values)
+                    SizedBox(
+                      width: isMobileLayout(context) ? 136 : 168,
+                      child: _SeasonCard(
+                        client: client,
+                        season: season,
+                        series: series,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+      loading: () => SliverMainAxisGroup(
+        slivers: [
+          heading,
+          const SliverToBoxAdapter(child: LoadingNotice()),
+        ],
+      ),
+      error: (error, _) => SliverMainAxisGroup(
+        slivers: [
+          heading,
+          SliverToBoxAdapter(
+            child: ErrorNotice(
+              error,
+              onRetry: () => ref.invalidate(seriesSeasonsProvider(query)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _EpisodesState extends ConsumerState<_Episodes> {
-  String? _seasonId;
+class _SeasonCard extends StatelessWidget {
+  const _SeasonCard({
+    required this.client,
+    required this.season,
+    required this.series,
+  });
+  final MediaServerClient client;
+  final MediaItem season;
+  final MediaItem series;
 
   @override
   Widget build(BuildContext context) {
-    final l = context.l10n;
-    final seasons = ref.watch(
-      seriesSeasonsProvider((
-        userId: widget.userId,
-        seriesId: widget.series.id,
-      )),
+    final label = _detailItemTitle(context, season);
+    final preview = MediaItem(
+      id: season.id,
+      name: label,
+      type: MediaType.season,
+      poster: season.poster ?? series.poster,
+      backdrop: season.backdrop ?? series.backdrop,
+      logo: season.logo,
+      seriesId: season.seriesId ?? series.id,
+      seriesName: season.seriesName ?? series.name,
+      indexNumber: season.indexNumber,
+      childCount: season.childCount,
+      recursiveItemCount: season.recursiveItemCount,
+      productionYear: season.productionYear,
+      communityRating: season.communityRating,
+      officialRating: season.officialRating,
+      genres: season.genres,
     );
-    final query = (
-      userId: widget.userId,
-      seriesId: widget.series.id,
-      seasonId: _seasonId,
+    final count = season.childCount ?? season.recursiveItemCount;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        MediaPosterCard(
+          key: ValueKey('detail-season-${season.id}'),
+          client: client,
+          item: preview,
+          framed: false,
+          textAlign: TextAlign.center,
+          heroTag: posterHeroTag(season.id),
+          onPosterTap: (posterUrl) => context.push(
+            '/library/${season.id}',
+            extra: DetailRouteExtra(
+              item: preview,
+              posterUrl: posterUrl,
+              seriesId: series.id,
+            ),
+          ),
+        ),
+        if (count != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            context.l10n.libraryEpisodeCount(count),
+            textAlign: TextAlign.center,
+            style: context.theme.typography.body.xs.copyWith(
+              color: context.theme.colors.mutedForeground,
+            ),
+          ),
+        ],
+      ],
     );
+  }
+}
+
+class _Episodes extends ConsumerWidget {
+  const _Episodes({
+    required this.client,
+    required this.userId,
+    required this.seriesId,
+    this.seasonId,
+  });
+  final MediaServerClient client;
+  final String userId;
+  final String seriesId;
+  final String? seasonId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final query = (userId: userId, seriesId: seriesId, seasonId: seasonId);
     final episodes = ref.watch(seriesEpisodesProvider(query));
+    final ambient = WindowPosterBackgroundScope.isActive(context);
     return SliverMainAxisGroup(
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.only(top: 24, bottom: 12),
-            child: _SectionTitle(l.episodes),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _SectionTitle(context.l10n.episodes),
+                if (episodes.value case final values?)
+                  Text(
+                    context.l10n.libraryEpisodeCount(values.length),
+                    style: context.theme.typography.body.sm.copyWith(
+                      color: context.theme.colors.mutedForeground,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
-        ...seasons.when(
-          data: (values) => values.length <= 1
-              ? const <Widget>[]
-              : <Widget>[
-                  SliverToBoxAdapter(child: _seasonChips(context, values)),
-                ],
-          loading: () => const <Widget>[],
-          error: (_, _) => const <Widget>[],
-        ),
         ...episodes.when(
-          data: (values) => _episodeSlivers(context, values),
+          data: (values) => values.isEmpty
+              ? [
+                  SliverToBoxAdapter(
+                    child: EmptyNotice(
+                      context.l10n.noItems,
+                      translucent: ambient,
+                    ),
+                  ),
+                ]
+              : [
+                  SliverList.builder(
+                    itemCount: values.length,
+                    itemBuilder: (context, index) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _EpisodeTile(
+                        client: client,
+                        item: values[index],
+                        translucent: ambient,
+                      ),
+                    ),
+                  ),
+                ],
           loading: () => [const SliverToBoxAdapter(child: LoadingNotice())],
           error: (error, _) => [
             SliverToBoxAdapter(
@@ -743,72 +966,6 @@ class _EpisodesState extends ConsumerState<_Episodes> {
       ],
     );
   }
-
-  Widget _seasonChips(BuildContext context, List<MediaItem> seasons) {
-    final l = context.l10n;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          _chip(
-            context,
-            label: l.all,
-            selected: _seasonId == null,
-            onPress: () => setState(() => _seasonId = null),
-          ),
-          for (final season in seasons)
-            _chip(
-              context,
-              label: season.name,
-              selected: _seasonId == season.id,
-              onPress: () => setState(() => _seasonId = season.id),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _chip(
-    BuildContext context, {
-    required String label,
-    required bool selected,
-    required VoidCallback onPress,
-  }) => FButton(
-    builder: responsiveButtonContent,
-    mainAxisSize: MainAxisSize.min,
-    variant: selected ? .primary : .outline,
-    style: selected ? const .context() : detailOutlineButtonStyle(context),
-    onPress: onPress,
-    child: Text(label),
-  );
-
-  List<Widget> _episodeSlivers(BuildContext context, List<MediaItem> episodes) {
-    final ambient = WindowPosterBackgroundScope.isActive(context);
-    if (episodes.isEmpty) {
-      return [
-        SliverToBoxAdapter(
-          child: EmptyNotice(context.l10n.noItems, translucent: ambient),
-        ),
-      ];
-    }
-    return [
-      SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _EpisodeTile(
-              client: widget.client,
-              item: episodes[index],
-              translucent: ambient,
-            ),
-          ),
-          childCount: episodes.length,
-        ),
-      ),
-    ];
-  }
 }
 
 class _EpisodeTile extends StatelessWidget {
@@ -817,7 +974,6 @@ class _EpisodeTile extends StatelessWidget {
     required this.item,
     this.translucent = false,
   });
-
   final MediaServerClient client;
   final MediaItem item;
   final bool translucent;
@@ -827,72 +983,140 @@ class _EpisodeTile extends StatelessWidget {
     final theme = context.theme;
     final code = item.episodeCode;
     final progress = item.progressFraction;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => context.push(playerLocation(item.id)),
-      child: Surface(
-        padding: 8,
-        translucent: translucent,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 140,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AspectRatio(
-                    aspectRatio: item.thumbnailAspectRatio,
-                    child: ClipRRect(
-                      borderRadius: theme.style.borderRadius.md,
-                      child: MediaImage(
-                        url: item.poster?.url(),
-                        headers: item.poster?.headers ?? const {},
-                      ),
+    final overview = item.overview?.trim() ?? '';
+    final title = item.indexNumber == null
+        ? item.name
+        : context.l10n.episodeTitle(item.indexNumber!, item.name);
+    final duration = item.runtime;
+    final metadata = [
+      ?code,
+      if (duration != null && duration > Duration.zero)
+        context.l10n.libraryDuration(duration.inMinutes),
+    ].join(' · ');
+    final information = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          key: ValueKey('detail-episode-title-${item.id}'),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: theme.typography.body.md.copyWith(fontWeight: FontWeight.w500),
+        ),
+        if (metadata.isNotEmpty || item.played) ...[
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (metadata.isNotEmpty)
+                Text(
+                  metadata,
+                  key: ValueKey('detail-episode-metadata-${item.id}'),
+                  style: theme.typography.body.xs.copyWith(
+                    color: theme.colors.mutedForeground,
+                  ),
+                ),
+              if (item.played)
+                Icon(
+                  FLucideIcons.check,
+                  size: 14,
+                  color: theme.colors.mutedForeground,
+                ),
+            ],
+          ),
+        ],
+        if (overview.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(
+            overview,
+            key: ValueKey('detail-episode-overview-${item.id}'),
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: theme.typography.body.sm.copyWith(
+              color: theme.colors.mutedForeground,
+            ),
+          ),
+        ],
+      ],
+    );
+    final thumbnail = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AspectRatio(
+          aspectRatio: item.thumbnailAspectRatio,
+          child: ClipRRect(
+            borderRadius: theme.style.borderRadius.md,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                MediaImage(
+                  url: item.poster?.url(),
+                  headers: item.poster?.headers ?? const {},
+                ),
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0x66000000),
+                    ),
+                    child: const Icon(
+                      FLucideIcons.play,
+                      size: 20,
+                      color: Color(0xFFFFFFFF),
                     ),
                   ),
-                  if (progress != null) ...[
-                    const SizedBox(height: 6),
-                    MediaProgressBar(value: progress),
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.typography.body.md,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
+          ),
+        ),
+        if (progress != null) ...[
+          const SizedBox(height: 6),
+          MediaProgressBar(value: progress),
+        ],
+      ],
+    );
+    return Semantics(
+      button: true,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          key: ValueKey('detail-episode-${item.id}'),
+          behavior: HitTestBehavior.opaque,
+          onTap: () => context.push(playerLocation(item.id)),
+          child: Surface(
+            padding: 12,
+            translucent: translucent,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth < 320) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (code != null)
-                        Text(
-                          code,
-                          style: theme.typography.body.sm.copyWith(
-                            color: theme.colors.mutedForeground,
-                          ),
-                        ),
-                      if (code != null && item.played) const SizedBox(width: 8),
-                      if (item.played)
-                        Icon(
-                          FLucideIcons.check,
-                          size: 14,
-                          color: theme.colors.mutedForeground,
-                        ),
+                      thumbnail,
+                      const SizedBox(height: 12),
+                      information,
                     ],
-                  ),
-                ],
-              ),
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: constraints.maxWidth < 600 ? 112 : 240,
+                      child: thumbnail,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(child: information),
+                  ],
+                );
+              },
             ),
-          ],
+          ),
         ),
       ),
     );

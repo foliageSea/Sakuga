@@ -168,6 +168,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cast => '演职员';
 
   @override
+  String get seasons => '季';
+
+  @override
+  String get season => '季';
+
+  @override
+  String get specials => '特别篇';
+
+  @override
+  String seasonNumber(int number) {
+    return '第 $number 季';
+  }
+
+  @override
+  String episodeTitle(int number, String title) {
+    return '$number. $title';
+  }
+
+  @override
   String get episodes => '分集';
 
   @override
