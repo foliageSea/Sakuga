@@ -191,8 +191,14 @@ abstract class AppLocalizations {
   /// No description provided for @serverUrl.
   ///
   /// In en, this message translates to:
-  /// **'Server URL'**
+  /// **'Server address'**
   String get serverUrl;
+
+  /// No description provided for @secureConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure connection'**
+  String get secureConnection;
 
   /// No description provided for @apiKey.
   ///
@@ -281,7 +287,7 @@ abstract class AppLocalizations {
   /// No description provided for @serverUrlInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Enter a valid http(s) URL.'**
+  /// **'Enter a valid IP address or domain.'**
   String get serverUrlInvalid;
 
   /// No description provided for @serverUnreachable.

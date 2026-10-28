@@ -58,6 +58,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get serverUrl => '服务器地址';
 
   @override
+  String get secureConnection => '安全连接';
+
+  @override
   String get apiKey => 'API 密钥';
 
   @override
@@ -100,7 +103,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get serverNameRequired => '请输入名称。';
 
   @override
-  String get serverUrlInvalid => '请输入有效的 http(s) 地址。';
+  String get serverUrlInvalid => '请输入有效的 IP 或域名。';
 
   @override
   String get serverUnreachable => '无法连接服务器。';

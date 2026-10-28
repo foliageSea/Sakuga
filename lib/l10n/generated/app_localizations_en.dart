@@ -55,7 +55,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get serverName => 'Name';
 
   @override
-  String get serverUrl => 'Server URL';
+  String get serverUrl => 'Server address';
+
+  @override
+  String get secureConnection => 'Secure connection';
 
   @override
   String get apiKey => 'API key';
@@ -100,7 +103,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get serverNameRequired => 'Enter a name.';
 
   @override
-  String get serverUrlInvalid => 'Enter a valid http(s) URL.';
+  String get serverUrlInvalid => 'Enter a valid IP address or domain.';
 
   @override
   String get serverUnreachable => 'Could not reach the server.';

@@ -123,8 +123,11 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
   }) async {
     final l = context.l10n;
     final nameController = TextEditingController(text: server?.name ?? '');
-    final urlController = TextEditingController(text: server?.baseUrl ?? '');
+    final urlController = TextEditingController(
+      text: stripBaseUrlScheme(server?.baseUrl ?? ''),
+    );
     final apiKeyController = TextEditingController(text: server?.apiKey ?? '');
+    var secure = isSecureBaseUrl(server?.baseUrl ?? '');
     String? error;
     String? probeResult;
     var testing = false;
@@ -159,7 +162,7 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
                   key: const ValueKey('server-url'),
                   control: .managed(controller: urlController),
                   label: Text(l.serverUrl),
-                  hint: 'http://192.168.1.2:8096',
+                  hint: '192.168.1.2:8096',
                   keyboardType: TextInputType.url,
                 ),
                 const SizedBox(height: 12),
@@ -167,6 +170,13 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
                   key: const ValueKey('server-api-key'),
                   control: .managed(controller: apiKeyController),
                   label: Text(l.apiKey),
+                ),
+                const SizedBox(height: 8),
+                FSwitch(
+                  key: const ValueKey('server-secure'),
+                  value: secure,
+                  label: Text(l.secureConnection),
+                  onChange: (value) => setState(() => secure = value),
                 ),
                 if (probeResult != null) ...[
                   const SizedBox(height: 12),
@@ -220,7 +230,10 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
                                       ),
                                     )
                                     .probe(
-                                      urlController.text,
+                                      composeBaseUrl(
+                                        urlController.text,
+                                        secure: secure,
+                                      ),
                                       apiKey: apiKeyController.text,
                                     );
                                 if (!context.mounted) return;
@@ -247,14 +260,16 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
                       mainAxisSize: MainAxisSize.min,
                       onPress: () async {
                         final name = nameController.text.trim();
-                        final rawUrl = urlController.text.trim();
                         if (name.isEmpty) {
                           setState(() => error = l.serverNameRequired);
                           return;
                         }
                         String baseUrl;
                         try {
-                          baseUrl = normalizeBaseUrl(rawUrl);
+                          baseUrl = composeBaseUrl(
+                            urlController.text,
+                            secure: secure,
+                          );
                         } on FormatException {
                           setState(() => error = l.serverUrlInvalid);
                           return;

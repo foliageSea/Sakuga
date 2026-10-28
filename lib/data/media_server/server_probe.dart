@@ -27,3 +27,22 @@ String normalizeBaseUrl(String input) {
   }
   return value.replaceAll(RegExp(r'/+$'), '');
 }
+
+/// Resolves [input] (an IP, domain, or bare address) into a full base URL.
+///
+/// An explicit `http(s)://` prefix typed into [input] is respected so pasted
+/// URLs keep working; otherwise [secure] decides between HTTPS and HTTP.
+String composeBaseUrl(String input, {required bool secure}) {
+  final value = input.trim();
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return normalizeBaseUrl(value);
+  }
+  return normalizeBaseUrl('${secure ? 'https' : 'http'}://$value');
+}
+
+/// Hides the scheme of [baseUrl] so the editor can show only host and port.
+String stripBaseUrlScheme(String baseUrl) =>
+    baseUrl.trim().replaceFirst(RegExp(r'^[a-zA-Z][a-zA-Z0-9+.\-]*://'), '');
+
+bool isSecureBaseUrl(String baseUrl) =>
+    baseUrl.trim().toLowerCase().startsWith('https://');
