@@ -302,15 +302,33 @@ class _SearchGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => ref
       .watch(searchResultsProvider(term))
       .when(
-        data: (items) => _LibraryGrid(
-          client: client,
-          items: items,
-          emptyMessage: context.l10n.noResults,
-          onTap: (item, posterUrl) => context.go(
-            '/library/${item.id}',
-            extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
-          ),
-        ),
+        data: (items) => items.isEmpty
+            ? SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        FLucideIcons.inbox,
+                        size: 32,
+                        color: context.theme.colors.mutedForeground,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(context.l10n.noResults, textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              )
+            : _LibraryGrid(
+                client: client,
+                items: items,
+                emptyMessage: context.l10n.noResults,
+                onTap: (item, posterUrl) => context.go(
+                  '/library/${item.id}',
+                  extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
+                ),
+              ),
         loading: () => const SliverToBoxAdapter(child: LoadingNotice()),
         error: (error, _) => SliverToBoxAdapter(
           child: ErrorNotice(
