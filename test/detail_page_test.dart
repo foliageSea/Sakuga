@@ -232,6 +232,150 @@ Future<void> expectBackButtonPinned(
 }
 
 void main() {
+  for (final size in [const Size(390, 844), const Size(1280, 1000)]) {
+    testWidgets(
+      'cancelling a season push restores the series scroll and poster at ${size.width}',
+      (tester) async {
+        final seasonData = Completer<MediaItem>();
+        final router = await pumpDetailPage(
+          tester,
+          item: _series,
+          size: size,
+          itemById: (id) => id == 'season-1' ? seasonData.future : _series(),
+          seasons: [_season()],
+          episodes: const [],
+        );
+        final season = find.byKey(const ValueKey('detail-season-season-1'));
+        await tester.ensureVisible(season);
+        await tester.pumpAndSettle();
+        final sourceScroll = Scrollable.of(tester.element(season)).position;
+        final sourceOffset = sourceScroll.pixels;
+        final sourceRect = tester.getRect(season);
+        await tester.tap(season);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 120));
+        router.pop();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 80));
+        seasonData.complete(_season());
+        await tester.pumpAndSettle();
+        expect(find.text('Season 1'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('detail-episode-episode-1')),
+          findsNothing,
+        );
+        expect(
+          Scrollable.of(tester.element(season)).position,
+          same(sourceScroll),
+        );
+        expect(sourceScroll.pixels, sourceOffset);
+        expect(tester.getRect(season), sourceRect);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final size in [const Size(390, 844), const Size(1280, 1000)]) {
+    testWidgets(
+      'season loading keeps the known series heading when full metadata omits it at ${size.width}',
+      (tester) async {
+        final seasonData = Completer<MediaItem>();
+        await pumpDetailPage(
+          tester,
+          item: _series,
+          size: size,
+          itemById: (id) => id == 'season-1' ? seasonData.future : _series(),
+          seasons: [_season()],
+          episodes: const [],
+        );
+        final season = find.byKey(const ValueKey('detail-season-season-1'));
+        await tester.ensureVisible(season);
+        await tester.tap(season);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        final seriesHeading = find.byKey(const ValueKey('detail-series-name'));
+        expect(seriesHeading, findsOneWidget);
+        final previewRect = tester.getRect(seriesHeading);
+        seasonData.complete(
+          const MediaItem(
+            id: 'season-1',
+            name: 'Season 1',
+            type: MediaType.season,
+            seriesId: 'series-1',
+            indexNumber: 1,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          seriesHeading,
+          findsOneWidget,
+          reason: 'known parent context should not disappear when omitted by the item response',
+        );
+        expect(tester.getRect(seriesHeading), previewRect);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final size in [const Size(390, 844), const Size(1280, 1000)]) {
+    testWidgets(
+      'season transition fades out the previous detail and restores it on return at ${size.width}',
+      (tester) async {
+        final seasonData = Completer<MediaItem>();
+        final router = await pumpDetailPage(
+          tester,
+          item: _series,
+          size: size,
+          itemById: (id) => id == 'season-1' ? seasonData.future : _series(),
+          seasons: [_season()],
+          episodes: [_episode()],
+        );
+        double routeOpacity(String id) {
+          final page = find.byWidgetPredicate(
+            (widget) => widget is DetailPage && widget.itemId == id,
+            skipOffstage: false,
+          );
+          final fades = find.ancestor(
+            of: page,
+            matching: find.byType(FadeTransition, skipOffstage: false),
+          );
+          return tester
+              .widgetList<FadeTransition>(fades)
+              .fold(1.0, (opacity, fade) => opacity * fade.opacity.value);
+        }
+
+        expect(routeOpacity('movie-1'), 1);
+        final season = find.byKey(const ValueKey('detail-season-season-1'));
+        await tester.ensureVisible(season);
+        await tester.tap(season);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 120));
+        final outgoingOpacity = routeOpacity('movie-1');
+        expect(
+          outgoingOpacity,
+          inExclusiveRange(0, 0.5),
+          reason: 'the old transparent detail must fade away under the incoming season',
+        );
+        expect(routeOpacity('season-1'), inExclusiveRange(0.5, 1));
+        seasonData.complete(_season());
+        await tester.pumpAndSettle();
+        expect(routeOpacity('movie-1'), 0);
+        router.pop();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(routeOpacity('movie-1'), inExclusiveRange(0, 1));
+        expect(routeOpacity('season-1'), inExclusiveRange(0, 1));
+        await tester.pumpAndSettle();
+        expect(routeOpacity('movie-1'), 1);
+        expect(
+          find.byKey(const ValueKey('detail-season-season-1')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final size in [const Size(320, 760), const Size(1280, 1000)]) {
     testWidgets(
       'single season stays visible and opens numbered episode details at ${size.width}',

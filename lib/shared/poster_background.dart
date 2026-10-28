@@ -172,7 +172,7 @@ class _PosterWindowBackgroundState extends State<PosterWindowBackground>
   }
 
   void _scheduleClearOutgoing() {
-    _outgoingReleaseTimer?.cancel();
+    if (_outgoingReleaseTimer != null || _outgoing == null) return;
     if (_reduceMotion) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         if (mounted && _outgoing != null) {
@@ -181,6 +181,9 @@ class _PosterWindowBackgroundState extends State<PosterWindowBackground>
       });
       return;
     }
+    // imageBuilder reports the first frame before the image's 200ms fade-in
+    // finishes. Keep the previous artwork through that inner transition, even
+    // when the outer animation has already completed.
     _outgoingReleaseTimer = Timer(const Duration(milliseconds: 220), () {
       _outgoingReleaseTimer = null;
       if (mounted && _outgoing != null) {
@@ -201,7 +204,7 @@ class _PosterWindowBackgroundState extends State<PosterWindowBackground>
     } else if (status == AnimationStatus.completed &&
         _outgoing != null &&
         _currentReady) {
-      setState(() => _outgoing = null);
+      _scheduleClearOutgoing();
     }
   }
 

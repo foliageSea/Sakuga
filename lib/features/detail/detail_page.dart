@@ -45,7 +45,16 @@ CustomTransitionPage<void> buildDetailTransitionPage(GoRouterState state) {
             curve: Curves.easeOutCubic,
             reverseCurve: Curves.easeInCubic,
           ),
-          child: child,
+          child: FadeTransition(
+            opacity: ReverseAnimation(
+              CurvedAnimation(
+                parent: secondaryAnimation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              ),
+            ),
+            child: child,
+          ),
         ),
     child: DetailPage(
       itemId: itemId,
@@ -472,7 +481,13 @@ class _Hero extends StatelessWidget {
             children: [
               SizedBox(width: posterWidth, child: poster),
               const SizedBox(width: 12),
-              Expanded(child: _TitleBlock(item: item, onDark: false)),
+              Expanded(
+                child: _TitleBlock(
+                  item: item,
+                  fallbackItem: fallbackItem,
+                  onDark: false,
+                ),
+              ),
             ],
           ),
         ],
@@ -505,7 +520,13 @@ class _Hero extends StatelessWidget {
                 children: [
                   SizedBox(width: posterWidth, child: poster),
                   const SizedBox(width: 20),
-                  Expanded(child: _TitleBlock(item: item, onDark: true)),
+                  Expanded(
+                    child: _TitleBlock(
+                      item: item,
+                      fallbackItem: fallbackItem,
+                      onDark: true,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -517,9 +538,14 @@ class _Hero extends StatelessWidget {
 }
 
 class _TitleBlock extends StatelessWidget {
-  const _TitleBlock({required this.item, required this.onDark});
+  const _TitleBlock({
+    required this.item,
+    required this.onDark,
+    this.fallbackItem,
+  });
 
   final MediaItem item;
+  final MediaItem? fallbackItem;
   final bool onDark;
 
   @override
@@ -529,14 +555,18 @@ class _TitleBlock extends StatelessWidget {
         ? const Color(0xCCFFFFFF)
         : theme.colors.mutedForeground;
     final background = onDark ? const Color(0x33FFFFFF) : theme.colors.muted;
+    final seriesName = item.seriesName?.trim().isNotEmpty == true
+        ? item.seriesName
+        : fallbackItem?.seriesName;
+    final logo = item.logo ?? fallbackItem?.logo;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (item.type == MediaType.season &&
-            item.seriesName?.trim().isNotEmpty == true) ...[
+            seriesName?.trim().isNotEmpty == true) ...[
           Text(
-            item.seriesName!,
+            seriesName!,
             key: const ValueKey('detail-series-name'),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -547,7 +577,7 @@ class _TitleBlock extends StatelessWidget {
           ),
           const SizedBox(height: 12),
         ],
-        if (item.logo case final logo?) ...[
+        if (logo != null) ...[
           SizedBox(
             width: 420,
             height: isMobileLayout(context) ? 80 : 120,
