@@ -183,14 +183,15 @@ ScrollPosition _pageScrollPosition(WidgetTester tester) {
 }
 
 /// Scrolls the page by [dy] and checks that the back button kept its place
-/// while the page content moved.
+/// and title while the page content moved.
 Future<void> expectBackButtonPinned(
   WidgetTester tester, {
   double dy = -320,
 }) async {
   expect(_backButton, findsOneWidget);
   final pinnedAt = tester.getTopLeft(_backButton);
-  final titleBefore = tester.getTopLeft(find.text(_title)).dy;
+  final titleBefore = tester.getTopLeft(find.text(_title));
+  final contentBefore = tester.getTopLeft(find.text('PG-13')).dy;
 
   final position = _pageScrollPosition(tester);
   expect(
@@ -204,14 +205,51 @@ Future<void> expectBackButtonPinned(
 
   expect(position.pixels, greaterThan(0));
   expect(
-    tester.getTopLeft(find.text(_title)).dy,
-    lessThan(titleBefore),
+    tester.getTopLeft(find.text('PG-13')).dy,
+    lessThan(contentBefore),
     reason: 'the content should scroll under the pinned back button',
   );
   expect(tester.getTopLeft(_backButton), pinnedAt);
+  expect(tester.getTopLeft(find.text(_title)), titleBefore);
 }
 
 void main() {
+  for (final size in [const Size(390, 844), const Size(1280, 800)]) {
+    testWidgets(
+      'detail uses header title and banner logo at width ${size.width}',
+      (tester) async {
+        await pumpDetailPage(
+          tester,
+          size: size,
+          item: () => const MediaItem(
+            id: 'series-1',
+            name: _title,
+            type: MediaType.series,
+            logo: MediaImageResource(
+              urlTemplate: 'http://127.0.0.1:8096/Items/series-1/Images/Logo?maxWidth={width}',
+              cacheKey: 'series-logo',
+              headers: {'X-Emby-Token': 'test-key'},
+            ),
+          ),
+          seasons: const [],
+          episodes: const [],
+        );
+
+        expect(find.text(_title), findsOneWidget);
+        final logoFinder = find.byKey(const ValueKey('detail-logo'));
+        final logo = tester.widget<CachedNetworkImage>(logoFinder);
+        expect(logo.imageUrl, contains('Images/Logo?maxWidth=840'));
+        expect(logo.httpHeaders, {'X-Emby-Token': 'test-key'});
+        expect(logo.fit, BoxFit.contain);
+        expect(
+          tester.getRect(find.text(_title)).bottom,
+          lessThan(tester.getRect(logoFinder).top),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('the back button stays pinned while the detail page scrolls', (
     tester,
   ) async {

@@ -56,6 +56,7 @@ class MediaItem {
     required this.type,
     this.poster,
     this.backdrop,
+    this.logo,
     this.seriesId,
     this.seriesName,
     this.seasonId,
@@ -82,6 +83,7 @@ class MediaItem {
   final MediaType type;
   final MediaImageResource? poster;
   final MediaImageResource? backdrop;
+  final MediaImageResource? logo;
   final String? seriesId;
   final String? seriesName;
   final String? seasonId;
@@ -130,6 +132,7 @@ class MediaItem {
       type: type,
       poster: poster,
       backdrop: backdrop,
+      logo: logo,
       seriesId: seriesId,
       seriesName: seriesName,
       seasonId: seasonId,

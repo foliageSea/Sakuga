@@ -56,6 +56,13 @@ class JellyfinMapper {
       backdrop: backdrops.isEmpty
           ? null
           : _image(id, backdrops.first, kind: 'Backdrop/0'),
+      logo:
+          _image(id, tags['Logo'], kind: 'Logo') ??
+          _image(
+            json['ParentLogoItemId'],
+            json['ParentLogoImageTag'],
+            kind: 'Logo',
+          ),
       seriesId: json['SeriesId'] as String?,
       seriesName: json['SeriesName'] as String?,
       seasonId: json['SeasonId'] as String?,
@@ -108,9 +115,12 @@ class JellyfinMapper {
     }
     final url =
         '${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/Items/${Uri.encodeComponent(id)}/Images/$kind';
+    // PNG preserves the transparent background of title artwork.
+    final format = kind == 'Logo' ? '&format=Png' : '';
     return MediaImageResource(
-      urlTemplate: '$url?maxWidth={width}&tag=${Uri.encodeQueryComponent(tag)}',
-      cacheKey: '$url?tag=${Uri.encodeQueryComponent(tag)}',
+      urlTemplate:
+          '$url?maxWidth={width}&tag=${Uri.encodeQueryComponent(tag)}$format',
+      cacheKey: '$url?tag=${Uri.encodeQueryComponent(tag)}$format',
       headers: headers,
     );
   }

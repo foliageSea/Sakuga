@@ -108,6 +108,71 @@ void main() {
     );
   });
 
+  test(
+    'maps transparent logos and preserves them through playback overlays',
+    () {
+      const mapper = JellyfinMapper(
+        baseUrl: 'https://media.test/jellyfin/',
+        headers: {'Authorization': 'test'},
+      );
+      final item = mapper.item({
+        'Id': 'movie',
+        'ImageTags': {'Logo': 'logo tag'},
+        'ParentLogoItemId': 'series',
+        'ParentLogoImageTag': 'parent-logo',
+      });
+      final logo = item.logo!;
+      expect(
+        logo.url(width: 900),
+        'https://media.test/jellyfin/Items/movie/Images/Logo'
+        '?maxWidth=900&tag=logo+tag&format=Png',
+      );
+      expect(logo.headers, {'Authorization': 'test'});
+      expect(
+        logo.cacheKey,
+        'https://media.test/jellyfin/Items/movie/Images/Logo'
+        '?tag=logo+tag&format=Png',
+      );
+      expect(
+        item.withPlaybackPosition(const Duration(seconds: 30)).logo,
+        same(logo),
+      );
+      expect(item.withPlaybackPosition(Duration.zero).logo, same(logo));
+    },
+  );
+
+  test('uses parent logos and leaves missing artwork null', () {
+    const mapper = JellyfinMapper(baseUrl: 'https://media.test', headers: {});
+    final episode = mapper.item({
+      'Id': 'episode',
+      'ImageTags': {'Logo': ''},
+      'ParentLogoItemId': 'series',
+      'ParentLogoImageTag': 'parent-logo',
+    });
+    expect(
+      episode.logo!.url(),
+      'https://media.test/Items/series/Images/Logo'
+      '?maxWidth=600&tag=parent-logo&format=Png',
+    );
+    for (final json in <Map<String, dynamic>>[
+      {'Id': 'movie'},
+      {
+        'Id': 'movie',
+        'ImageTags': {'Primary': 'poster'},
+      },
+      {
+        'Id': 'movie',
+        'ImageTags': {'Logo': ''},
+      },
+      {'Id': 'movie', 'ParentLogoItemId': 'series'},
+      {
+        'ImageTags': {'Logo': 'logo'},
+      },
+    ]) {
+      expect(mapper.item(json).logo, isNull);
+    }
+  });
+
   test('library resolves a client from the factory and switches without Jellyfin inheritance', () async {
     const a = ServerProfile(id: 'a', name: 'A', baseUrl: 'https://a.test');
     const b = ServerProfile(id: 'b', name: 'B', baseUrl: 'https://b.test');

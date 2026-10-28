@@ -735,14 +735,19 @@ void main() {
       expect(refreshRect.right, closeTo(tester.getRect(rightCard).right, 1));
 
       // Opening a detail page replaces the right refresh button with a single
-      // back button to the left of the "Library" header title on the same row.
+      // back button to the left of the series title on the same row.
       await tester.tap(find.text('Series a'));
       await tester.pumpAndSettle();
 
       expect(refreshButton, findsNothing);
       expect(backButton, findsOneWidget);
 
-      final titleRectOnDetail = tester.getRect(headerTitle);
+      final detailTitle = find.descendant(
+        of: find.byKey(const ValueKey('mobile-header')),
+        matching: find.text('Series a'),
+      );
+      expect(detailTitle, findsOneWidget);
+      final titleRectOnDetail = tester.getRect(detailTitle);
       final backRect = tester.getRect(backButton);
       expect(backRect.center.dy, closeTo(titleRectOnDetail.center.dy, 1.0));
       expect(backRect.right, lessThanOrEqualTo(titleRectOnDetail.left));

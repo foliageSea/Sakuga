@@ -32,7 +32,27 @@ void main() {
     expect(adapter.lastQuery['sortBy'], 'Random');
     expect(adapter.lastQuery['startIndex'], 60);
     expect(adapter.lastQuery['limit'], 30);
+    expect(adapter.lastQuery['enableImageTypes'], 'Primary,Backdrop,Logo');
     expect(page.totalRecordCount, 90);
+  });
+
+  test('requests and maps detail logo metadata', () async {
+    final adapter = _PlaybackAdapter({
+      'Id': 'movie',
+      'Name': 'Movie',
+      'Type': 'Movie',
+      'ImageTags': {'Logo': 'logo-tag'},
+    });
+    final client = JellyfinClient(server: server, dio: _dio(adapter));
+    final item = await client.item('user-1', 'movie');
+    expect(adapter.lastPath, '/Items/movie');
+    expect(adapter.lastQuery['enableImageTypes'], 'Primary,Backdrop,Logo');
+    expect(
+      adapter.lastQuery['fields'].toString().split(','),
+      contains('ImageTags'),
+    );
+    expect(item.logo!.url(), contains('/Items/movie/Images/Logo?'));
+    expect(Uri.parse(item.logo!.url()).queryParameters['format'], 'Png');
   });
 
   test('negotiates a direct-play URL with auth and resume position', () async {

@@ -300,9 +300,17 @@ class AppShell extends ConsumerWidget {
                                                   const SizedBox(width: 12),
                                                 ],
                                                 Expanded(
-                                                  child: _HeaderTitle(
-                                                    labels[shell.currentIndex],
-                                                  ),
+                                                  child:
+                                                      detailBackgroundSpec !=
+                                                          null
+                                                      ? DetailHeaderTitle(
+                                                          spec:
+                                                              detailBackgroundSpec!,
+                                                        )
+                                                      : _HeaderTitle(
+                                                          labels[shell
+                                                              .currentIndex],
+                                                        ),
                                                 ),
                                               ],
                                             ),

@@ -42,6 +42,7 @@ class JellyfinClient implements MediaServerClient {
   /// per-user playback state.
   static const _itemFields =
       'RunTimeTicks,PrimaryImageAspectRatio,ImageTags,UserData';
+  static const _itemImageTypes = 'Primary,Backdrop,Logo';
 
   Map<String, String> get authHeaders => _headers(server.apiKey);
 
@@ -369,6 +370,7 @@ class JellyfinClient implements MediaServerClient {
         },
         'sortOrder': 'Ascending',
         'fields': _itemFields,
+        'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,
         'startIndex': startIndex,
         'limit': limit,
@@ -385,6 +387,7 @@ class JellyfinClient implements MediaServerClient {
       queryParameters: {
         'userId': userId,
         'fields': _itemFields,
+        'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,
       },
     );
@@ -406,6 +409,7 @@ class JellyfinClient implements MediaServerClient {
         'userId': userId,
         'seasonId': ?seasonId,
         'fields': _itemFields,
+        'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,
       },
     );
@@ -432,6 +436,7 @@ class JellyfinClient implements MediaServerClient {
             'Overview,Genres,People,Studios,ProviderIds,CommunityRating,'
             'OfficialRating,RunTimeTicks,PremiereDate,BackdropImageTags,'
             'Taglines,PrimaryImageAspectRatio,ImageTags,UserData',
+        'enableImageTypes': _itemImageTypes,
       },
     );
     return _mapper.item(response.data ?? const {});
@@ -450,6 +455,7 @@ class JellyfinClient implements MediaServerClient {
         'sortBy': 'DatePlayed',
         'sortOrder': 'Descending',
         'fields': _itemFields,
+        'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,
         'limit': limit,
       },
@@ -465,6 +471,7 @@ class JellyfinClient implements MediaServerClient {
       queryParameters: {
         'limit': limit,
         'fields': _itemFields,
+        'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,
       },
     );
@@ -489,6 +496,7 @@ class JellyfinClient implements MediaServerClient {
             'Overview,Genres,OfficialRating,PremiereDate,'
             'BackdropImageTags,PrimaryImageAspectRatio,ImageTags,UserData,'
             'RunTimeTicks',
+        'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,
         'limit': limit,
       },
@@ -513,6 +521,7 @@ class JellyfinClient implements MediaServerClient {
         'sortBy': 'SortName',
         'sortOrder': 'Ascending',
         'fields': _itemFields,
+        'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,
         'limit': limit,
       },

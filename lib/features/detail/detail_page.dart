@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/images/artwork_cache.dart';
 import '../../data/media_server/media_server_client.dart';
 import '../../data/media_server/media_server_factory.dart';
 import '../../data/media_server/media_models.dart';
@@ -135,6 +137,7 @@ class DetailPage extends ConsumerWidget {
         final server = ref.watch(activeServerProvider);
         if (server != null && preview != null) {
           return _DetailScaffold(
+            title: preview.name,
             slivers: [
               SliverToBoxAdapter(
                 child: _Hero(
@@ -152,6 +155,7 @@ class DetailPage extends ConsumerWidget {
         );
       },
       error: (error, _) => _DetailScaffold(
+        title: preview?.name,
         slivers: [
           SliverToBoxAdapter(
             child: ErrorNotice(
@@ -207,6 +211,7 @@ class _DetailBody extends ConsumerWidget {
             initialPosterUrl != null &&
             value.poster?.cacheKey == preview?.poster?.cacheKey;
         return _DetailScaffold(
+          title: value.name,
           slivers: [
             SliverToBoxAdapter(
               child: _Hero(
@@ -222,6 +227,7 @@ class _DetailBody extends ConsumerWidget {
         );
       },
       loading: () => _DetailScaffold(
+        title: preview?.name,
         slivers: [
           if (preview != null)
             SliverToBoxAdapter(
@@ -235,6 +241,7 @@ class _DetailBody extends ConsumerWidget {
         ],
       ),
       error: (error, _) => _DetailScaffold(
+        title: preview?.name,
         slivers: [
           if (preview != null)
             SliverToBoxAdapter(
@@ -262,9 +269,10 @@ class _DetailBody extends ConsumerWidget {
 /// The detail page shell: the back bar is pinned above the scrolling content
 /// so it stays reachable in every state, including loading and errors.
 class _DetailScaffold extends StatelessWidget {
-  const _DetailScaffold({required this.slivers});
+  const _DetailScaffold({required this.slivers, this.title});
 
   final List<Widget> slivers;
+  final String? title;
 
   @override
   Widget build(BuildContext context) {
@@ -272,7 +280,7 @@ class _DetailScaffold extends StatelessWidget {
         isMobileLayout(context) &&
         WindowPosterBackgroundScope.hasShell(context);
     return PageScrollView(
-      header: mobileShell ? null : const _BackBar(),
+      header: mobileShell ? null : _BackBar(title: title),
       animate: false,
       transparent: true,
       slivers: slivers,
@@ -313,8 +321,48 @@ FButtonStyleDelta detailOutlineButtonStyle(BuildContext context) {
   );
 }
 
+/// The detail title displayed in the mobile shell's app bar.
+class DetailHeaderTitle extends ConsumerWidget {
+  const DetailHeaderTitle({required this.spec, super.key});
+
+  final DetailBackgroundSpec spec;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final library = ref.watch(libraryViewsProvider).value;
+    final item = library == null
+        ? null
+        : ref
+              .watch(
+                libraryItemProvider((
+                  userId: library.userId,
+                  itemId: spec.itemId,
+                )),
+              )
+              .value;
+    return _DetailTitle(item?.name ?? spec.initialItem?.name ?? '');
+  }
+}
+
+class _DetailTitle extends StatelessWidget {
+  const _DetailTitle(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    title,
+    key: const ValueKey('detail-title'),
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: context.theme.typography.body.lg,
+  );
+}
+
 class _BackBar extends StatelessWidget {
-  const _BackBar();
+  const _BackBar({this.title});
+
+  final String? title;
 
   @override
   Widget build(BuildContext context) {
@@ -330,6 +378,10 @@ class _BackBar extends StatelessWidget {
           onPress: () => popDetailRoute(context),
           child: const Icon(FLucideIcons.arrowLeft),
         ),
+        if (title != null) ...[
+          const SizedBox(width: 12),
+          Expanded(child: _DetailTitle(title!)),
+        ],
       ],
     );
   }
@@ -440,9 +492,6 @@ class _TitleBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final foreground = onDark
-        ? const Color(0xFFFFFFFF)
-        : theme.colors.foreground;
     final muted = onDark
         ? const Color(0xCCFFFFFF)
         : theme.colors.mutedForeground;
@@ -451,16 +500,24 @@ class _TitleBlock extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          item.name,
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-          style: theme.typography.display.xl.copyWith(
-            color: foreground,
-            fontWeight: FontWeight.w600,
+        if (item.logo case final logo?) ...[
+          SizedBox(
+            width: 420,
+            height: isMobileLayout(context) ? 80 : 120,
+            child: CachedNetworkImage(
+              key: const ValueKey('detail-logo'),
+              imageUrl: logo.url(width: 840),
+              httpHeaders: logo.headers,
+              cacheManager: ArtworkCacheManager.instance,
+              fit: BoxFit.contain,
+              alignment: Alignment.bottomLeft,
+              fadeInDuration: const Duration(milliseconds: 200),
+              placeholder: (_, _) => const SizedBox.shrink(),
+              errorWidget: (_, _, _) => const SizedBox.shrink(),
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
+          const SizedBox(height: 10),
+        ],
         Wrap(
           spacing: 8,
           runSpacing: 8,
