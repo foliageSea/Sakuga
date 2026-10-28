@@ -127,9 +127,13 @@ class _EpisodeListState extends State<_EpisodeList> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      final titleStyle = context.theme.typography.body.sm;
       final extent = math.max(
-        64.0,
-        MediaQuery.textScalerOf(context).scale(16) * 3 + 16,
+        48.0,
+        MediaQuery.textScalerOf(context).scale(titleStyle.fontSize!) *
+                (titleStyle.height ?? 1.4) *
+                2 +
+            16,
       );
       final index = widget.episodes.indexWhere((e) => e.id == widget.currentId);
       final maxOffset = math.max(
@@ -153,9 +157,20 @@ class _EpisodeListState extends State<_EpisodeList> {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: FItemGroup(
+              style: const .delta(spacing: 0),
               children: [
                 FItem(
                   key: ValueKey('player-episode-${episode.id}'),
+                  style: const .delta(
+                    contentStyle: .delta(
+                      suffixedPadding: .value(
+                        EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      ),
+                      unsuffixedPadding: .value(
+                        EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      ),
+                    ),
+                  ),
                   title: Text(
                     episode.displaySubtitle ?? episode.name,
                     maxLines: 2,

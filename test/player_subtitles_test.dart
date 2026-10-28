@@ -55,7 +55,7 @@ void main() {
   });
 
   testWidgets(
-    'subtitle style previews changes and saves for the next session',
+    'subtitle style saves changes for the next session without a preview',
     (tester) async {
       final repository = MemorySettings();
       final container = ProviderContainer(
@@ -94,6 +94,7 @@ void main() {
       );
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
+      expect(find.byType(SubtitleCaption), findsNothing);
       final fontSlider = tester.widget<PlayerSlider>(
         find.byKey(const ValueKey('subtitle-font-size')),
       );
@@ -106,22 +107,12 @@ void main() {
       opacitySlider.onChange(0.25);
       opacitySlider.onEnd!(0.25);
       await tester.pumpAndSettle();
-      final originalPosition = tester.getTopLeft(find.byType(SubtitleCaption));
       final positionSlider = tester.widget<PlayerSlider>(
         find.byKey(const ValueKey('subtitle-vertical-position')),
       );
       positionSlider.onChange(0.2);
       positionSlider.onEnd!(0.2);
       await tester.pumpAndSettle();
-      expect(
-        tester.getTopLeft(find.byType(SubtitleCaption)).dy,
-        lessThan(originalPosition.dy),
-      );
-      final caption = tester.widget<SubtitleCaption>(
-        find.byType(SubtitleCaption),
-      );
-      expect(caption.fontSize, 48);
-      expect(caption.backgroundOpacity, 0.25);
       expect(repository.value.subtitleFontSize, 48);
       expect(repository.value.subtitleBackgroundOpacity, 0.25);
       expect(repository.value.subtitleVerticalPosition, 0.2);

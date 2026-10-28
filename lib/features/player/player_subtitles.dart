@@ -177,25 +177,6 @@ class _SubtitleStyleSettingsState
         children: [
           Text(l.subtitleStyle, style: context.theme.typography.body.lg),
           const SizedBox(height: 20),
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF475569),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SubtitlePlacement(
-                position: _verticalPosition,
-                child: SubtitleCaption(
-                  text: l.subtitles,
-                  fontSize: _fontSize,
-                  backgroundOpacity: _opacity,
-                  textScaler: const TextScaler.linear(0.6),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
           Text('${l.fontSize} · ${_fontSize.round()}'),
           PlayerSlider(
             key: const ValueKey('subtitle-font-size'),
