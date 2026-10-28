@@ -7,7 +7,6 @@ import '../features/detail/detail_page.dart';
 import '../features/home/home_page.dart';
 import '../features/library/library_page.dart';
 import '../features/player/player_page.dart';
-import '../features/search/search_page.dart';
 import '../features/settings/settings_page.dart';
 import '../shared/localization.dart';
 import '../shared/responsive_button.dart';
@@ -64,11 +63,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                 ],
               ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(path: '/search', builder: (_, _) => const SearchPage()),
             ],
           ),
           StatefulShellBranch(

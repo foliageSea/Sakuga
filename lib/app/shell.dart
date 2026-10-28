@@ -46,11 +46,10 @@ class AppShell extends ConsumerWidget {
         activeServer != null &&
         activeServer.apiKey.isNotEmpty;
     final l = context.l10n;
-    final labels = [l.home, l.library, l.search, l.settings];
+    final labels = [l.home, l.library, l.settings];
     const icons = [
       FLucideIcons.house,
       FLucideIcons.film,
-      FLucideIcons.search,
       FLucideIcons.settings2,
     ];
     return LayoutBuilder(

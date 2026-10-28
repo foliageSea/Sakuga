@@ -186,3 +186,9 @@ final libraryItemsProvider = AsyncNotifierProvider.autoDispose
     .family<LibraryItemsController, LibraryItemsState, LibraryQuery>(
       LibraryItemsController.new,
     );
+
+final searchResultsProvider = FutureProvider.autoDispose
+    .family<List<MediaItem>, String>((ref, term) async {
+      final library = await ref.watch(libraryViewsProvider.future);
+      return library.client.search(library.userId, term);
+    });

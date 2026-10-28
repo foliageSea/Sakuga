@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
@@ -25,13 +26,47 @@ class LibraryPage extends ConsumerStatefulWidget {
 }
 
 class _LibraryPageState extends ConsumerState<LibraryPage> {
+  static const _debounceDelay = Duration(milliseconds: 300);
+
   final _scrollController = ScrollController();
+  final _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  String _searchTerm = '';
   String? _selectedViewId;
 
   @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_scheduleSearch);
+  }
+
+  @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scheduleSearch() {
+    final term = _searchController.text.trim();
+    _searchDebounce?.cancel();
+    if (term == _searchTerm) return;
+    if (term.isEmpty) {
+      _search(term);
+    } else {
+      _searchDebounce = Timer(_debounceDelay, () => _search(term));
+    }
+  }
+
+  void _search(String term) {
+    _searchDebounce?.cancel();
+    term = term.trim();
+    if (!mounted || term == _searchTerm) return;
+    setState(() => _searchTerm = term);
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
   }
 
   void _selectView(String id) {
@@ -90,7 +125,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     final mobileShell =
         isMobileLayout(context) &&
         WindowPosterBackgroundScope.hasShell(context);
-    final viewChips = hasViews
+    final viewChips = hasViews && _searchTerm.isEmpty
         ? Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -111,28 +146,35 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       onNotification: _onScroll,
       child: PageScrollView(
         controller: _scrollController,
-        headerGap: hasViews ? (mobileShell ? 16 : 20) : 0,
-        header: mobileShell
-            ? viewChips
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  PageHeading(
-                    l.library,
-                    hideTitleOnMobile: true,
-                    action: FButton.icon(
-                      key: const ValueKey('library-refresh'),
-                      variant: .outline,
-                      size: .sm,
-                      semanticsLabel: l.refresh,
-                      onPress: () => ref.invalidate(libraryViewsProvider),
-                      child: const Icon(FLucideIcons.refreshCw),
-                    ),
-                  ),
-                  ?viewChips,
-                ],
+        headerGap: mobileShell ? 16 : 20,
+        header: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!mobileShell)
+              PageHeading(
+                l.library,
+                hideTitleOnMobile: true,
+                action: FButton.icon(
+                  key: const ValueKey('library-refresh'),
+                  variant: .outline,
+                  size: .sm,
+                  semanticsLabel: l.refresh,
+                  onPress: () => ref.invalidate(libraryViewsProvider),
+                  child: const Icon(FLucideIcons.refreshCw),
+                ),
               ),
+            FTextField(
+              key: const ValueKey('library-search'),
+              control: .managed(controller: _searchController),
+              hint: l.searchHint,
+              textInputAction: TextInputAction.search,
+              clearable: (value) => value.text.isNotEmpty,
+              onSubmit: _search,
+            ),
+            if (viewChips != null) ...[const SizedBox(height: 12), viewChips],
+          ],
+        ),
         slivers: data.when(
           data: (library) => _librarySlivers(context, library, activeViewId),
           loading: () => const [SliverToBoxAdapter(child: LoadingNotice())],
@@ -150,6 +192,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   }
 
   bool _onScroll(ScrollNotification notification) {
+    if (_searchTerm.isNotEmpty) return false;
     if (notification.metrics.axis != Axis.vertical) return false;
     if (notification.metrics.extentAfter > 480) return false;
     final library = ref.read(libraryViewsProvider).value;
@@ -173,6 +216,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     LibraryData library,
     String? viewId,
   ) {
+    if (_searchTerm.isNotEmpty) {
+      return [
+        SliverPadding(
+          padding: const EdgeInsets.only(top: 24),
+          sliver: _SearchGrid(client: library.client, term: _searchTerm),
+        ),
+      ];
+    }
     if (library.views.isEmpty || viewId == null) {
       return [
         SliverToBoxAdapter(child: EmptyNotice(context.l10n.emptyLibrary)),
@@ -214,7 +265,12 @@ class _PagedGrid extends ConsumerWidget {
     return SliverMainAxisGroup(
       slivers: state.when(
         data: (value) => [
-          _grid(context, value),
+          _LibraryGrid(
+            client: client,
+            items: value.items,
+            onTap: onTap,
+            emptyMessage: context.l10n.noItems,
+          ),
           SliverToBoxAdapter(
             child: _PageFooter(query: query, state: value),
           ),
@@ -231,12 +287,56 @@ class _PagedGrid extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Widget _grid(BuildContext context, LibraryItemsState state) {
-    if (state.items.isEmpty) {
-      return SliverToBoxAdapter(child: EmptyNotice(context.l10n.noItems));
+class _SearchGrid extends ConsumerWidget {
+  const _SearchGrid({required this.client, required this.term});
+
+  final MediaServerClient client;
+  final String term;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(searchResultsProvider(term))
+      .when(
+        data: (items) => _LibraryGrid(
+          client: client,
+          items: items,
+          emptyMessage: context.l10n.noResults,
+          onTap: (item, posterUrl) => context.go(
+            '/library/${item.id}',
+            extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
+          ),
+        ),
+        loading: () => const SliverToBoxAdapter(child: LoadingNotice()),
+        error: (error, _) => SliverToBoxAdapter(
+          child: ErrorNotice(
+            error,
+            onRetry: () => ref.invalidate(searchResultsProvider(term)),
+          ),
+        ),
+      );
+}
+
+class _LibraryGrid extends StatelessWidget {
+  const _LibraryGrid({
+    required this.client,
+    required this.items,
+    required this.onTap,
+    required this.emptyMessage,
+  });
+
+  final MediaServerClient client;
+  final List<MediaItem> items;
+  final _OpenLibraryItem onTap;
+  final String emptyMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    if (this.items.isEmpty) {
+      return SliverToBoxAdapter(child: EmptyNotice(emptyMessage));
     }
-    final items = _uniqueItems(state.items);
+    final items = _uniqueItems(this.items);
     if (isMobileLayout(context)) {
       return SliverToBoxAdapter(
         child: _MobileMasonryGrid(client: client, items: items, onTap: onTap),

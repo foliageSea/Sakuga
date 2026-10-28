@@ -492,8 +492,8 @@ void main() {
         ),
       );
 
-      // Switching away to search hides the global blurred poster background.
-      container.read(routerProvider).go('/search');
+      // Switching to settings hides the global blurred poster background.
+      container.read(routerProvider).go('/settings');
       await pumpFrames();
       expect(blurMaskFinder, findsNothing);
 

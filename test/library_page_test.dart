@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart' show MaterialApp;
 import 'package:sakuga/app/app.dart';
 import 'package:sakuga/app/router.dart';
 import 'package:sakuga/app/theme.dart';
+import 'package:sakuga/core/app_exception.dart';
 import 'package:sakuga/core/settings/settings.dart';
 import 'package:sakuga/core/window/desktop_window.dart';
 import 'package:sakuga/data/media_server/media_models.dart';
@@ -53,7 +54,29 @@ class _FakeItems extends LibraryItemsController {
   }
 }
 
-Future<void> _pumpLibrary(WidgetTester tester, Size size) async {
+class _SearchClient extends FakeMediaServerClient {
+  _SearchClient() : super(server: _server);
+
+  final terms = <String>[];
+  Future<List<MediaItem>> Function(String term)? searchItems;
+
+  @override
+  Future<List<MediaItem>> search(
+    String userId,
+    String term, {
+    int limit = 60,
+  }) async {
+    expect(userId, 'user-1');
+    terms.add(term);
+    return searchItems?.call(term) ?? [_item('result', 0.7)];
+  }
+}
+
+Future<void> _pumpLibrary(
+  WidgetTester tester,
+  Size size, {
+  FakeMediaServerClient? client,
+}) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -61,11 +84,12 @@ Future<void> _pumpLibrary(WidgetTester tester, Size size) async {
 
   final servers = MemoryServerRepository()..items = [_server];
   final container = ProviderContainer(
+    retry: (_, _) => null,
     overrides: [
       serverRepositoryProvider.overrideWithValue(servers),
       libraryViewsProvider.overrideWith(
         (ref) async => LibraryData(
-          client: FakeMediaServerClient(server: _server),
+          client: client ?? FakeMediaServerClient(server: _server),
           userId: 'user-1',
           views: const [
             MediaLibrary(
@@ -107,6 +131,130 @@ Future<void> _pumpLibrary(WidgetTester tester, Size size) async {
 }
 
 void main() {
+  for (final size in [const Size(390, 900), const Size(1280, 900)]) {
+    testWidgets('library searches and clears at width ${size.width}', (
+      tester,
+    ) async {
+      final client = _SearchClient();
+      await _pumpLibrary(tester, size, client: client);
+      final search = find.byKey(const ValueKey('library-search'));
+
+      await tester.enterText(search, 'res');
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(client.terms, isEmpty);
+      await tester.enterText(search, '  result  ');
+      await tester.pump(const Duration(milliseconds: 299));
+      expect(client.terms, isEmpty);
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(client.terms, ['result']);
+      expect(find.text('Series result'), findsOneWidget);
+      expect(find.text('Series a'), findsNothing);
+      expect(find.text('Shows'), findsNothing);
+      expect(
+        find.byKey(
+          ValueKey(
+            size.width < 600
+                ? 'library-mobile-card-result'
+                : 'library-desktop-card-result',
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byIcon(FLucideIcons.x));
+      await tester.pumpAndSettle();
+
+      expect(client.terms, ['result']);
+      expect(find.text('Series result'), findsNothing);
+      expect(find.text('Series a'), findsOneWidget);
+      expect(find.text('Shows'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('library shows empty results and retries a failed search', (
+    tester,
+  ) async {
+    final client = _SearchClient()
+      ..searchItems = (_) async =>
+          throw const AppException(FailureKind.network);
+    await _pumpLibrary(tester, const Size(1280, 900), client: client);
+    final search = find.byKey(const ValueKey('library-search'));
+
+    await tester.enterText(search, 'missing');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(client.terms, ['missing']);
+    expect(find.text('Try again'), findsOneWidget);
+
+    client.searchItems = (_) async => [];
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+
+    expect(client.terms, ['missing', 'missing']);
+    expect(find.text('No matching results'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('late search results do not replace a newer query', (
+    tester,
+  ) async {
+    final first = Completer<List<MediaItem>>();
+    final client = _SearchClient()
+      ..searchItems = (term) async =>
+          term == 'first' ? first.future : [_item('second', 0.7)];
+    await _pumpLibrary(tester, const Size(1280, 900), client: client);
+    final search = find.byKey(const ValueKey('library-search'));
+
+    await tester.enterText(search, 'first');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    expect(client.terms, ['first']);
+
+    await tester.enterText(search, 'second');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(find.text('Series second'), findsOneWidget);
+
+    first.complete([_item('first', 0.7)]);
+    await tester.pumpAndSettle();
+    expect(find.text('Series first'), findsNothing);
+    expect(find.text('Series second'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('returning from a search result preserves the library query', (
+    tester,
+  ) async {
+    await _pumpRoutedLibrary(
+      tester,
+      size: const Size(1280, 900),
+      client: _SearchClient(),
+      loadItem: (id) async => _item(id, 0.7),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('library-search')),
+      'result',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Series result'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('detail-back')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('detail-back')));
+    await tester.pumpAndSettle();
+    expect(find.text('Series result'), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+      'result',
+    );
+    expect(find.text('Shows'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('mobile library flows posters into two staggered columns', (
     tester,
   ) async {
@@ -609,6 +757,7 @@ Future<void> _pumpRoutedLibrary(
   WidgetTester tester, {
   required Size size,
   required FutureOr<MediaItem> Function(String itemId) loadItem,
+  FakeMediaServerClient? client,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -638,7 +787,7 @@ Future<void> _pumpRoutedLibrary(
       serverRepositoryProvider.overrideWithValue(servers),
       libraryViewsProvider.overrideWith(
         (ref) async => LibraryData(
-          client: FakeMediaServerClient(server: _server),
+          client: client ?? FakeMediaServerClient(server: _server),
           userId: 'user-1',
           views: const [
             MediaLibrary(

@@ -71,7 +71,10 @@ void main() {
     await settle(tester);
     expect(tester.takeException(), isNull);
 
-    for (final path in ['/home', '/library', '/search', '/settings']) {
+    expect(find.byType(FBottomNavigationBarItem), findsNWidgets(3));
+    expect(find.text('Search'), findsNothing);
+
+    for (final path in ['/home', '/library', '/settings']) {
       container.read(routerProvider).go(path);
       await settle(tester);
       expect(tester.takeException(), isNull, reason: path);
@@ -97,7 +100,7 @@ void main() {
     final sidebar = find.byType(FSidebar);
     final logo = find.byKey(const ValueKey('sidebar-logo'));
     expect(tester.getSize(sidebar).width, 76);
-    expect(find.byType(FSidebarItem), findsNWidgets(4));
+    expect(find.byType(FSidebarItem), findsNWidgets(3));
     expect(
       tester.widget<Image>(logo).image,
       const AssetImage('assets/icons/sakuga.png'),
@@ -112,7 +115,7 @@ void main() {
     expect(container.read(settingsProvider).compactSidebar, isFalse);
     expect(find.text('Home'), findsWidgets);
     expect(find.text('Library'), findsWidgets);
-    expect(find.text('Search'), findsWidgets);
+    expect(find.text('Search'), findsNothing);
     expect(find.text('Downloads'), findsNothing);
     expect(find.text('Settings'), findsWidgets);
     expect(tester.takeException(), isNull);
