@@ -171,6 +171,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               textInputAction: TextInputAction.search,
               clearable: (value) => value.text.isNotEmpty,
               onSubmit: _search,
+              // Blend into the page instead of drawing a filled card behind the
+              // input; the default forui style fills it with the card color.
+              style: .delta(color: .delta([.base(const Color(0x00000000))])),
             ),
             if (viewChips != null) ...[const SizedBox(height: 12), viewChips],
           ],

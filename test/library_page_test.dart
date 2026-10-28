@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart' show MaterialApp;
+import 'package:material_ui/material_ui.dart' show MaterialApp, TextField;
 import 'package:sakuga/app/app.dart';
 import 'package:sakuga/app/router.dart';
 import 'package:sakuga/app/theme.dart';
@@ -173,6 +173,19 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('library search field blends into the page background', (
+    tester,
+  ) async {
+    await _pumpLibrary(tester, const Size(1280, 900), client: _SearchClient());
+    final field = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('library-search')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(field.decoration?.fillColor, const Color(0x00000000));
+  });
 
   testWidgets('library shows empty results and retries a failed search', (
     tester,
