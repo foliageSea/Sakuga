@@ -205,7 +205,8 @@ Future<ProviderContainer> _pumpLibrary(
     ),
   );
   await tester.pumpAndSettle();
-  if (expandFilters && size.width < 600) {
+  expect(find.byKey(const ValueKey('library-filter-panel')), findsNothing);
+  if (expandFilters) {
     await tester.tap(find.byKey(const ValueKey('library-toggle-filters')));
     await tester.pumpAndSettle();
   }
@@ -223,6 +224,7 @@ void main() {
         const Size(1280, 900),
         client: client,
         useRealItems: true,
+        expandFilters: true,
       );
       expect(find.byKey(const ValueKey('library-year-2010')), findsNothing);
       await tester.tap(find.text('More years'));

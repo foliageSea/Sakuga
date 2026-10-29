@@ -40,24 +40,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   int? _selectedYear;
   MediaSort _sort = MediaSort.name;
   bool _descending = false;
-  bool _showFilters = true;
+  bool _showFilters = false;
   bool _listView = false;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_scheduleSearch);
-  }
-
-  bool _initializedLayout = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_initializedLayout) {
-      _showFilters = !isMobileLayout(context);
-      _initializedLayout = true;
-    }
   }
 
   @override
