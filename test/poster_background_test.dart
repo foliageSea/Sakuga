@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter, TileMode;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/widgets.dart';
@@ -16,6 +17,8 @@ Future<void> _show(
   WidgetTester tester,
   PosterBackground? background, {
   bool disableAnimations = false,
+  double titleBarHeight = 0,
+  double sidebarWidth = 0,
 }) => tester.pumpWidget(
   MediaQuery(
     data: MediaQueryData(disableAnimations: disableAnimations),
@@ -23,7 +26,16 @@ Future<void> _show(
       textDirection: TextDirection.ltr,
       child: FTheme(
         data: FTheme.neutral.light.touch,
-        child: PosterWindowBackground(background: background),
+        child: PosterWindowBackground(
+          background: background,
+          titleBarHeight: titleBarHeight,
+          sidebarWidth: sidebarWidth,
+          routeRadius: sidebarWidth > 0
+              ? const Radius.circular(12)
+              : Radius.zero,
+          titleBarBlurSigma: 60,
+          sidebarBlurSigma: 48,
+        ),
       ),
     ),
   ),
@@ -101,6 +113,55 @@ void main() {
 
   tearDown(() {
     HttpOverrides.global = previousOverrides;
+  });
+
+  testWidgets('desktop blur regions stay independent when sidebar expands', (
+    tester,
+  ) async {
+    final poster = _poster('regions');
+    for (final width in [76.0, 200.0]) {
+      await _show(tester, poster, titleBarHeight: 48, sidebarWidth: width);
+      final paths = <String, Path>{};
+      for (final (name, sigma) in [
+        ('window-poster-title-bar-blur-mask', 60.0),
+        ('window-poster-sidebar-blur-mask', 48.0),
+        ('window-poster-blur-mask', 20.0),
+      ]) {
+        final finder = find.byKey(ValueKey(name));
+        final filter = tester.widget<BackdropFilter>(finder);
+        expect(
+          filter.filter,
+          ImageFilter.blur(
+            sigmaX: sigma,
+            sigmaY: sigma,
+            tileMode: TileMode.clamp,
+          ),
+        );
+        final clip = tester.widget<ClipPath>(
+          find.ancestor(of: finder, matching: find.byType(ClipPath)).first,
+        );
+        paths[name] = clip.clipper!.getClip(tester.getSize(finder));
+      }
+      final title = paths['window-poster-title-bar-blur-mask']!;
+      final sidebar = paths['window-poster-sidebar-blur-mask']!;
+      final route = paths['window-poster-blur-mask']!;
+      for (final point in [
+        const Offset(30, 20),
+        Offset(width - 10, 100),
+        Offset(width + 30, 100),
+        Offset(width + 1, 49), // Outside the rounded route corner.
+      ]) {
+        expect(
+          [title, sidebar, route].where((p) => p.contains(point)),
+          hasLength(1),
+          reason: 'Each point must have exactly one blur region',
+        );
+      }
+      expect(title.contains(const Offset(30, 20)), isTrue);
+      expect(sidebar.contains(Offset(width + 1, 49)), isTrue);
+      expect(route.contains(Offset(width + 30, 100)), isTrue);
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets(

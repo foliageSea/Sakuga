@@ -79,14 +79,26 @@ class WindowPosterBackgroundScope extends InheritedWidget {
 class PosterWindowBackground extends StatefulWidget {
   const PosterWindowBackground({
     required this.background,
-    this.blurSigma = 64,
+    this.blurSigma = 20,
+    this.titleBarBlurSigma = 64,
+    this.sidebarBlurSigma = 64,
+    this.titleBarHeight = 0,
+    this.sidebarWidth = 0,
+    this.routeRadius = Radius.zero,
     this.fadeInDuration = const Duration(milliseconds: 300),
     this.fadeOutDuration = const Duration(milliseconds: 260),
     super.key,
   });
 
   final PosterBackground? background;
+
+  /// Route content blur, independent of the desktop chrome.
   final double blurSigma;
+  final double titleBarBlurSigma;
+  final double sidebarBlurSigma;
+  final double titleBarHeight;
+  final double sidebarWidth;
+  final Radius routeRadius;
   final Duration fadeInDuration;
   final Duration fadeOutDuration;
 
@@ -247,31 +259,115 @@ class _PosterWindowBackgroundState extends State<PosterWindowBackground>
                 onSettled: () => _markCurrentReady(current.url),
               ),
             ),
-            BackdropFilter(
-              key: const ValueKey('window-poster-blur-mask'),
-              filter: ImageFilter.blur(
-                sigmaX: widget.blurSigma,
-                sigmaY: widget.blurSigma,
-                tileMode: TileMode.clamp,
-              ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      colors.background.withValues(alpha: dark ? 0.62 : 0.64),
-                      colors.background.withValues(alpha: 0.78),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final routeRect = Rect.fromLTRB(
+                  widget.sidebarWidth,
+                  widget.titleBarHeight,
+                  constraints.maxWidth,
+                  constraints.maxHeight,
+                );
+                // All regions sample the same artwork without compounding blur.
+                return BackdropGroup(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      for (final (region, sigma, key) in [
+                        if (widget.titleBarHeight > 0)
+                          (
+                            _PosterRegion.titleBar,
+                            widget.titleBarBlurSigma,
+                            'window-poster-title-bar-blur-mask',
+                          ),
+                        if (widget.sidebarWidth > 0)
+                          (
+                            _PosterRegion.sidebar,
+                            widget.sidebarBlurSigma,
+                            'window-poster-sidebar-blur-mask',
+                          ),
+                        (
+                          _PosterRegion.route,
+                          widget.blurSigma,
+                          'window-poster-blur-mask',
+                        ),
+                      ])
+                        ClipPath(
+                          clipper: _PosterRegionClipper(
+                            region: region,
+                            routeRect: routeRect,
+                            radius: widget.routeRadius,
+                          ),
+                          child: BackdropFilter.grouped(
+                            key: ValueKey(key),
+                            filter: ImageFilter.blur(
+                              sigmaX: sigma,
+                              sigmaY: sigma,
+                              tileMode: TileMode.clamp,
+                            ),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    colors.background.withValues(
+                                      alpha: dark ? 0.62 : 0.64,
+                                    ),
+                                    colors.background.withValues(alpha: 0.78),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ],
         ),
       ),
     );
   }
+}
+
+enum _PosterRegion { titleBar, sidebar, route }
+
+class _PosterRegionClipper extends CustomClipper<Path> {
+  const _PosterRegionClipper({
+    required this.region,
+    required this.routeRect,
+    required this.radius,
+  });
+
+  final _PosterRegion region;
+  final Rect routeRect;
+  final Radius radius;
+
+  @override
+  Path getClip(Size size) {
+    final route = Path()
+      ..addRRect(RRect.fromRectAndCorners(routeRect, topLeft: radius));
+    return switch (region) {
+      _PosterRegion.titleBar =>
+        Path()..addRect(Rect.fromLTWH(0, 0, size.width, routeRect.top)),
+      // Include the route's outer corner so no unfiltered artwork shows through.
+      _PosterRegion.sidebar => Path.combine(
+        PathOperation.difference,
+        Path()
+          ..addRect(Rect.fromLTRB(0, routeRect.top, size.width, size.height)),
+        route,
+      ),
+      _PosterRegion.route => route,
+    };
+  }
+
+  @override
+  bool shouldReclip(_PosterRegionClipper oldClipper) =>
+      region != oldClipper.region ||
+      routeRect != oldClipper.routeRect ||
+      radius != oldClipper.radius;
 }
 
 class _PosterArtworkLayer extends StatelessWidget {
