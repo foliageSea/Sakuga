@@ -138,7 +138,113 @@ Future<void> _tapCard(WidgetTester tester, String title) async {
   await tester.pumpAndSettle();
 }
 
+const _loopItems = [
+  MediaItem(id: 'loop-1', name: 'Loop One', type: MediaType.movie),
+  MediaItem(id: 'loop-2', name: 'Loop Two', type: MediaType.movie),
+  MediaItem(id: 'loop-3', name: 'Loop Three', type: MediaType.movie),
+];
+
 void main() {
+  testWidgets('carousel arrows cross boundaries in the same direction', (
+    tester,
+  ) async {
+    await pumpHome(tester, carousel: _loopItems);
+    final controller = tester
+        .widget<PageView>(find.byType(PageView))
+        .controller!;
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomePage)),
+    );
+
+    // Moving backwards from the first item goes straight to the last item.
+    await tester.tap(find.byKey(const ValueKey('home-carousel-prev')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(controller.page, inExclusiveRange(0, 1));
+    await tester.pumpAndSettle();
+    expect(container.read(homeCarouselIndexProvider), 2);
+    expect(find.text('Loop Three'), findsOneWidget);
+
+    // Moving forwards from the last item continues forwards to the first.
+    await tester.tap(find.byKey(const ValueKey('home-carousel-next')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(controller.page, inExclusiveRange(3, 4));
+    await tester.pumpAndSettle();
+    expect(container.read(homeCarouselIndexProvider), 0);
+    expect(find.text('Loop One'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('home-carousel-dot-1')));
+    await tester.pumpAndSettle();
+    expect(container.read(homeCarouselIndexProvider), 1);
+    expect(find.text('Loop Two'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final kind in [
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+  ]) {
+    testWidgets('carousel swipes loop both ways with ${kind.name}', (
+      tester,
+    ) async {
+      await pumpHome(tester, carousel: _loopItems);
+      final page = find.byType(PageView);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomePage)),
+      );
+      final width = tester.getSize(page).width;
+      // Repeated backward swipes cross the first/last boundary twice.
+      for (final expected in [2, 1, 0, 2]) {
+        await tester.drag(page, Offset(width * 0.7, 0), kind: kind);
+        await tester.pumpAndSettle();
+        expect(container.read(homeCarouselIndexProvider), expected);
+      }
+      for (final expected in [0, 1, 2, 0]) {
+        await tester.drag(page, Offset(-width * 0.7, 0), kind: kind);
+        await tester.pumpAndSettle();
+        expect(container.read(homeCarouselIndexProvider), expected);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('carousel autoplay continues forwards across repeated loops', (
+    tester,
+  ) async {
+    await pumpHome(tester, carousel: _loopItems);
+    final controller = tester
+        .widget<PageView>(find.byType(PageView))
+        .controller!;
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomePage)),
+    );
+    for (var step = 1; step <= 7; step++) {
+      final start = controller.page!;
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(controller.page, greaterThan(start));
+      expect(controller.page, lessThan(start + 1));
+      await tester.pumpAndSettle();
+      expect(container.read(homeCarouselIndexProvider), step % 3);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('single carousel item stays still without loop controls', (
+    tester,
+  ) async {
+    await pumpHome(tester, carousel: [_loopItems.first]);
+    expect(find.byKey(const ValueKey('home-carousel-prev')), findsNothing);
+    expect(find.byKey(const ValueKey('home-carousel-next')), findsNothing);
+    await tester.pump(const Duration(seconds: 12));
+    expect(find.text('Loop One'), findsOneWidget);
+    expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final kind in [
     PointerDeviceKind.mouse,
     PointerDeviceKind.trackpad,
@@ -434,7 +540,7 @@ void main() {
       expect(blurMaskFinder, findsOneWidget);
       expect(
         tester.widget<BackdropFilter>(blurMaskFinder).filter,
-        ImageFilter.blur(sigmaX: 64, sigmaY: 64, tileMode: TileMode.clamp),
+        ImageFilter.blur(sigmaX: 20, sigmaY: 20, tileMode: TileMode.clamp),
       );
 
       Iterable<String> activeBackgroundUrls() => tester

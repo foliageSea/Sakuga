@@ -185,7 +185,10 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
     final initial = ref
         .read(homeCarouselIndexProvider)
         .clamp(0, widget.items.length - 1);
-    _pageController = PageController(initialPage: initial);
+    _pageController = PageController(
+      initialPage: widget.items.length > 1 ? initial + 1 : 0,
+      keepPage: false,
+    );
   }
 
   @override
@@ -203,10 +206,11 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
       final clamped = ref
           .read(homeCarouselIndexProvider)
           .clamp(0, widget.items.length - 1);
-      if (_pageController.hasClients &&
-          _pageController.page?.round() != clamped) {
-        _pageController.jumpToPage(clamped);
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_pageController.hasClients) return;
+        _pageController.jumpToPage(widget.items.length > 1 ? clamped + 1 : 0);
+        ref.read(homeCarouselIndexProvider.notifier).set(clamped);
+      });
       _syncAutoPlay();
     }
   }
@@ -232,11 +236,7 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
       if (!mounted || !_pageController.hasClients || widget.items.length <= 1) {
         return;
       }
-      final current = ref
-          .read(homeCarouselIndexProvider)
-          .clamp(0, widget.items.length - 1);
-      final next = (current + 1) % widget.items.length;
-      _goToPage(next);
+      _moveBy(1);
     });
   }
 
@@ -246,9 +246,32 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
     _syncAutoPlay();
   }
 
-  void _goToPage(int index) {
-    final target = index.clamp(0, widget.items.length - 1);
-    ref.read(homeCarouselIndexProvider.notifier).set(target);
+  int _itemIndex(int page) =>
+      widget.items.length > 1 ? (page - 1) % widget.items.length : 0;
+
+  // The extra pages repeat the last and first items. Once scrolling stops,
+  // move to the identical real page without a visible transition.
+  void _normalizePage() {
+    if (!_pageController.hasClients || widget.items.length <= 1) return;
+    final page = _pageController.page;
+    if (page == 0) {
+      _pageController.jumpToPage(widget.items.length);
+    } else if (page == widget.items.length + 1) {
+      _pageController.jumpToPage(1);
+    }
+  }
+
+  void _moveBy(int delta) {
+    if (!_pageController.hasClients ||
+        _pageController.position.isScrollingNotifier.value) {
+      return;
+    }
+    _normalizePage();
+    _goToPage(_pageController.page!.round() + delta);
+  }
+
+  void _goToPage(int page) {
+    final target = page.clamp(0, widget.items.length + 1);
     if (_pageController.hasClients) {
       if (_reduceMotion) {
         _pageController.jumpToPage(target);
@@ -266,7 +289,7 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
   }
 
   void _handlePageChanged(int index) {
-    ref.read(homeCarouselIndexProvider.notifier).set(index);
+    ref.read(homeCarouselIndexProvider.notifier).set(_itemIndex(index));
     _syncAutoPlay();
   }
 
@@ -299,15 +322,32 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
                     PointerDeviceKind.trackpad,
                   },
                 ),
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: length,
-                  onPageChanged: _handlePageChanged,
-                  itemBuilder: (context, index) => _CarouselSlide(
-                    client: widget.client,
-                    item: widget.items[index],
-                    mobile: mobile,
-                    hasMultiple: length > 1,
+                child: NotificationListener<ScrollEndNotification>(
+                  onNotification: (notification) {
+                    if (notification.depth == 0) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted &&
+                            _pageController.hasClients &&
+                            !_pageController
+                                .position
+                                .isScrollingNotifier
+                                .value) {
+                          _normalizePage();
+                        }
+                      });
+                    }
+                    return false;
+                  },
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: length > 1 ? length + 2 : 1,
+                    onPageChanged: _handlePageChanged,
+                    itemBuilder: (context, index) => _CarouselSlide(
+                      client: widget.client,
+                      item: widget.items[_itemIndex(index)],
+                      mobile: mobile,
+                      hasMultiple: length > 1,
+                    ),
                   ),
                 ),
               ),
@@ -321,14 +361,13 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
                       _CarouselArrowButton(
                         key: const ValueKey('home-carousel-prev'),
                         icon: FLucideIcons.chevronLeft,
-                        onTap: () =>
-                            _goToPage((activeIndex - 1 + length) % length),
+                        onTap: () => _moveBy(-1),
                       ),
                       const SizedBox(width: 8),
                       _CarouselArrowButton(
                         key: const ValueKey('home-carousel-next'),
                         icon: FLucideIcons.chevronRight,
-                        onTap: () => _goToPage((activeIndex + 1) % length),
+                        onTap: () => _moveBy(1),
                       ),
                     ],
                   ),
@@ -343,7 +382,7 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
                         GestureDetector(
                           key: ValueKey('home-carousel-dot-$i'),
                           behavior: HitTestBehavior.opaque,
-                          onTap: () => _goToPage(i),
+                          onTap: () => _goToPage(i + 1),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 3,
