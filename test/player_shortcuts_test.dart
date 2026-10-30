@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -168,7 +169,15 @@ void main() {
     expect(_text(tester, _backwardKey), '8');
     expect(_text(tester, _forwardKey), '21');
     final l = AppLocalizations.of(tester.element(find.byType(FDialog)));
-    expect(find.text(l.screenshotShortcut), findsOneWidget);
+    expect(find.text('S'), findsOneWidget);
+    expect(
+      find.text(
+        defaultTargetPlatform == TargetPlatform.android
+            ? l.saveScreenshotShortcut
+            : l.screenshotShortcut,
+      ),
+      findsOneWidget,
+    );
     await tester.enterText(_input(_backwardKey), '1');
     await tester.enterText(_input(_forwardKey), '600');
     expect(repository.value.seekBackwardSeconds, 8);

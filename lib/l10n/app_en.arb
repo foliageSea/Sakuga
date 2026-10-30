@@ -278,12 +278,12 @@
   "seekBackwardSeconds": "Backward seconds (←)",
   "seekForwardSeconds": "Forward seconds (→)",
   "seekSecondsInvalid": "Enter a whole number from 1 to 600.",
-  "screenshotShortcut": "S: copy screenshot with subtitles",
+  "screenshotShortcut": "Copy screenshot with subtitles",
   "copyScreenshot": "Copy screenshot with subtitles (S)",
   "screenshotCopied": "Screenshot copied to clipboard.",
   "screenshotFailed": "Could not copy the screenshot. Please try again.",
   "saveScreenshot": "Save screenshot with subtitles to gallery (S)",
-  "saveScreenshotShortcut": "S: save screenshot with subtitles to gallery",
+  "saveScreenshotShortcut": "Save screenshot with subtitles to gallery",
   "screenshotSaved": "Screenshot saved to gallery.",
   "screenshotSaveFailed": "Could not save the screenshot. Check storage permission and available space, then try again."
 }

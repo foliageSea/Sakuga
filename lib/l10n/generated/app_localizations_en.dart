@@ -853,7 +853,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seekSecondsInvalid => 'Enter a whole number from 1 to 600.';
 
   @override
-  String get screenshotShortcut => 'S: copy screenshot with subtitles';
+  String get screenshotShortcut => 'Copy screenshot with subtitles';
 
   @override
   String get copyScreenshot => 'Copy screenshot with subtitles (S)';
@@ -870,7 +870,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get saveScreenshotShortcut =>
-      'S: save screenshot with subtitles to gallery';
+      'Save screenshot with subtitles to gallery';
 
   @override
   String get screenshotSaved => 'Screenshot saved to gallery.';

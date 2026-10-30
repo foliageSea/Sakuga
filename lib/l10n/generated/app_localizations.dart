@@ -1697,7 +1697,7 @@ abstract class AppLocalizations {
   /// No description provided for @screenshotShortcut.
   ///
   /// In en, this message translates to:
-  /// **'S: copy screenshot with subtitles'**
+  /// **'Copy screenshot with subtitles'**
   String get screenshotShortcut;
 
   /// No description provided for @copyScreenshot.
@@ -1727,7 +1727,7 @@ abstract class AppLocalizations {
   /// No description provided for @saveScreenshotShortcut.
   ///
   /// In en, this message translates to:
-  /// **'S: save screenshot with subtitles to gallery'**
+  /// **'Save screenshot with subtitles to gallery'**
   String get saveScreenshotShortcut;
 
   /// No description provided for @screenshotSaved.

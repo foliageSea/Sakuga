@@ -825,7 +825,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get seekSecondsInvalid => '请输入 1 到 600 之间的整数。';
 
   @override
-  String get screenshotShortcut => 'S：复制带字幕截图';
+  String get screenshotShortcut => '复制带字幕截图';
 
   @override
   String get copyScreenshot => '复制带字幕截图（S）';
@@ -840,7 +840,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get saveScreenshot => '保存带字幕截图到相册（S）';
 
   @override
-  String get saveScreenshotShortcut => 'S：保存带字幕截图到相册';
+  String get saveScreenshotShortcut => '保存带字幕截图到相册';
 
   @override
   String get screenshotSaved => '截图已保存到相册。';
