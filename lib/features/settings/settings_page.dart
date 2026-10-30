@@ -541,7 +541,11 @@ class _SettingsTabs extends StatelessWidget {
               label: entry.label,
               child: ScrollConfiguration(
                 behavior: scrollBehavior,
-                child: entry.child,
+                // Keep adjacent cards separated while the tab pages slide.
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: entry.child,
+                ),
               ),
             ),
         ],
