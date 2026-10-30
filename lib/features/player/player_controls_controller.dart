@@ -13,9 +13,11 @@ abstract class PlayerControlsController extends ChangeNotifier {
   Duration get duration;
   Duration get buffer;
   double get volume;
+  double get rate;
   Future<void> playOrPause();
   Future<void> seek(Duration position);
   Future<void> setVolume(double volume);
+  Future<void> setRate(double rate);
 }
 
 class MediaKitControlsController extends PlayerControlsController {
@@ -27,6 +29,7 @@ class MediaKitControlsController extends PlayerControlsController {
       player.stream.duration.listen((_) => notifyListeners()),
       player.stream.buffer.listen((_) => notifyListeners()),
       player.stream.volume.listen((_) => notifyListeners()),
+      player.stream.rate.listen((_) => notifyListeners()),
     ]);
     _onBufferingChanged(player.state.buffering);
   }
@@ -92,11 +95,15 @@ class MediaKitControlsController extends PlayerControlsController {
   @override
   double get volume => player.state.volume;
   @override
+  double get rate => player.state.rate;
+  @override
   Future<void> playOrPause() => player.playOrPause();
   @override
   Future<void> seek(Duration position) => player.seek(position);
   @override
   Future<void> setVolume(double volume) => player.setVolume(volume);
+  @override
+  Future<void> setRate(double rate) => player.setRate(rate);
 
   @override
   void dispose() {

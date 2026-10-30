@@ -26,7 +26,10 @@ class _Controller extends PlayerControlsController {
   Duration get buffer => Duration.zero;
   @override
   double volume = 50;
+  @override
+  double rate = 1;
   int seeks = 0;
+  Future<void>? boostGate;
   @override
   Future<void> playOrPause() async => playing = !playing;
   @override
@@ -37,6 +40,11 @@ class _Controller extends PlayerControlsController {
 
   @override
   Future<void> setVolume(double value) async => volume = value;
+  @override
+  Future<void> setRate(double value) async {
+    if (value == 2) await boostGate;
+    rate = value;
+  }
 }
 
 void main() {
@@ -46,6 +54,7 @@ void main() {
     VoidCallback? onTap,
     Future<void> Function()? onFullscreen,
     ValueChanged<bool>? onInteraction,
+    bool enabled = true,
   }) async {
     final theme = createAppTheme(
       const AppSettings(),
@@ -66,12 +75,118 @@ void main() {
         ),
         home: PlayerGestureSurface(
           controller: controller,
+          enabled: enabled,
           onTap: onTap ?? () {},
           onToggleFullscreen: onFullscreen ?? () async {},
           onInteractionChanged: onInteraction ?? (_) {},
         ),
       ),
     );
+  }
+
+  testWidgets(
+    'Android hold boosts to 2x and release restores the original rate',
+    (tester) async {
+      final controller = _Controller()..rate = 1.25;
+      final interactions = <bool>[];
+      var taps = 0;
+      await pumpSurface(
+        tester,
+        controller,
+        onTap: () => taps++,
+        onInteraction: interactions.add,
+      );
+      final hold = await tester.startGesture(const Offset(400, 300));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
+      expect(controller.rate, 2);
+      expect(find.text('2×'), findsOneWidget);
+      await hold.up();
+      await tester.pump();
+      expect(controller.rate, 1.25);
+      expect(find.text('2×'), findsNothing);
+      expect(interactions.last, isFalse);
+      expect(taps, 0);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets('release restores speed after a delayed boost write', (
+    tester,
+  ) async {
+    final gate = Completer<void>();
+    final controller = _Controller()..boostGate = gate.future;
+    await pumpSurface(tester, controller);
+    final hold = await tester.startGesture(const Offset(400, 300));
+    await tester.pump(const Duration(milliseconds: 600));
+    await hold.up();
+    gate.complete();
+    await tester.pump();
+    expect(controller.rate, 1);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('desktop hold does not change playback speed', (tester) async {
+    final controller = _Controller();
+    await pumpSurface(tester, controller);
+    final hold = await tester.startGesture(const Offset(400, 300));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
+    expect(controller.rate, 1);
+    await hold.up();
+    await tester.pump(const Duration(seconds: 1));
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  for (final interruption in [
+    'cancel',
+    'dispose',
+    'background',
+    'disable',
+    'replace',
+  ]) {
+    testWidgets('Android hold restores rate on $interruption', (tester) async {
+      final controller = _Controller()..rate = 1.5;
+      await pumpSurface(tester, controller);
+      final hold = await tester.startGesture(const Offset(400, 300));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
+      expect(controller.rate, 2);
+      switch (interruption) {
+        case 'cancel':
+          await hold.cancel();
+        case 'dispose':
+          await tester.pumpWidget(const SizedBox.shrink());
+        case 'background':
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.inactive,
+          );
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+        case 'disable':
+          await pumpSurface(tester, controller, enabled: false);
+        case 'replace':
+          await pumpSurface(tester, _Controller());
+      }
+      await tester.pump();
+      expect(controller.rate, 1.5);
+      if (interruption != 'cancel') await hold.up();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+  }
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.macOS]) {
+    testWidgets('hold does not accelerate paused playback on $platform', (
+      tester,
+    ) async {
+      final controller = _Controller()..playing = false;
+      await pumpSurface(tester, controller);
+      final hold = await tester.startGesture(const Offset(400, 300));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
+      expect(controller.rate, 1);
+      expect(controller.playing, isFalse);
+      await hold.up();
+      await tester.pump(const Duration(seconds: 1));
+    }, variant: TargetPlatformVariant.only(platform));
   }
 
   testWidgets('Android taps toggle controls and double taps toggle playback', (

@@ -32,7 +32,8 @@ class PlayerGestureSurface extends StatefulWidget {
   State<PlayerGestureSurface> createState() => _PlayerGestureSurfaceState();
 }
 
-class _PlayerGestureSurfaceState extends State<PlayerGestureSurface> {
+class _PlayerGestureSurfaceState extends State<PlayerGestureSurface>
+    with WidgetsBindingObserver {
   _Adjustment? _adjustment;
   Duration _startPosition = Duration.zero;
   Duration _targetPosition = Duration.zero;
@@ -47,7 +48,65 @@ class _PlayerGestureSurfaceState extends State<PlayerGestureSurface> {
   bool _brightnessReady = false;
   Future<void> _writes = Future.value();
 
+  PlayerControlsController? _boostController;
+  double? _originalRate;
+  Future<void> _rateWrites = Future.value();
+
   bool get _android => defaultTargetPlatform == TargetPlatform.android;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _cancel();
+  }
+
+  void _writeRate(PlayerControlsController controller, double rate) {
+    // Always restore after an in-flight boost write, even after disposal.
+    _rateWrites = _rateWrites.then((_) async {
+      try {
+        await controller.setRate(rate);
+      } catch (_) {
+        if (mounted) notifyUser(context, context.l10n.playerAdjustmentError);
+      }
+    });
+  }
+
+  void _boostStart(LongPressStartDetails details) {
+    if (!widget.enabled ||
+        !widget.controller.playing ||
+        _originalRate != null) {
+      return;
+    }
+    _hudTimer?.cancel();
+    _boostController = widget.controller;
+    _originalRate = widget.controller.rate;
+    setState(() {
+      _adjustment = null;
+      _showHud = true;
+    });
+    widget.onInteractionChanged(true);
+    _writeRate(_boostController!, 2);
+  }
+
+  void _restoreRate() {
+    final controller = _boostController;
+    final rate = _originalRate;
+    _boostController = null;
+    _originalRate = null;
+    if (controller != null && rate != null) _writeRate(controller, rate);
+  }
+
+  void _boostEnd() {
+    if (_originalRate == null) return;
+    _restoreRate();
+    setState(() => _showHud = false);
+    widget.onInteractionChanged(false);
+  }
 
   @override
   void didUpdateWidget(PlayerGestureSurface oldWidget) {
@@ -175,6 +234,7 @@ class _PlayerGestureSurfaceState extends State<PlayerGestureSurface> {
   }
 
   void _cancel() {
+    _restoreRate();
     _generation++;
     _hudTimer?.cancel();
     setState(() {
@@ -199,6 +259,8 @@ class _PlayerGestureSurfaceState extends State<PlayerGestureSurface> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _restoreRate();
     _generation++;
     _hudTimer?.cancel();
     // Await any in-flight write so the restore is always the final operation.
@@ -236,6 +298,9 @@ class _PlayerGestureSurfaceState extends State<PlayerGestureSurface> {
           PointerDeviceKind.touch,
           PointerDeviceKind.stylus,
         },
+        onLongPressStart: _android ? _boostStart : null,
+        onLongPressEnd: _android ? (_) => _boostEnd() : null,
+        onLongPressCancel: _android ? _boostEnd : null,
         onHorizontalDragStart: _android ? _seekStart : null,
         onHorizontalDragUpdate: _android ? _seekUpdate : null,
         onHorizontalDragEnd: _android ? _seekEnd : null,
@@ -293,6 +358,7 @@ class _PlayerGestureSurfaceState extends State<PlayerGestureSurface> {
   );
 
   String _hudText(BuildContext context) {
+    if (_originalRate != null) return '2×';
     if (_adjustment == _Adjustment.seek) {
       final delta = (_targetPosition - _startPosition).inSeconds;
       return '${_time(_targetPosition)} / ${_time(widget.controller.duration)}'

@@ -570,6 +570,8 @@ class _ControlsController extends PlayerControlsController {
   Duration buffer = const Duration(seconds: 90);
   @override
   double volume = 80;
+  @override
+  double rate = 1;
 
   @override
   Future<void> playOrPause() async {
@@ -586,6 +588,12 @@ class _ControlsController extends PlayerControlsController {
   @override
   Future<void> setVolume(double value) async {
     volume = value;
+    notifyListeners();
+  }
+
+  @override
+  Future<void> setRate(double value) async {
+    rate = value;
     notifyListeners();
   }
 }
