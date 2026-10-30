@@ -14,7 +14,7 @@ final resumeItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   final pending = await ref
       .watch(playbackProgressRepositoryProvider)
       .tryLoadAll(serverId: library.client.server.id, userId: library.userId);
-  if (pending.isEmpty) return serverItems;
+  if (pending.isEmpty) return groupResumeItems(serverItems);
 
   final byId = {for (final item in serverItems) item.id: item};
   for (final entry in pending.entries) {
@@ -40,8 +40,30 @@ final resumeItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
       // Keep the server-provided row usable if one pending item cannot load.
     }
   }
-  return byId.values.toList();
+  return groupResumeItems(byId.values);
 });
+
+/// Keeps the most recently watched episode per season. Resume items arrive
+/// from the server in descending playback-date order.
+List<MediaItem> groupResumeItems(Iterable<MediaItem> items) {
+  final seasons = <Object>{};
+  return items.where((item) {
+    if (!item.isEpisode) return true;
+    final seriesId = item.seriesId;
+    final seasonNumber = item.parentIndexNumber;
+    final seasonId = item.seasonId;
+    final Object? key;
+    if (seriesId != null && seriesId.isNotEmpty && seasonNumber != null) {
+      key = (seriesId, seasonNumber);
+    } else if (seasonId != null && seasonId.isNotEmpty) {
+      key = seasonId;
+    } else {
+      // Missing season metadata must not hide unrelated episodes.
+      key = null;
+    }
+    return key == null || seasons.add(key);
+  }).toList();
+}
 
 final latestItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   ref,
