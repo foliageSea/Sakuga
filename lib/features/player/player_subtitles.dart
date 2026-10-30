@@ -117,6 +117,7 @@ Future<void> showSubtitleStyleDialog(BuildContext context) => showFDialog<void>(
   context: context,
   useRootNavigator: true,
   useSafeArea: true,
+  routeStyle: .delta(barrierFilter: () => null),
   builder: (context, style, animation) => FDialog(
     animation: animation,
     builder: (context, style) => const _SubtitleStyleSettings(),

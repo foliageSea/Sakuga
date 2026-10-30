@@ -117,7 +117,7 @@ void main() {
       expect(repository.value.subtitleBackgroundOpacity, 0.25);
       expect(repository.value.subtitleVerticalPosition, 0.2);
 
-      await tester.tap(find.text('Close'));
+      await tester.tap(find.bySemanticsLabel('Close'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
