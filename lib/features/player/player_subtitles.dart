@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 
 import '../../core/settings/settings.dart';
 import '../../shared/localization.dart';
+import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import 'player_slider.dart';
 
@@ -175,23 +176,11 @@ class _SubtitleStyleSettingsState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l.subtitleStyle,
-                  style: context.theme.typography.body.lg,
-                ),
-              ),
-              FButton.icon(
-                variant: .ghost,
-                onPress: () => Navigator.of(context).pop(),
-                semanticsLabel: l.close,
-                child: const Icon(FLucideIcons.x, size: 18),
-              ),
-            ],
+          Text(
+            l.subtitleStyle,
+            style: context.theme.dialogStyle.titleTextStyle,
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
           Text('${l.fontSize} · ${_fontSize.round()}'),
           const SizedBox(height: 8),
           PlayerSlider(
@@ -221,6 +210,17 @@ class _SubtitleStyleSettingsState
             value: _verticalPosition,
             onChange: (value) => setState(() => _verticalPosition = value),
             onEnd: (_) => _save(),
+          ),
+          const SizedBox(height: 20),
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: FButton(
+              builder: responsiveButtonContent,
+              mainAxisSize: MainAxisSize.min,
+              variant: .outline,
+              onPress: () => Navigator.of(context).pop(),
+              child: Text(l.close),
+            ),
           ),
         ],
       ),

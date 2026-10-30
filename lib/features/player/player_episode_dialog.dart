@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 
 import '../../data/media_server/media_models.dart';
 import '../../shared/localization.dart';
+import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import '../detail/detail_providers.dart';
 
@@ -28,26 +29,17 @@ Future<void> showPlayerEpisodeDialog(
       builder: (context, style) => SizedBox(
         height: math.min(520, MediaQuery.sizeOf(context).height * 0.7),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      context.l10n.selectEpisode,
-                      style: context.theme.typography.body.lg,
-                    ),
-                  ),
-                  FButton.icon(
-                    variant: .ghost,
-                    onPress: () => Navigator.of(context).pop(),
-                    semanticsLabel: context.l10n.close,
-                    child: const Icon(FLucideIcons.x, size: 18),
-                  ),
-                ],
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  context.l10n.selectEpisode,
+                  style: style.titleTextStyle,
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
               Expanded(
                 child: Consumer(
                   builder: (context, ref, _) {
@@ -83,6 +75,17 @@ Future<void> showPlayerEpisodeDialog(
                             ),
                     );
                   },
+                ),
+              ),
+              const SizedBox(height: 20),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: FButton(
+                  builder: responsiveButtonContent,
+                  mainAxisSize: MainAxisSize.min,
+                  variant: .outline,
+                  onPress: () => Navigator.of(context).pop(),
+                  child: Text(context.l10n.close),
                 ),
               ),
             ],
