@@ -835,4 +835,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get screenshotFailed => '截图复制失败，请重试。';
+
+  @override
+  String get saveScreenshot => '保存带字幕截图到相册（S）';
+
+  @override
+  String get saveScreenshotShortcut => 'S：保存带字幕截图到相册';
+
+  @override
+  String get screenshotSaved => '截图已保存到相册。';
+
+  @override
+  String get screenshotSaveFailed => '截图保存失败，请检查存储权限和可用空间后重试。';
 }

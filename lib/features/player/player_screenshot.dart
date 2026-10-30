@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/platform/image_clipboard.dart';
+import '../../core/platform/image_gallery.dart';
 import '../../shared/localization.dart';
 import '../../shared/widgets.dart';
 
@@ -20,7 +23,7 @@ class PlayerScreenshotSurface extends StatefulWidget {
 
   final Future<Uint8List?> Function() captureFrame;
   final Widget subtitles;
-  final Widget Function(BuildContext context, Future<void> Function() copy)
+  final Widget Function(BuildContext context, Future<void> Function() capture)
   controlsBuilder;
 
   @override
@@ -32,9 +35,10 @@ class _PlayerScreenshotSurfaceState extends State<PlayerScreenshotSurface> {
   final _subtitleKey = GlobalKey();
   bool _capturing = false;
 
-  Future<void> _copyScreenshot() async {
+  Future<void> _captureScreenshot() async {
     if (_capturing) return;
     _capturing = true;
+    final saveToGallery = defaultTargetPlatform == TargetPlatform.android;
     ui.Image? subtitles;
     try {
       // The video is a native texture; capture it through the player instead of
@@ -61,10 +65,28 @@ class _PlayerScreenshotSurfaceState extends State<PlayerScreenshotSurface> {
         viewport: viewport,
       );
       if (!mounted) return;
-      await ImageClipboard.writePng(png);
-      if (mounted) notifyUser(context, context.l10n.screenshotCopied);
+      if (saveToGallery) {
+        await ImageGallery.savePng(png);
+      } else {
+        await ImageClipboard.writePng(png);
+      }
+      if (mounted) {
+        notifyUser(
+          context,
+          saveToGallery
+              ? context.l10n.screenshotSaved
+              : context.l10n.screenshotCopied,
+        );
+      }
     } catch (_) {
-      if (mounted) notifyUser(context, context.l10n.screenshotFailed);
+      if (mounted) {
+        notifyUser(
+          context,
+          saveToGallery
+              ? context.l10n.screenshotSaveFailed
+              : context.l10n.screenshotFailed,
+        );
+      }
     } finally {
       subtitles?.dispose();
       _capturing = false;
@@ -76,7 +98,7 @@ class _PlayerScreenshotSurfaceState extends State<PlayerScreenshotSurface> {
     fit: StackFit.expand,
     children: [
       RepaintBoundary(key: _subtitleKey, child: widget.subtitles),
-      widget.controlsBuilder(context, _copyScreenshot),
+      widget.controlsBuilder(context, _captureScreenshot),
     ],
   );
 }

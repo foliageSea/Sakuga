@@ -510,7 +510,12 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
                                                     key: const ValueKey(
                                                       'player-screenshot',
                                                     ),
-                                                    label: l.copyScreenshot,
+                                                    label:
+                                                        defaultTargetPlatform ==
+                                                            TargetPlatform
+                                                                .android
+                                                        ? l.saveScreenshot
+                                                        : l.copyScreenshot,
                                                     icon: FLucideIcons.camera,
                                                     onPress: () =>
                                                         unawaited(screenshot()),

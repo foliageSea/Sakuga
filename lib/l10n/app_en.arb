@@ -281,5 +281,9 @@
   "screenshotShortcut": "S: copy screenshot with subtitles",
   "copyScreenshot": "Copy screenshot with subtitles (S)",
   "screenshotCopied": "Screenshot copied to clipboard.",
-  "screenshotFailed": "Could not copy the screenshot. Please try again."
+  "screenshotFailed": "Could not copy the screenshot. Please try again.",
+  "saveScreenshot": "Save screenshot with subtitles to gallery (S)",
+  "saveScreenshotShortcut": "S: save screenshot with subtitles to gallery",
+  "screenshotSaved": "Screenshot saved to gallery.",
+  "screenshotSaveFailed": "Could not save the screenshot. Check storage permission and available space, then try again."
 }

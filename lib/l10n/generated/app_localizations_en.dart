@@ -864,4 +864,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get screenshotFailed =>
       'Could not copy the screenshot. Please try again.';
+
+  @override
+  String get saveScreenshot => 'Save screenshot with subtitles to gallery (S)';
+
+  @override
+  String get saveScreenshotShortcut =>
+      'S: save screenshot with subtitles to gallery';
+
+  @override
+  String get screenshotSaved => 'Screenshot saved to gallery.';
+
+  @override
+  String get screenshotSaveFailed =>
+      'Could not save the screenshot. Check storage permission and available space, then try again.';
 }

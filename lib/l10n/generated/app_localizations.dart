@@ -1717,6 +1717,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not copy the screenshot. Please try again.'**
   String get screenshotFailed;
+
+  /// No description provided for @saveScreenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Save screenshot with subtitles to gallery (S)'**
+  String get saveScreenshot;
+
+  /// No description provided for @saveScreenshotShortcut.
+  ///
+  /// In en, this message translates to:
+  /// **'S: save screenshot with subtitles to gallery'**
+  String get saveScreenshotShortcut;
+
+  /// No description provided for @screenshotSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot saved to gallery.'**
+  String get screenshotSaved;
+
+  /// No description provided for @screenshotSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the screenshot. Check storage permission and available space, then try again.'**
+  String get screenshotSaveFailed;
 }
 
 class _AppLocalizationsDelegate

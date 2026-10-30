@@ -281,5 +281,9 @@
   "screenshotShortcut": "S：复制带字幕截图",
   "copyScreenshot": "复制带字幕截图（S）",
   "screenshotCopied": "截图已复制到剪贴板。",
-  "screenshotFailed": "截图复制失败，请重试。"
+  "screenshotFailed": "截图复制失败，请重试。",
+  "saveScreenshot": "保存带字幕截图到相册（S）",
+  "saveScreenshotShortcut": "S：保存带字幕截图到相册",
+  "screenshotSaved": "截图已保存到相册。",
+  "screenshotSaveFailed": "截图保存失败，请检查存储权限和可用空间后重试。"
 }

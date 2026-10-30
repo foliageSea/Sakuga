@@ -1,5 +1,8 @@
 package com.foliage.sakuga
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -13,9 +16,69 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
     private var originalScreenBrightness: Float? = null
+    private val imageGallery by lazy { ImageGallery(applicationContext) }
+    private var pendingGallerySave: Pair<ByteArray, MethodChannel.Result>? = null
+
+    private fun savePng(bytes: ByteArray, result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT <= 28 &&
+            checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            if (pendingGallerySave != null) {
+                result.error("save_in_progress", "A storage permission request is already pending.", null)
+                return
+            }
+            pendingGallerySave = bytes to result
+            try {
+                requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), GALLERY_PERMISSION_REQUEST)
+            } catch (error: Exception) {
+                pendingGallerySave = null
+                result.error("permission_denied", error.message, null)
+            }
+        } else {
+            imageGallery.savePng(bytes, result)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != GALLERY_PERMISSION_REQUEST) return
+        val pending = pendingGallerySave ?: return
+        pendingGallerySave = null
+        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            imageGallery.savePng(pending.first, pending.second)
+        } else {
+            pending.second.error("permission_denied", "Storage permission is required to save images on this Android version.", null)
+        }
+    }
+
+    override fun onDestroy() {
+        pendingGallerySave?.second?.error("permission_denied", "Activity closed before storage permission was granted.", null)
+        pendingGallerySave = null
+        imageGallery.close()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val GALLERY_PERMISSION_REQUEST = 7314
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.foliage.sakuga/image_gallery",
+        ).setMethodCallHandler { call, result ->
+            if (call.method != "savePng") {
+                result.notImplemented()
+            } else {
+                val bytes = call.arguments as? ByteArray
+                if (bytes == null || bytes.isEmpty()) {
+                    result.error("invalid_png", "Expected PNG image bytes.", null)
+                } else {
+                    savePng(bytes, result)
+                }
+            }
+        }
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.foliage.sakuga/window_brightness",

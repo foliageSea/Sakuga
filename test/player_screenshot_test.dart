@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,7 @@ import 'package:sakuga/features/player/player_subtitles.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
 
 const _channel = MethodChannel('com.foliage.sakuga/image_clipboard');
+const _galleryChannel = MethodChannel('com.foliage.sakuga/image_gallery');
 
 Future<Uint8List> _videoFrame() async {
   final recorder = ui.PictureRecorder();
@@ -95,95 +97,117 @@ void main() {
     });
   });
 
-  for (final fail in [false, true]) {
-    testWidgets('screenshot clipboard flow, failure=$fail', (tester) async {
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetDevicePixelRatio);
-      Uint8List? written;
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(_channel, (call) async {
-            expect(call.method, 'writePng');
-            if (fail) throw PlatformException(code: 'clipboard_failed');
-            written = call.arguments as Uint8List;
-            return null;
-          });
-      addTearDown(
-        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(_channel, null),
-      );
-      final frame = await tester.runAsync(_videoFrame);
-      late Future<void> Function() copy;
-      var captures = 0;
-      final theme = createAppTheme(
-        const AppSettings(),
-        brightness: Brightness.dark,
-        touch: false,
-      );
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            ...FLocalizations.localizationsDelegates,
-          ],
-          builder: (context, child) => FTheme(
-            data: theme,
-            child: FToaster(child: child!),
-          ),
-          home: Center(
-            child: SizedBox(
-              width: 200,
-              height: 200,
-              child: PlayerScreenshotSurface(
-                captureFrame: () async {
-                  captures++;
-                  return frame;
-                },
-                subtitles: const Align(
-                  alignment: Alignment.bottomCenter,
-                  child: SubtitleCaption(
-                    text: 'Caption',
-                    fontSize: 16,
-                    backgroundOpacity: 0.5,
+  for (final platform in [TargetPlatform.macOS, TargetPlatform.android]) {
+    for (final fail in [false, true]) {
+      testWidgets('screenshot flow on $platform, failure=$fail', (
+        tester,
+      ) async {
+        debugDefaultTargetPlatformOverride = platform;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        final gallery = platform == TargetPlatform.android;
+        final channel = gallery ? _galleryChannel : _channel;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetDevicePixelRatio);
+        Uint8List? written;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              expect(call.method, gallery ? 'savePng' : 'writePng');
+              if (fail) throw PlatformException(code: 'clipboard_failed');
+              written = call.arguments as Uint8List;
+              return null;
+            });
+        addTearDown(
+          () => TestDefaultBinaryMessengerBinding
+              .instance
+              .defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null),
+        );
+        final frame = await tester.runAsync(_videoFrame);
+        late Future<void> Function() copy;
+        var captures = 0;
+        final theme = createAppTheme(
+          const AppSettings(),
+          brightness: Brightness.dark,
+          touch: false,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('en'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              ...FLocalizations.localizationsDelegates,
+            ],
+            builder: (context, child) => FTheme(
+              data: theme,
+              child: FToaster(child: child!),
+            ),
+            home: Center(
+              child: SizedBox(
+                width: 200,
+                height: 200,
+                child: PlayerScreenshotSurface(
+                  captureFrame: () async {
+                    captures++;
+                    return frame;
+                  },
+                  subtitles: const Align(
+                    alignment: Alignment.bottomCenter,
+                    child: SubtitleCaption(
+                      text: 'Caption',
+                      fontSize: 16,
+                      backgroundOpacity: 0.5,
+                    ),
                   ),
+                  controlsBuilder: (context, action) {
+                    copy = action;
+                    return const ColoredBox(color: Color(0xFF00FF00));
+                  },
                 ),
-                controlsBuilder: (context, action) {
-                  copy = action;
-                  return const ColoredBox(color: Color(0xFF00FF00));
-                },
               ),
             ),
           ),
-        ),
-      );
-      // Pump the frame that the capture waits for, then await real image work.
-      late Future<void> capturing;
-      await tester.runAsync(() async {
-        capturing = copy();
-        final duplicate = copy();
-        await tester.pump();
-        await Future.wait([capturing, duplicate]);
-      });
-      await tester.pump();
-      expect(captures, 1);
-      if (fail) {
-        expect(written, isNull);
-        expect(
-          find.text('Could not copy the screenshot. Please try again.'),
-          findsOneWidget,
         );
-      } else {
-        expect(written, isNotNull);
+        // Pump the frame that the capture waits for, then await real image work.
+        late Future<void> capturing;
         await tester.runAsync(() async {
-          final data = await _pixels(written!);
-          // Green controls cover the widget but are outside the subtitle capture.
-          expect(data.getUint32((75 * 200 + 100) * 4), 0xFF0000FF);
+          capturing = copy();
+          final duplicate = copy();
+          await tester.pump();
+          await Future.wait([capturing, duplicate]);
         });
-        expect(find.text('Screenshot copied to clipboard.'), findsOneWidget);
-      }
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    });
+        await tester.pump();
+        expect(captures, 1);
+        if (fail) {
+          expect(written, isNull);
+          expect(
+            find.text(
+              gallery
+                  ? 'Could not save the screenshot. Check storage permission and available space, then try again.'
+                  : 'Could not copy the screenshot. Please try again.',
+            ),
+            findsOneWidget,
+          );
+        } else {
+          expect(written, isNotNull);
+          await tester.runAsync(() async {
+            final data = await _pixels(written!);
+            // Green controls cover the widget but are outside the subtitle capture.
+            expect(data.getUint32((75 * 200 + 100) * 4), 0xFF0000FF);
+          });
+          expect(
+            find.text(
+              gallery
+                  ? 'Screenshot saved to gallery.'
+                  : 'Screenshot copied to clipboard.',
+            ),
+            findsOneWidget,
+          );
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        debugDefaultTargetPlatformOverride = null;
+      });
+    }
   }
 }
