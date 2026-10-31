@@ -356,7 +356,7 @@ class AppShell extends ConsumerWidget {
                                                           ? 'home-refresh'
                                                           : 'library-refresh',
                                                     ),
-                                                    variant: .outline,
+                                                    variant: .ghost,
                                                     size: .sm,
                                                     semanticsLabel: l.refresh,
                                                     onPress: () {

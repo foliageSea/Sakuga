@@ -58,7 +58,7 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
               ),
               FButton.icon(
                 key: const ValueKey('add-server'),
-                variant: .outline,
+                variant: .ghost,
                 onPress: _switchingServerId != null
                     ? null
                     : () => _showEditor(context, ref),

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
@@ -35,14 +36,33 @@ class PlayerSubtitles extends ConsumerWidget {
                 (constraints.maxWidth * constraints.maxHeight / (1920 * 1080))
                     .clamp(0.0, 1.0),
               );
-              return SubtitlePlacement(
-                position: settings.subtitleVerticalPosition,
-                child: SubtitleCaption(
-                  text: text,
-                  fontSize: settings.subtitleFontSize,
-                  backgroundOpacity: settings.subtitleBackgroundOpacity,
-                  textScaler: TextScaler.linear(scale),
-                ),
+              return StreamBuilder<VideoParams>(
+                stream: player.stream.videoParams,
+                initialData: player.state.videoParams,
+                builder: (context, snapshot) {
+                  final params = snapshot.data;
+                  final width = params?.dw ?? params?.w;
+                  final height = params?.dh ?? params?.h;
+                  var aspect = params?.aspect;
+                  if (aspect == null || !aspect.isFinite || aspect <= 0) {
+                    aspect = width != null && height != null && height > 0
+                        ? width / height
+                        : null;
+                  }
+                  if ((params?.rotate ?? 0) % 180 != 0 && aspect != null) {
+                    aspect = 1 / aspect;
+                  }
+                  return SubtitlePlacement(
+                    position: settings.subtitleVerticalPosition,
+                    videoAspectRatio: aspect,
+                    child: SubtitleCaption(
+                      text: text,
+                      fontSize: settings.subtitleFontSize,
+                      backgroundOpacity: settings.subtitleBackgroundOpacity,
+                      textScaler: TextScaler.linear(scale),
+                    ),
+                  );
+                },
               );
             },
           );
@@ -56,22 +76,51 @@ class SubtitlePlacement extends StatelessWidget {
   const SubtitlePlacement({
     required this.position,
     required this.child,
+    this.videoAspectRatio,
     super.key,
   });
 
   final double position;
   final Widget child;
+  final double? videoAspectRatio;
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    minimum: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-    child: ClipRect(
-      child: Align(
-        alignment: Alignment(0, position.clamp(0, 1) * 2 - 1),
-        child: child,
+  Widget build(BuildContext context) {
+    final placement = SafeArea(
+      minimum: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      child: ClipRect(
+        child: Align(
+          alignment: Alignment(0, position.clamp(0, 1) * 2 - 1),
+          child: child,
+        ),
       ),
-    ),
-  );
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final aspect = videoAspectRatio;
+        if (defaultTargetPlatform != TargetPlatform.android ||
+            constraints.maxHeight <= constraints.maxWidth ||
+            aspect == null ||
+            !aspect.isFinite ||
+            aspect <= 0) {
+          return placement;
+        }
+        // In portrait, anchor subtitles to the video instead of the tall
+        // letterboxed player viewport. Keep the saved position as a fraction.
+        final videoHeight = math.min(
+          constraints.maxHeight,
+          constraints.maxWidth / aspect,
+        );
+        return Center(
+          child: SizedBox(
+            height: videoHeight,
+            width: double.infinity,
+            child: placement,
+          ),
+        );
+      },
+    );
+  }
 }
 
 class SubtitleCaption extends StatelessWidget {

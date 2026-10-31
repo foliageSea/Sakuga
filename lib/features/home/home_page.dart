@@ -35,7 +35,7 @@ class HomePage extends ConsumerWidget {
         hideTitleOnMobile: true,
         action: FButton.icon(
           key: const ValueKey('home-refresh'),
-          variant: .outline,
+          variant: .ghost,
           size: .sm,
           semanticsLabel: l.refresh,
           onPress: () => refreshHome(ref),

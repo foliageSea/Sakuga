@@ -237,7 +237,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     ),
                     FButton.icon(
                       key: const ValueKey('library-refresh'),
-                      variant: .outline,
+                      variant: .ghost,
                       size: .sm,
                       semanticsLabel: l.refresh,
                       onPress: () => ref.invalidate(libraryViewsProvider),

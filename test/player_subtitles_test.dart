@@ -141,6 +141,95 @@ void main() {
     },
   );
 
+  for (final aspect in [16 / 9, 4 / 3, 9 / 16]) {
+    testWidgets(
+      'Android portrait subtitles follow video bounds for aspect $aspect',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        for (final position in [
+          0.0,
+          0.5,
+          const AppSettings().subtitleVerticalPosition,
+          1.0,
+        ]) {
+          await tester.pumpWidget(
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: MediaQuery(
+                data: const MediaQueryData(),
+                child: SubtitlePlacement(
+                  position: position,
+                  videoAspectRatio: aspect,
+                  child: const SizedBox(
+                    key: ValueKey('caption'),
+                    width: 200,
+                    height: 30,
+                  ),
+                ),
+              ),
+            ),
+          );
+          final rect = tester.getRect(find.byKey(const ValueKey('caption')));
+          final height = 390 / aspect;
+          final top = (844 - height) / 2;
+          expect(rect.top, greaterThanOrEqualTo(top));
+          expect(rect.bottom, lessThanOrEqualTo(top + height));
+          expect(rect.center.dx, 195);
+          if (position == const AppSettings().subtitleVerticalPosition) {
+            expect(rect.bottom, greaterThan(top + height * 0.75));
+          }
+        }
+        // Rotation returns to the landscape placement rules.
+        tester.view.physicalSize = const Size(844, 390);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.byKey(const ValueKey('caption'))).bottom,
+          378,
+        );
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
+  }
+
+  for (final aspect in [null, 0.0, double.nan, double.infinity]) {
+    testWidgets(
+      'missing or invalid video aspect $aspect keeps safe portrait subtitles',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: MediaQuery(
+              data: const MediaQueryData(),
+              child: SubtitlePlacement(
+                position: 1,
+                videoAspectRatio: aspect,
+                child: const SizedBox(
+                  key: ValueKey('caption'),
+                  width: 200,
+                  height: 30,
+                ),
+              ),
+            ),
+          ),
+        );
+        expect(
+          tester.getRect(find.byKey(const ValueKey('caption'))).bottom,
+          832,
+        );
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
+  }
+
   testWidgets('subtitle positions remain within the safe viewport', (
     tester,
   ) async {
