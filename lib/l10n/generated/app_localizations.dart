@@ -266,6 +266,18 @@ abstract class AppLocalizations {
   /// **'Watched'**
   String get libraryWatched;
 
+  /// No description provided for @markAsPlayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as played'**
+  String get markAsPlayed;
+
+  /// No description provided for @markAsUnplayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as unplayed'**
+  String get markAsUnplayed;
+
   /// No description provided for @libraryDuration.
   ///
   /// In en, this message translates to:

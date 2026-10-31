@@ -209,6 +209,20 @@ class JellyfinClient implements MediaServerClient {
     failed: failed,
   );
 
+  @override
+  Future<void> setPlayed(
+    String userId,
+    String itemId, {
+    required bool played,
+  }) async {
+    final path = '/Users/$userId/PlayedItems/$itemId';
+    if (played) {
+      await _dio.post<void>(path);
+    } else {
+      await _dio.delete<void>(path);
+    }
+  }
+
   /// Persists resume progress for an explicit user. Session playback reports
   /// cannot infer a user when the client authenticates with an API key.
   @override
@@ -488,22 +502,17 @@ class JellyfinClient implements MediaServerClient {
     return _mapper.item(response.data ?? const {});
   }
 
-  /// Items the user has started but not finished, most recent first.
+  /// Uses Jellyfin's default resume list and preserves its ordering.
   @override
   Future<List<MediaItem>> resume(String userId, {int limit = 12}) async {
     final response = await _dio.get<Map<String, dynamic>>(
-      '/Items',
+      '/Users/$userId/Items/Resume',
       queryParameters: {
-        'userId': userId,
-        'recursive': true,
-        'filters': 'IsResumable',
-        'includeItemTypes': 'Movie,Episode',
-        'sortBy': 'DatePlayed',
-        'sortOrder': 'Descending',
+        'limit': limit,
         'fields': _itemFields,
         'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,
-        'limit': limit,
+        'mediaTypes': 'Video',
       },
     );
     return _parseItems(response.data);

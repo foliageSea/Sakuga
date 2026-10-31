@@ -117,6 +117,7 @@ class MediaPosterCard extends StatefulWidget {
     this.framed = true,
     this.textAlign = TextAlign.start,
     this.showRating = false,
+    this.posterAction,
     super.key,
   }) : assert(onTap != null || onPosterTap != null);
 
@@ -148,6 +149,9 @@ class MediaPosterCard extends StatefulWidget {
 
   /// Whether to overlay a valid community rating on the poster.
   final bool showRating;
+
+  /// An optional action inside the bottom-right corner of the artwork.
+  final Widget? posterAction;
 
   @override
   State<MediaPosterCard> createState() => _MediaPosterCardState();
@@ -254,51 +258,70 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
                 children: [
                   AspectRatio(
                     aspectRatio: widget.aspectRatio ?? 2 / 3,
-                    child: PosterHero(
-                      tag: widget.heroTag,
-                      borderRadius: theme.style.borderRadius.md,
-                      child: ratingLabel != null
-                          ? Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                image,
-                                Positioned(
-                                  left: 0,
-                                  right: 0,
-                                  bottom: 0,
-                                  child: DecoratedBox(
-                                    decoration: const BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Color(0x00000000),
-                                          Color(0xB3000000),
-                                        ],
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        PosterHero(
+                          tag: widget.heroTag,
+                          borderRadius: theme.style.borderRadius.md,
+                          child: ratingLabel != null
+                              ? Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    image,
+                                    Positioned(
+                                      left: 0,
+                                      right: 0,
+                                      bottom: 0,
+                                      child: DecoratedBox(
+                                        decoration: const BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              Color(0x00000000),
+                                              Color(0xB3000000),
+                                            ],
+                                          ),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                            10,
+                                            24,
+                                            10,
+                                            8,
+                                          ),
+                                          child: Text(
+                                            ratingLabel,
+                                            textAlign: TextAlign.right,
+                                            style: theme.typography.body.sm
+                                                .copyWith(
+                                                  color: const Color(
+                                                    0xFFE2BB6A,
+                                                  ),
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        10,
-                                        24,
-                                        10,
-                                        8,
-                                      ),
-                                      child: Text(
-                                        ratingLabel,
-                                        textAlign: TextAlign.right,
-                                        style: theme.typography.body.sm
-                                            .copyWith(
-                                              color: const Color(0xFFE2BB6A),
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : image,
+                                  ],
+                                )
+                              : image,
+                        ),
+                        if (widget.posterAction case final action?)
+                          Positioned(
+                            right: 6,
+                            bottom: 6,
+                            child: GestureDetector(
+                              // A disabled action must not fall through to play.
+                              behavior: HitTestBehavior.opaque,
+                              excludeFromSemantics: true,
+                              onTap: () {},
+                              child: action,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   if (watched != null && watched > 0) ...[

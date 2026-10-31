@@ -1,76 +1,93 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sakuga/data/media_server/media_models.dart';
+import 'package:sakuga/data/media_server/server_profile.dart';
 import 'package:sakuga/features/home/home_providers.dart';
+import 'package:sakuga/features/library/library_providers.dart';
+import 'package:sakuga/features/player/playback_progress_repository.dart';
 
-MediaItem episode(
-  String id, {
-  String? series = 'series',
-  String? season,
-  int? seasonNumber = 1,
-  int? number,
-}) => MediaItem(
-  id: id,
-  name: id,
-  type: MediaType.episode,
-  seriesId: series,
-  seasonId: season,
-  parentIndexNumber: seasonNumber,
-  indexNumber: number,
-);
+import 'fakes.dart';
+
+class _Client extends FakeMediaServerClient {
+  _Client()
+    : super(
+        server: const ServerProfile(
+          id: 'server',
+          name: 'Server',
+          baseUrl: 'https://media.test',
+          apiKey: 'key',
+        ),
+      );
+
+  List<MediaItem> result = [
+    for (final id in ['episode-4', 'episode-5'])
+      MediaItem(
+        id: id,
+        name: id,
+        type: MediaType.episode,
+        seriesId: 'series',
+        seasonId: 'season',
+        parentIndexNumber: 1,
+      ),
+    const MediaItem(id: 'movie', name: 'Movie', type: MediaType.movie),
+  ];
+  int calls = 0;
+
+  @override
+  Future<List<MediaItem>> resume(String userId, {int limit = 12}) async {
+    expect(userId, 'user');
+    calls++;
+    return result;
+  }
+}
+
+class _Progress extends Fake implements PlaybackProgressRepository {
+  @override
+  Future<Map<String, int>> loadAll({
+    required String serverId,
+    required String userId,
+  }) {
+    fail('The default resume list must not be modified by local progress');
+  }
+}
 
 void main() {
-  test('keeps the most recently watched episode, even when rewatching', () {
-    final recent = episode('recent', number: 2);
-    final older = episode('older', number: 20);
-    expect(groupResumeItems([recent, older]), [recent]);
+  test('home preserves Jellyfin resume entries and server ordering', () async {
+    final client = _Client();
+    final container = ProviderContainer(
+      overrides: [
+        libraryViewsProvider.overrideWith(
+          (ref) async =>
+              LibraryData(client: client, userId: 'user', views: const []),
+        ),
+        playbackProgressRepositoryProvider.overrideWithValue(_Progress()),
+      ],
+    );
+    addTearDown(container.dispose);
+    final items = await container.read(resumeItemsProvider.future);
+    expect(items, same(client.result));
+    expect(items.map((item) => item.id), ['episode-4', 'episode-5', 'movie']);
+    expect(client.calls, 1);
   });
 
-  test('preserves different series, seasons, movies and their ordering', () {
-    final recent = episode('recent', season: 'season-1');
-    final movie = const MediaItem(
-      id: 'movie',
-      name: 'Movie',
-      type: MediaType.movie,
-    );
-    final otherSeason = episode('season-2', seasonNumber: 2);
-    final otherSeries = episode('other-series', series: 'other');
-    final special = episode('special', seasonNumber: 0);
-    final items = [recent, movie, otherSeason, otherSeries, special];
-    expect(
-      groupResumeItems([...items, episode('older', season: 'season-1')]),
-      items,
-    );
-  });
-
-  test('falls back to season ID when series or season number is missing', () {
-    final recent = episode(
-      'recent',
-      series: null,
-      season: 'season-1',
-      seasonNumber: null,
-    );
-    final older = episode(
-      'older',
-      series: null,
-      season: 'season-1',
-      seasonNumber: null,
-    );
-    final other = episode(
-      'other',
-      series: null,
-      season: 'season-2',
-      seasonNumber: null,
-    );
-    expect(groupResumeItems([recent, older, other]), [recent, other]);
-  });
-
-  test('retains episodes with incomplete season metadata', () {
-    final items = [
-      episode('unknown-1', seasonNumber: null),
-      episode('unknown-2', seasonNumber: null),
-      episode('empty-ids', series: '', season: '', seasonNumber: null),
-    ];
-    expect(groupResumeItems(items), items);
-    expect(groupResumeItems([]), isEmpty);
-  });
+  test(
+    'refresh fetches updated native resume list including an empty result',
+    () async {
+      final client = _Client();
+      final container = ProviderContainer(
+        overrides: [
+          libraryViewsProvider.overrideWith(
+            (ref) async =>
+                LibraryData(client: client, userId: 'user', views: const []),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(resumeItemsProvider.future);
+      client.result = [];
+      container.invalidate(resumeItemsProvider);
+      expect(await container.read(resumeItemsProvider.future), isEmpty);
+      expect(client.calls, 2);
+    },
+  );
 }

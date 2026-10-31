@@ -16,6 +16,7 @@ import '../../shared/poster_background.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import '../detail/detail_page.dart';
+import '../detail/played_status_button.dart';
 import '../library/library_providers.dart';
 import '../player/player_route.dart';
 import 'home_providers.dart';
@@ -80,6 +81,17 @@ class HomePage extends ConsumerWidget {
                       client: data.client,
                       title: l.continueWatching,
                       compact: true,
+                      posterAction: (item) => PlayedStatusButton(
+                        key: ValueKey((
+                          data.client.server,
+                          data.userId,
+                          item.id,
+                        )),
+                        client: data.client,
+                        userId: data.userId,
+                        item: item,
+                        iconOnly: true,
+                      ),
                       items: ref.watch(resumeItemsProvider),
                       onRetry: () => ref.invalidate(resumeItemsProvider),
                       onTap: (item, posterUrl) =>
@@ -676,6 +688,7 @@ class _MediaSection extends StatelessWidget {
     required this.onRetry,
     required this.onTap,
     this.compact = false,
+    this.posterAction,
   });
 
   final MediaServerClient client;
@@ -684,6 +697,7 @@ class _MediaSection extends StatelessWidget {
   final VoidCallback onRetry;
   final void Function(MediaItem item, String? posterUrl) onTap;
   final bool compact;
+  final Widget Function(MediaItem item)? posterAction;
 
   @override
   Widget build(BuildContext context) {
@@ -731,6 +745,7 @@ class _MediaSection extends StatelessWidget {
                                 client: client,
                                 item: item,
                                 progress: item.progressFraction,
+                                posterAction: posterAction?.call(item),
                                 aspectRatio: compact
                                     ? 16 / 9
                                     : (landscape

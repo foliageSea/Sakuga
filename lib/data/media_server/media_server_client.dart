@@ -61,6 +61,7 @@ abstract interface class MediaServerClient {
     required bool failed,
     double volume = 100,
   });
+  Future<void> setPlayed(String userId, String itemId, {required bool played});
   Future<void> updatePlaybackPosition(
     String userId,
     String itemId, {

@@ -907,7 +907,7 @@ void main() {
       final blur = tester.widget<BackdropFilter>(blurMaskFinder);
       expect(
         blur.filter,
-        ImageFilter.blur(sigmaX: 64, sigmaY: 64, tileMode: TileMode.clamp),
+        ImageFilter.blur(sigmaX: 20, sigmaY: 20, tileMode: TileMode.clamp),
       );
 
       final bgImage = tester.widget<CachedNetworkImage>(

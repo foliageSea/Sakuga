@@ -28,6 +28,8 @@
   "libraryProgress": "Progress",
   "libraryUnwatched": "Unwatched",
   "libraryWatched": "Watched",
+  "markAsPlayed": "Mark as played",
+  "markAsUnplayed": "Mark as unplayed",
   "libraryDuration": "{count} min",
   "@libraryDuration": { "placeholders": { "count": { "type": "int" } } },
   "libraryYear": "Year",

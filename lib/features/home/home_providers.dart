@@ -4,7 +4,6 @@ import '../../data/media_server/media_models.dart';
 import '../../data/media_server/server_repository.dart';
 import '../../shared/poster_background.dart';
 import '../library/library_providers.dart';
-import '../player/playback_progress_repository.dart';
 
 void refreshHome(WidgetRef ref) {
   ref.invalidate(libraryViewsProvider);
@@ -17,60 +16,8 @@ final resumeItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   ref,
 ) async {
   final library = await ref.watch(libraryViewsProvider.future);
-  final serverItems = await library.client.resume(library.userId);
-  final pending = await ref
-      .watch(playbackProgressRepositoryProvider)
-      .tryLoadAll(serverId: library.client.server.id, userId: library.userId);
-  if (pending.isEmpty) return groupResumeItems(serverItems);
-
-  final byId = {for (final item in serverItems) item.id: item};
-  for (final entry in pending.entries) {
-    if (entry.value <= 0) {
-      byId.remove(entry.key);
-      continue;
-    }
-    final item = byId[entry.key];
-    if (item != null) {
-      byId[entry.key] = item.withPlaybackPosition(
-        Duration(microseconds: entry.value ~/ 10),
-      );
-      continue;
-    }
-    try {
-      final fetched = await library.client.item(library.userId, entry.key);
-      if (fetched.id.isNotEmpty) {
-        byId[entry.key] = fetched.withPlaybackPosition(
-          Duration(microseconds: entry.value ~/ 10),
-        );
-      }
-    } catch (_) {
-      // Keep the server-provided row usable if one pending item cannot load.
-    }
-  }
-  return groupResumeItems(byId.values);
+  return library.client.resume(library.userId);
 });
-
-/// Keeps the most recently watched episode per season. Resume items arrive
-/// from the server in descending playback-date order.
-List<MediaItem> groupResumeItems(Iterable<MediaItem> items) {
-  final seasons = <Object>{};
-  return items.where((item) {
-    if (!item.isEpisode) return true;
-    final seriesId = item.seriesId;
-    final seasonNumber = item.parentIndexNumber;
-    final seasonId = item.seasonId;
-    final Object? key;
-    if (seriesId != null && seriesId.isNotEmpty && seasonNumber != null) {
-      key = (seriesId, seasonNumber);
-    } else if (seasonId != null && seasonId.isNotEmpty) {
-      key = seasonId;
-    } else {
-      // Missing season metadata must not hide unrelated episodes.
-      key = null;
-    }
-    return key == null || seasons.add(key);
-  }).toList();
-}
 
 final latestItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   ref,

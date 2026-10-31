@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -13,6 +14,7 @@ import 'package:sakuga/app/router.dart';
 import 'package:sakuga/app/shell.dart';
 import 'package:sakuga/app/theme.dart';
 import 'package:sakuga/core/settings/settings.dart';
+import 'package:sakuga/core/app_exception.dart';
 import 'package:sakuga/core/window/desktop_window.dart';
 import 'package:sakuga/data/media_server/media_models.dart';
 import 'package:sakuga/data/media_server/server_profile.dart';
@@ -21,6 +23,8 @@ import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/home/home_page.dart';
 import 'package:sakuga/features/home/home_providers.dart';
 import 'package:sakuga/features/library/library_providers.dart';
+import 'package:sakuga/features/player/playback_progress_repository.dart';
+import 'package:sakuga/shared/media_widgets.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
 import 'package:sakuga/shared/widgets.dart';
 
@@ -58,6 +62,9 @@ Future<void> pumpHome(
   List<MediaItem>? carousel,
   List<MediaItem>? resume,
   List<MediaItem>? latest,
+  FakeMediaServerClient? client,
+  Future<List<MediaItem>> Function()? loadResume,
+  PlaybackProgressRepository? progress,
   Size size = const Size(1280, 1200),
 }) async {
   tester.view.devicePixelRatio = 1;
@@ -85,10 +92,12 @@ Future<void> pumpHome(
   final servers = MemoryServerRepository()..items = [_server];
   final container = ProviderContainer(
     overrides: [
+      if (progress != null)
+        playbackProgressRepositoryProvider.overrideWithValue(progress),
       serverRepositoryProvider.overrideWithValue(servers),
       libraryViewsProvider.overrideWith(
         (ref) async => LibraryData(
-          client: FakeMediaServerClient(server: _server),
+          client: client ?? FakeMediaServerClient(server: _server),
           userId: 'user-1',
           views: const [],
         ),
@@ -97,7 +106,9 @@ Future<void> pumpHome(
         (ref) async => carousel ?? const <MediaItem>[],
       ),
       resumeItemsProvider.overrideWith(
-        (ref) async => resume ?? [_resumableEpisode()],
+        (ref) async => loadResume != null
+            ? await loadResume()
+            : resume ?? [_resumableEpisode()],
       ),
       latestItemsProvider.overrideWith((ref) async => latest ?? [_series()]),
     ],
@@ -144,7 +155,139 @@ const _loopItems = [
   MediaItem(id: 'loop-3', name: 'Loop Three', type: MediaType.movie),
 ];
 
+class _PlayedClient extends FakeMediaServerClient {
+  _PlayedClient() : super(server: _server);
+  final calls = <(String, String, bool)>[];
+  bool played = false;
+  Object? error;
+  Completer<void>? pending;
+
+  @override
+  Future<void> setPlayed(
+    String userId,
+    String itemId, {
+    required bool played,
+  }) async {
+    calls.add((userId, itemId, played));
+    if (error != null) throw error!;
+    await pending?.future;
+    this.played = played;
+  }
+
+  Future<List<MediaItem>> resumeItems() async =>
+      played ? [] : [_resumableEpisode()];
+}
+
+class _NoProgress extends Fake implements PlaybackProgressRepository {
+  @override
+  Future<int?> load({
+    required String serverId,
+    required String userId,
+    required String itemId,
+  }) async => null;
+}
+
 void main() {
+  for (final width in [390.0, 1280.0]) {
+    testWidgets(
+      'resume poster ghost action marks played without navigating at $width',
+      (tester) async {
+        final client = _PlayedClient();
+        await pumpHome(
+          tester,
+          client: client,
+          loadResume: client.resumeItems,
+          progress: _NoProgress(),
+          size: Size(width, 1200),
+        );
+        final button = find.byKey(const ValueKey('played-status-episode-1'));
+        expect(button, findsOneWidget);
+        expect(tester.widget<FButton>(button).variant, FButtonVariant.ghost);
+        expect(find.bySemanticsLabel('Pilot: Mark as played'), findsOneWidget);
+        final card = find.ancestor(
+          of: button,
+          matching: find.byType(MediaPosterCard),
+        );
+        final poster = find.descendant(
+          of: card,
+          matching: find.byType(PosterHero),
+        );
+        final bounds = tester.getRect(poster);
+        final action = tester.getRect(button);
+        expect(bounds.right - action.right, closeTo(6, 0.1));
+        expect(bounds.bottom - action.bottom, closeTo(6, 0.1));
+        expect(bounds.contains(action.center), isTrue);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(client.calls, [('user-1', 'episode-1', true)]);
+        expect(find.text('Resumed Series'), findsNothing);
+        expect(find.text('player:episode-1'), findsNothing);
+        expect(find.byType(HomePage), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'busy resume poster button ignores repeated taps without starting playback',
+    (tester) async {
+      final client = _PlayedClient()..pending = Completer<void>();
+      await pumpHome(
+        tester,
+        client: client,
+        loadResume: client.resumeItems,
+        progress: _NoProgress(),
+      );
+      final button = find.byKey(const ValueKey('played-status-episode-1'));
+      await tester.tap(button);
+      await tester.pump();
+      expect(tester.widget<FButton>(button).onPress, isNull);
+      expect(
+        find.descendant(of: button, matching: find.byType(FCircularProgress)),
+        findsOneWidget,
+      );
+      await tester.tap(button);
+      await tester.pump();
+      expect(client.calls.length, 1);
+      expect(find.byType(HomePage), findsOneWidget);
+      client.pending!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Resumed Series'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('failed poster action keeps the card and can retry', (
+    tester,
+  ) async {
+    final client = _PlayedClient()
+      ..error = const AppException(FailureKind.server);
+    await pumpHome(
+      tester,
+      client: client,
+      loadResume: client.resumeItems,
+      progress: _NoProgress(),
+    );
+    final button = find.byKey(const ValueKey('played-status-episode-1'));
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(find.text('Resumed Series'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: button,
+        matching: find.byIcon(FLucideIcons.circleAlert),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(HomePage), findsOneWidget);
+    client.error = null;
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(client.calls.length, 2);
+    expect(find.text('Resumed Series'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final width in [390.0, 1280.0]) {
     testWidgets('home refresh reloads all sections at width $width', (
       tester,

@@ -94,6 +94,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get libraryWatched => 'Watched';
 
   @override
+  String get markAsPlayed => 'Mark as played';
+
+  @override
+  String get markAsUnplayed => 'Mark as unplayed';
+
+  @override
   String libraryDuration(int count) {
     return '$count min';
   }

@@ -94,6 +94,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libraryWatched => '已观看';
 
   @override
+  String get markAsPlayed => '标为已播放';
+
+  @override
+  String get markAsUnplayed => '标为未播放';
+
+  @override
   String libraryDuration(int count) {
     return '$count 分钟';
   }
