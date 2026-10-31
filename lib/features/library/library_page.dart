@@ -714,79 +714,80 @@ class _LibraryListItem extends StatelessWidget {
     final theme = context.theme;
     final metadata = _libraryMetadata(context, item);
     final rating = item.communityRating;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.colors.border)),
-      ),
-      child: FButton(
-        variant: .ghost,
-        builder: responsiveButtonContent,
-        onPress: () => onTap(item, item.poster?.url()),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 56,
-              height: 84,
-              child: PosterHero(
-                tag: posterHeroTag(item.id),
-                borderRadius: theme.style.borderRadius.md,
-                child: MediaImage(
-                  url: item.poster?.url(),
-                  headers: item.poster?.headers ?? const {},
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Surface(
+        padding: 0,
+        translucent: true,
+        child: FButton(
+          variant: .ghost,
+          builder: responsiveButtonContent,
+          onPress: () => onTap(item, item.poster?.url()),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 56,
+                height: 84,
+                child: PosterHero(
+                  tag: posterHeroTag(item.id),
+                  borderRadius: theme.style.borderRadius.md,
+                  child: MediaImage(
+                    url: item.poster?.url(),
+                    headers: item.poster?.headers ?? const {},
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.displayTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.typography.body.sm.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (metadata != null) ...[
-                    const SizedBox(height: 6),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      metadata,
+                      item.displayTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.typography.body.xs.copyWith(
-                        color: theme.colors.mutedForeground,
+                      style: theme.typography.body.sm.copyWith(
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
+                    if (metadata != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        metadata,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.typography.body.xs.copyWith(
+                          color: theme.colors.mutedForeground,
+                        ),
+                      ),
+                    ],
+                    if (item.progressFraction != null) ...[
+                      const SizedBox(height: 8),
+                      MediaProgressBar(value: item.progressFraction!),
+                    ],
                   ],
-                  if (item.progressFraction != null) ...[
-                    const SizedBox(height: 8),
-                    MediaProgressBar(value: item.progressFraction!),
-                  ],
-                ],
-              ),
-            ),
-            if (rating != null && rating.isFinite && rating > 0) ...[
-              const SizedBox(width: 12),
-              Text(
-                rating.toStringAsFixed(1),
-                style: theme.typography.body.sm.copyWith(
-                  color: const Color(0xFFE2BB6A),
-                  fontWeight: FontWeight.w600,
                 ),
               ),
+              if (rating != null && rating.isFinite && rating > 0) ...[
+                const SizedBox(width: 12),
+                Text(
+                  rating.toStringAsFixed(1),
+                  style: theme.typography.body.sm.copyWith(
+                    color: const Color(0xFFE2BB6A),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              if (item.played) ...[
+                const SizedBox(width: 12),
+                Icon(
+                  FLucideIcons.circleCheck,
+                  size: 18,
+                  color: theme.colors.mutedForeground,
+                ),
+              ],
             ],
-            if (item.played) ...[
-              const SizedBox(width: 12),
-              Icon(
-                FLucideIcons.circleCheck,
-                size: 18,
-                color: theme.colors.mutedForeground,
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
