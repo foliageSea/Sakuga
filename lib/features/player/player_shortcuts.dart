@@ -14,6 +14,7 @@ Future<void> showPlayerShortcutDialog(BuildContext context) =>
       useRootNavigator: true,
       useSafeArea: true,
       builder: (context, style, animation) => FDialog(
+        constraints: const BoxConstraints.tightFor(width: 480),
         animation: animation,
         builder: (context, style) => const _PlayerShortcutSettings(),
       ),
@@ -95,7 +96,10 @@ class _PlayerShortcutSettingsState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(l.playbackShortcuts, style: context.theme.typography.body.lg),
+          Text(
+            l.playbackShortcuts,
+            style: context.theme.dialogStyle.titleTextStyle,
+          ),
           const SizedBox(height: 20),
           FTextField(
             key: const ValueKey('seek-backward-seconds'),

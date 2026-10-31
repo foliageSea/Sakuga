@@ -120,6 +120,7 @@ Future<void> showSubtitleStyleDialog(BuildContext context) => showFDialog<void>(
   useSafeArea: true,
   routeStyle: .delta(barrierFilter: () => null),
   builder: (context, style, animation) => FDialog(
+    constraints: const BoxConstraints.tightFor(width: 480),
     animation: animation,
     builder: (context, style) => const _SubtitleStyleSettings(),
   ),

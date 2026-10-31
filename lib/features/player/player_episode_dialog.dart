@@ -25,6 +25,7 @@ Future<void> showPlayerEpisodeDialog(
     useSafeArea: true,
     builder: (context, style, animation) => FDialog(
       key: const ValueKey('player-episodes-dialog'),
+      constraints: const BoxConstraints.tightFor(width: 480),
       animation: animation,
       builder: (context, style) => SizedBox(
         height: math.min(520, MediaQuery.sizeOf(context).height * 0.7),
