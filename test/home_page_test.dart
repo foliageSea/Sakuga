@@ -340,7 +340,7 @@ void main() {
               .state<ScrollableState>(
                 find
                     .descendant(
-                      of: find.byType(ListView),
+                      of: find.byType(CustomScrollView),
                       matching: find.byType(Scrollable),
                     )
                     .first,
@@ -369,6 +369,30 @@ void main() {
     );
   }
 
+  testWidgets('home content scrolls below the fixed title and refresh button', (
+    tester,
+  ) async {
+    await pumpHome(tester, size: const Size(1280, 500), carousel: _loopItems);
+    final heading = find.text('Home');
+    final refresh = find.byKey(const ValueKey('home-refresh'));
+    final viewport = find.byType(CustomScrollView);
+    final headingRect = tester.getRect(heading);
+    final refreshRect = tester.getRect(refresh);
+    final carousel = find.byKey(const ValueKey('home-poster-carousel'));
+    final carouselTop = tester.getTopLeft(carousel).dy;
+    expect(
+      tester.getRect(viewport).top,
+      greaterThanOrEqualTo(refreshRect.bottom),
+    );
+    await tester.drag(viewport, const Offset(0, -180));
+    await tester.pump();
+    expect(tester.getTopLeft(carousel).dy, lessThan(carouselTop));
+    expect(tester.getRect(heading), headingRect);
+    expect(tester.getRect(refresh), refreshRect);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('vertical wheel scroll over media rows scrolls the home page', (
     tester,
   ) async {
@@ -377,7 +401,7 @@ void main() {
         .state<ScrollableState>(
           find
               .descendant(
-                of: find.byType(ListView),
+                of: find.byType(CustomScrollView),
                 matching: find.byType(Scrollable),
               )
               .first,

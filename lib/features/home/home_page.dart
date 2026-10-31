@@ -27,83 +27,86 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     final servers = ref.watch(serversProvider);
-    final content = PageContent(
+    final content = PageScrollView(
       transparent: true,
-      children: [
-        PageHeading(
-          l.home,
-          hideTitleOnMobile: true,
-          action: FButton.icon(
-            key: const ValueKey('home-refresh'),
-            variant: .outline,
-            size: .sm,
-            semanticsLabel: l.refresh,
-            onPress: () => refreshHome(ref),
-            child: const Icon(FLucideIcons.refreshCw),
-          ),
+      headerGap: 0,
+      header: PageHeading(
+        l.home,
+        hideTitleOnMobile: true,
+        action: FButton.icon(
+          key: const ValueKey('home-refresh'),
+          variant: .outline,
+          size: .sm,
+          semanticsLabel: l.refresh,
+          onPress: () => refreshHome(ref),
+          child: const Icon(FLucideIcons.refreshCw),
         ),
-        servers.when(
-          data: (items) {
-            if (items.isEmpty) {
-              return EmptyNotice(
-                l.noServer,
-                child: FButton(
-                  builder: responsiveButtonContent,
-                  mainAxisSize: MainAxisSize.min,
-                  onPress: () => context.go('/settings?tab=servers'),
-                  child: Text(l.addServer),
+      ),
+      slivers: [
+        SliverToBoxAdapter(
+          child: servers.when(
+            data: (items) {
+              if (items.isEmpty) {
+                return EmptyNotice(
+                  l.noServer,
+                  child: FButton(
+                    builder: responsiveButtonContent,
+                    mainAxisSize: MainAxisSize.min,
+                    onPress: () => context.go('/settings?tab=servers'),
+                    child: Text(l.addServer),
+                  ),
+                );
+              }
+              if (!ref
+                  .watch(mediaServerClientProvider(items.first))
+                  .isConfigured) {
+                return EmptyNotice(
+                  l.noApiKey,
+                  child: FButton(
+                    builder: responsiveButtonContent,
+                    mainAxisSize: MainAxisSize.min,
+                    onPress: () => context.go('/settings?tab=servers'),
+                    child: Text(l.servers),
+                  ),
+                );
+              }
+              final library = ref.watch(libraryViewsProvider);
+              return library.when(
+                data: (data) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _PosterCarouselSection(client: data.client),
+                    _MediaSection(
+                      client: data.client,
+                      title: l.continueWatching,
+                      compact: true,
+                      items: ref.watch(resumeItemsProvider),
+                      onRetry: () => ref.invalidate(resumeItemsProvider),
+                      onTap: (item, posterUrl) =>
+                          _resume(context, item, posterUrl),
+                    ),
+                    _MediaSection(
+                      client: data.client,
+                      title: l.recentlyAdded,
+                      items: ref.watch(latestItemsProvider),
+                      onRetry: () => ref.invalidate(latestItemsProvider),
+                      onTap: (item, posterUrl) =>
+                          _openDetail(context, item, posterUrl),
+                    ),
+                  ],
+                ),
+                loading: () => const LoadingNotice(),
+                error: (error, _) => ErrorNotice(
+                  error,
+                  onRetry: () => ref.invalidate(libraryViewsProvider),
                 ),
               );
-            }
-            if (!ref
-                .watch(mediaServerClientProvider(items.first))
-                .isConfigured) {
-              return EmptyNotice(
-                l.noApiKey,
-                child: FButton(
-                  builder: responsiveButtonContent,
-                  mainAxisSize: MainAxisSize.min,
-                  onPress: () => context.go('/settings?tab=servers'),
-                  child: Text(l.servers),
-                ),
-              );
-            }
-            final library = ref.watch(libraryViewsProvider);
-            return library.when(
-              data: (data) => Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _PosterCarouselSection(client: data.client),
-                  _MediaSection(
-                    client: data.client,
-                    title: l.continueWatching,
-                    compact: true,
-                    items: ref.watch(resumeItemsProvider),
-                    onRetry: () => ref.invalidate(resumeItemsProvider),
-                    onTap: (item, posterUrl) =>
-                        _resume(context, item, posterUrl),
-                  ),
-                  _MediaSection(
-                    client: data.client,
-                    title: l.recentlyAdded,
-                    items: ref.watch(latestItemsProvider),
-                    onRetry: () => ref.invalidate(latestItemsProvider),
-                    onTap: (item, posterUrl) =>
-                        _openDetail(context, item, posterUrl),
-                  ),
-                ],
-              ),
-              loading: () => const LoadingNotice(),
-              error: (error, _) => ErrorNotice(
-                error,
-                onRetry: () => ref.invalidate(libraryViewsProvider),
-              ),
-            );
-          },
-          loading: () => const LoadingNotice(),
-          error: (error, _) => ErrorNotice(
-            error,
-            onRetry: () => ref.invalidate(serversProvider),
+            },
+            loading: () => const LoadingNotice(),
+            error: (error, _) => ErrorNotice(
+              error,
+              onRetry: () => ref.invalidate(serversProvider),
+            ),
           ),
         ),
       ],
