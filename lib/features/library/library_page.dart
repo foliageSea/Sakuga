@@ -246,19 +246,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   ],
                 ),
               ),
-            FTextField(
-              key: const ValueKey('library-search'),
-              control: .managed(controller: _searchController),
-              hint: l.searchHint,
-              textInputAction: TextInputAction.search,
-              clearable: (value) => value.text.isNotEmpty,
-              onSubmit: _search,
-              // Blend into the page instead of drawing a filled card behind the
-              // input; the default forui style fills it with the card color.
-              style: .delta(color: .delta([.base(const Color(0x00000000))])),
-            ),
             if (viewChips != null) ...[
-              const SizedBox(height: 16),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final count = query == null
@@ -296,6 +284,23 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   );
                 },
               ),
+            ],
+            if (viewChips == null)
+              Align(alignment: Alignment.centerRight, child: toolbar),
+            if (_showFilters) ...[
+              const SizedBox(height: 12),
+              FTextField(
+                key: const ValueKey('library-search'),
+                control: .managed(controller: _searchController),
+                hint: l.searchHint,
+                textInputAction: TextInputAction.search,
+                clearable: (value) => value.text.isNotEmpty,
+                onSubmit: _search,
+                // Blend into the page instead of drawing a filled card behind the
+                // input; the default forui style fills it with the card color.
+                style: .delta(color: .delta([.base(const Color(0x00000000))])),
+              ),
+              const SizedBox(height: 8),
             ],
             if (_showFilters && _searchTerm.isEmpty && query != null)
               LibraryFilterPanel(

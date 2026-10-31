@@ -456,6 +456,24 @@ void main() {
     ) async {
       final client = _SearchClient();
       await _pumpLibrary(tester, size, client: client);
+      final toggle = find.byKey(const ValueKey('library-toggle-filters'));
+      expect(find.byKey(const ValueKey('library-search')), findsNothing);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getBottomLeft(toggle).dy,
+        lessThan(
+          tester.getTopLeft(find.byKey(const ValueKey('library-search'))).dy,
+        ),
+      );
+      expect(
+        tester.getBottomLeft(find.byKey(const ValueKey('library-search'))).dy,
+        lessThan(
+          tester
+              .getTopLeft(find.byKey(const ValueKey('library-filter-panel')))
+              .dy,
+        ),
+      );
       final search = find.byKey(const ValueKey('library-search'));
 
       await tester.enterText(search, 'res');
@@ -467,6 +485,22 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1));
       await tester.pumpAndSettle();
 
+      expect(client.terms, ['result']);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(search, findsNothing);
+      expect(find.text('Series result'), findsOneWidget);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(of: search, matching: find.byType(EditableText)),
+            )
+            .controller
+            .text,
+        '  result  ',
+      );
       expect(client.terms, ['result']);
       expect(find.text('Series result'), findsOneWidget);
       expect(find.text('Series a'), findsNothing);
@@ -496,7 +530,12 @@ void main() {
   testWidgets('library search field blends into the page background', (
     tester,
   ) async {
-    await _pumpLibrary(tester, const Size(1280, 900), client: _SearchClient());
+    await _pumpLibrary(
+      tester,
+      const Size(1280, 900),
+      client: _SearchClient(),
+      expandFilters: true,
+    );
     final field = tester.widget<TextField>(
       find.descendant(
         of: find.byKey(const ValueKey('library-search')),
@@ -512,7 +551,12 @@ void main() {
     final client = _SearchClient()
       ..searchItems = (_) async =>
           throw const AppException(FailureKind.network);
-    await _pumpLibrary(tester, const Size(1280, 900), client: client);
+    await _pumpLibrary(
+      tester,
+      const Size(1280, 900),
+      client: client,
+      expandFilters: true,
+    );
     final search = find.byKey(const ValueKey('library-search'));
 
     await tester.enterText(search, 'missing');
@@ -538,7 +582,12 @@ void main() {
     final client = _SearchClient()
       ..searchItems = (term) async =>
           term == 'first' ? first.future : [_item('second', 0.7)];
-    await _pumpLibrary(tester, const Size(1280, 900), client: client);
+    await _pumpLibrary(
+      tester,
+      const Size(1280, 900),
+      client: client,
+      expandFilters: true,
+    );
     final search = find.byKey(const ValueKey('library-search'));
 
     await tester.enterText(search, 'first');
@@ -567,6 +616,8 @@ void main() {
       client: _SearchClient(),
       loadItem: (id) async => _item(id, 0.7),
     );
+    await tester.tap(find.byKey(const ValueKey('library-toggle-filters')));
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('library-search')),
       'result',
