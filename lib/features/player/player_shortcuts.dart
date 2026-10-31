@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
@@ -117,47 +116,6 @@ class _PlayerShortcutSettingsState
             keyboardType: TextInputType.number,
             enabled: !_saving,
             error: _forwardInvalid ? Text(l.seekSecondsInvalid) : null,
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: context.theme.colors.secondary,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border(
-                    top: BorderSide(color: context.theme.colors.border),
-                    left: BorderSide(color: context.theme.colors.border),
-                    right: BorderSide(color: context.theme.colors.border),
-                    bottom: BorderSide(
-                      color: context.theme.colors.border,
-                      width: 3,
-                    ),
-                  ),
-                ),
-                child: Text(
-                  'S',
-                  style: context.theme.typography.body.sm.copyWith(
-                    color: context.theme.colors.foreground,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  defaultTargetPlatform == TargetPlatform.android
-                      ? l.saveScreenshotShortcut
-                      : l.screenshotShortcut,
-                  style: context.theme.typography.body.sm.copyWith(
-                    color: context.theme.colors.mutedForeground,
-                  ),
-                ),
-              ),
-            ],
           ),
           if (_error != null) ...[
             const SizedBox(height: 16),
