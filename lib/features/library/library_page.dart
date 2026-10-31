@@ -598,7 +598,7 @@ class _MobileMasonryGrid extends StatelessWidget {
   });
 
   static const _spacing = 12.0;
-  static const _cardChromeHeight = 55.0;
+  static const _cardChromeHeight = 75.0;
 
   final MediaServerClient client;
   final List<MediaItem> items;
@@ -614,7 +614,9 @@ class _MobileMasonryGrid extends StatelessWidget {
         final column = heights[0] <= heights[1] ? 0 : 1;
         columns[column].add(item);
         heights[column] +=
-            cardWidth / item.posterAspectRatio + _cardChromeHeight + _spacing;
+            (cardWidth - 20) / item.posterAspectRatio +
+            _cardChromeHeight +
+            _spacing;
       }
       return Row(
         key: const ValueKey('library-mobile-masonry'),
@@ -682,35 +684,16 @@ class _LibraryPoster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final metadata = _libraryMetadata(context, item);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        MediaPosterCard(
-          key: cardKey,
-          client: client,
-          item: item,
-          framed: false,
-          textAlign: TextAlign.center,
-          showRating: true,
-          aspectRatio: aspectRatio,
-          progress: item.progressFraction,
-          heroTag: posterHeroTag(item.id),
-          onPosterTap: (posterUrl) => onTap(item, posterUrl),
-        ),
-        if (metadata != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            metadata,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: context.theme.typography.body.xs.copyWith(
-              color: context.theme.colors.mutedForeground,
-            ),
-          ),
-        ],
-      ],
+    return MediaPosterCard(
+      key: cardKey,
+      client: client,
+      item: item,
+      subtitle: _libraryMetadata(context, item),
+      showRating: true,
+      aspectRatio: aspectRatio,
+      progress: item.progressFraction,
+      heroTag: posterHeroTag(item.id),
+      onPosterTap: (posterUrl) => onTap(item, posterUrl),
     );
   }
 }

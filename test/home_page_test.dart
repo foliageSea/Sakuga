@@ -588,6 +588,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final width in [390.0, 1280.0]) {
+    testWidgets('recent cards keep equal heights at width $width', (
+      tester,
+    ) async {
+      await pumpHome(
+        tester,
+        size: Size(width, 1200),
+        resume: [],
+        latest: [
+          const MediaItem(
+            id: 'in-progress',
+            name: 'In progress',
+            type: MediaType.series,
+            reportedPlayedPercentage: 42,
+          ),
+          _series(),
+          const MediaItem(
+            id: 'other-series',
+            name: 'Another series with a long title',
+            type: MediaType.series,
+          ),
+        ],
+      );
+      final cards = find.byType(MediaPosterCard);
+      expect(cards, findsNWidgets(3));
+      final firstRect = tester.getRect(cards.at(0));
+      for (var index = 1; index < 3; index++) {
+        final rect = tester.getRect(cards.at(index));
+        expect(rect.top, firstRect.top);
+        expect(rect.bottom, firstRect.bottom);
+        expect(rect.height, firstRect.height);
+      }
+      expect(find.byType(MediaProgressBar), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('recently added opens the detail page', (tester) async {
     await pumpHome(tester);
 

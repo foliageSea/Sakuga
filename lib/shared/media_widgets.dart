@@ -112,6 +112,7 @@ class MediaPosterCard extends StatefulWidget {
     this.onPosterTap,
     this.heroTag,
     this.progress,
+    this.subtitle,
     this.aspectRatio,
     this.translucent = true,
     this.framed = true,
@@ -134,6 +135,9 @@ class MediaPosterCard extends StatefulWidget {
 
   /// Watched fraction between 0 and 1, drawn as a thin bar under the poster.
   final double? progress;
+
+  /// Optional subtitle replacing the item’s default display subtitle.
+  final String? subtitle;
 
   /// Frame shape; defaults to 2:3.
   final double? aspectRatio;
@@ -179,7 +183,7 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
   Widget build(BuildContext context) {
     final theme = context.theme;
     final posterUrl = widget.item.poster?.url();
-    final subtitle = widget.item.displaySubtitle;
+    final subtitle = widget.subtitle ?? widget.item.displaySubtitle;
     final watched = widget.progress;
     final rating = widget.item.communityRating;
     final ratingLabel =

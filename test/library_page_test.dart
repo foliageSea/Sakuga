@@ -240,7 +240,7 @@ void main() {
     },
   );
 
-  testWidgets('library posters show ratings and metadata without card frames', (
+  testWidgets('library poster cards show ratings and metadata inside frames', (
     tester,
   ) async {
     await _pumpLibrary(tester, const Size(1280, 900));
@@ -251,9 +251,10 @@ void main() {
     expect(
       cards.every(
         (card) =>
-            !card.framed &&
+            card.framed &&
             card.showRating &&
-            card.textAlign == TextAlign.center,
+            card.textAlign == TextAlign.start &&
+            card.subtitle == '2023 · 12 episodes',
       ),
       isTrue,
     );
