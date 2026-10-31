@@ -13,7 +13,7 @@ import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/library/library_providers.dart';
 import 'package:sakuga/features/player/player_controls.dart';
 import 'package:sakuga/features/player/player_controls_controller.dart';
-import 'package:sakuga/features/player/player_episode_dialog.dart';
+import 'package:sakuga/features/player/player_episode_drawer.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
 
 import 'fakes.dart';
@@ -335,7 +335,8 @@ void main() {
       expect(selected, ['second']);
       await tester.tap(find.byKey(menuKey));
       await tester.pumpAndSettle();
-      expect(find.text('S01E01 · first'), findsOneWidget);
+      expect(find.text('first'), findsOneWidget);
+      expect(find.text('S01E01'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('player-episode-second')));
       await tester.pumpAndSettle();
       expect(selected, ['second', 'second']);
@@ -368,7 +369,7 @@ void main() {
   );
 
   testWidgets(
-    'episode dialog locates current item after loading and on every opening',
+    'episode drawer locates current item after loading and on every opening',
     (tester) async {
       final loading = Completer<List<MediaItem>>();
       final currentId = ValueNotifier<String?>('episode-90');
@@ -400,7 +401,7 @@ void main() {
             home: Builder(
               builder: (context) => Center(
                 child: FButton(
-                  onPress: () => showPlayerEpisodeDialog(
+                  onPress: () => showPlayerEpisodeDrawer(
                     context,
                     userId: 'user',
                     seriesId: 'series',
@@ -431,7 +432,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(selected, ['episode-91']);
       expect(
-        find.byKey(const ValueKey('player-episodes-dialog')),
+        find.byKey(const ValueKey('player-episodes-drawer')),
         findsNothing,
       );
 

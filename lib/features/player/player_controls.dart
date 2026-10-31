@@ -14,7 +14,7 @@ import '../../shared/widgets.dart';
 import '../detail/detail_providers.dart';
 import '../library/library_providers.dart';
 import 'player_button_style.dart';
-import 'player_episode_dialog.dart';
+import 'player_episode_drawer.dart';
 import 'player_gestures.dart';
 import 'player_subtitles.dart';
 import 'player_controls_controller.dart';
@@ -721,7 +721,7 @@ class PlayerEpisodeButton extends StatelessWidget {
               onPress: busy
                   ? null
                   : () => unawaited(
-                      showPlayerEpisodeDialog(
+                      showPlayerEpisodeDrawer(
                         context,
                         userId: userId,
                         seriesId: seriesId,
