@@ -657,7 +657,13 @@ class JellyfinClient implements MediaServerClient {
   List<SubtitleSource> _subtitleSources(Map<String, dynamic> source) =>
       (source['MediaStreams'] as List? ?? const [])
           .whereType<Map<String, dynamic>>()
-          .where((stream) => stream['Type'] == 'Subtitle')
+          .where(
+            (stream) =>
+                stream['Type'] == 'Subtitle' &&
+                stream['SupportsExternalStream'] != false &&
+                (stream['DeliveryMethod'] == null ||
+                    stream['DeliveryMethod'] == 'External'),
+          )
           .map((stream) {
             final deliveryUrl = stream['DeliveryUrl'] as String?;
             if (deliveryUrl == null || deliveryUrl.isEmpty) return null;
@@ -699,8 +705,10 @@ class JellyfinClient implements MediaServerClient {
       {'Format': 'ass', 'Method': 'External'},
       {'Format': 'ssa', 'Method': 'External'},
       {'Format': 'vtt', 'Method': 'External'},
-      {'Format': 'pgssub', 'Method': 'External'},
-      {'Format': 'dvdsub', 'Method': 'External'},
+      // Keep bitmap subtitles in the video container for mpv to decode,
+      // rather than requesting raw codec URLs such as Stream.dvdsub.
+      {'Format': 'pgssub', 'Method': 'Embed'},
+      {'Format': 'dvdsub', 'Method': 'Embed'},
     ],
   };
 }

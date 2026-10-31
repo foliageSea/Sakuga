@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:sakuga/app/theme.dart';
 import 'package:sakuga/core/settings/settings.dart';
@@ -13,6 +14,47 @@ import 'package:sakuga/l10n/generated/app_localizations.dart';
 import 'fakes.dart';
 
 void main() {
+  test('bitmap subtitle tracks use native rendering', () {
+    for (final codec in [
+      'dvd_subtitle',
+      'DVDSUB',
+      'hdmv_pgs_subtitle',
+      'pgssub',
+    ]) {
+      final track = SubtitleTrack('1', null, null, codec: codec);
+      expect(usesNativeSubtitleRendering(track, []), isTrue);
+      expect(
+        usesNativeSubtitleRendering(SubtitleTrack('1', null, null), [track]),
+        isTrue,
+      );
+    }
+    expect(
+      usesNativeSubtitleRendering(
+        SubtitleTrack('2', null, null, image: true),
+        [],
+      ),
+      isTrue,
+    );
+  });
+
+  test('text subtitles and disabled tracks keep native rendering off', () {
+    for (final codec in ['ass', 'ssa', 'subrip', 'webvtt', null]) {
+      expect(
+        usesNativeSubtitleRendering(
+          SubtitleTrack('1', null, null, codec: codec),
+          [],
+        ),
+        isFalse,
+      );
+    }
+    final bitmap = SubtitleTrack('1', null, null, codec: 'dvd_subtitle');
+    expect(usesNativeSubtitleRendering(SubtitleTrack.no(), [bitmap]), isFalse);
+    expect(
+      usesNativeSubtitleRendering(SubtitleTrack.auto(), [bitmap]),
+      isFalse,
+    );
+  });
+
   test('subtitle preferences survive storage and other appearance updates', () {
     final original = const AppSettings()
         .copyWith(

@@ -12,6 +12,31 @@ import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import 'player_slider.dart';
 
+/// Bitmap subtitles have no text for the Flutter caption overlay to draw.
+bool usesNativeSubtitleRendering(
+  SubtitleTrack selected,
+  List<SubtitleTrack> available,
+) {
+  if (selected.id == 'no' || selected.id == 'auto') return false;
+  var track = selected;
+  for (final candidate in available) {
+    if (candidate.id == selected.id) {
+      track = candidate;
+      break;
+    }
+  }
+  return track.image == true ||
+      const {
+        'dvdsub',
+        'dvd_subtitle',
+        'pgssub',
+        'hdmv_pgs_subtitle',
+        'dvbsub',
+        'dvb_subtitle',
+        'xsub',
+      }.contains(track.codec?.toLowerCase());
+}
+
 class PlayerSubtitles extends ConsumerWidget {
   const PlayerSubtitles({required this.player, super.key});
 

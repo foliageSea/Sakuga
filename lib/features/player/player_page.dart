@@ -200,12 +200,18 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     );
     _subscriptions.add(
       _player.stream.tracks.listen((tracks) {
-        if (mounted) setState(() => _tracks = tracks);
+        if (mounted) {
+          setState(() => _tracks = tracks);
+          _syncSubtitleRendering();
+        }
       }),
     );
     _subscriptions.add(
       _player.stream.track.listen((track) {
-        if (mounted) setState(() => _track = track);
+        if (mounted) {
+          setState(() => _track = track);
+          _syncSubtitleRendering();
+        }
       }),
     );
     unawaited(_openMedia());
@@ -617,6 +623,35 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         notifyUser(context, context.l10n.audioTrackError);
       }
     }
+  }
+
+  Future<void> _subtitleRenderingTail = Future.value();
+
+  void _syncSubtitleRendering() {
+    final generation = _openGeneration;
+    _subtitleRenderingTail = _subtitleRenderingTail
+        .then((_) async {
+          if (!mounted || generation != _openGeneration) return;
+          var selected = _track.subtitle;
+          // media-kit keeps the auto sentinel rather than reporting mpv's
+          // chosen subtitle track, so resolve it from the native player.
+          if (selected.id == 'auto') {
+            final id = await _nativePlayer.getProperty('sid');
+            if (!mounted || generation != _openGeneration) return;
+            selected = SubtitleTrack(id, null, null);
+          }
+          final native = usesNativeSubtitleRendering(
+            selected,
+            _tracks.subtitle,
+          );
+          await _nativePlayer.setProperty(
+            'sub-visibility',
+            native ? 'yes' : 'no',
+          );
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          debugPrint('PLAYER_SUBTITLE_RENDER_ERROR $error\n$stackTrace');
+        });
   }
 
   Future<void> _setSubtitle(SubtitleTrack track) async {

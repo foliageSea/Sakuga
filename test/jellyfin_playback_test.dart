@@ -55,6 +55,56 @@ void main() {
     expect(Uri.parse(item.logo!.url()).queryParameters['format'], 'Png');
   });
 
+  test(
+    'keeps bitmap subtitles embedded and rejects unsupported extraction',
+    () async {
+      final adapter = _PlaybackAdapter({
+        'MediaSources': [
+          {
+            'Id': 'media-source',
+            'SupportsDirectPlay': true,
+            'MediaStreams': [
+              {
+                'Type': 'Subtitle',
+                'Codec': 'DVDSUB',
+                'IsExternal': false,
+                'SupportsExternalStream': false,
+                'DeliveryMethod': 'External',
+                'DeliveryUrl': '/Videos/item-1/Subtitles/2/Stream.dvdsub',
+              },
+              {
+                'Type': 'Subtitle',
+                'Codec': 'pgssub',
+                'DeliveryMethod': 'Embed',
+                'DeliveryUrl': '/Videos/item-1/Subtitles/3/Stream.pgssub',
+              },
+              {
+                'Type': 'Subtitle',
+                'Codec': 'ass',
+                'SupportsExternalStream': true,
+                'DeliveryMethod': 'External',
+                'DeliveryUrl': '/Videos/item-1/Subtitles/4/Stream.ass',
+              },
+            ],
+          },
+        ],
+      });
+      final client = JellyfinClient(server: server, dio: _dio(adapter));
+      final source = await client.playbackSource('user-1', 'item-1');
+      expect(source.subtitles, hasLength(1));
+      expect(source.subtitles.single.url, endsWith('Stream.ass'));
+      final profile = adapter.lastBody['DeviceProfile'] as Map;
+      expect(
+        profile['SubtitleProfiles'],
+        containsAll([
+          {'Format': 'dvdsub', 'Method': 'Embed'},
+          {'Format': 'pgssub', 'Method': 'Embed'},
+          {'Format': 'ass', 'Method': 'External'},
+        ]),
+      );
+    },
+  );
+
   test('negotiates a direct-play URL with auth and resume position', () async {
     final adapter = _PlaybackAdapter({
       'PlaySessionId': 'play-session',
