@@ -297,6 +297,17 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 },
               ),
             ],
+            if (_showFilters && _searchTerm.isEmpty && query != null)
+              LibraryFilterPanel(
+                key: ValueKey((
+                  data.requireValue.client.server.id,
+                  activeViewId,
+                )),
+                query: query,
+                onGenre: _selectGenre,
+                onPlayed: (value) => _updateView(() => _isPlayed = value),
+                onYear: (value) => _updateView(() => _selectedYear = value),
+              ),
           ],
         ),
         slivers: data.when(
@@ -353,16 +364,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       return [const _LibraryEmptyState()];
     }
     return [
-      if (_showFilters)
-        SliverToBoxAdapter(
-          child: LibraryFilterPanel(
-            key: ValueKey((library.client.server.id, viewId)),
-            query: _query(library, viewId),
-            onGenre: _selectGenre,
-            onPlayed: (value) => _updateView(() => _isPlayed = value),
-            onYear: (value) => _updateView(() => _selectedYear = value),
-          ),
-        ),
       SliverPadding(
         // Leave room inside the viewport for the first row's 3D hover effect.
         padding: const EdgeInsets.only(top: 24),

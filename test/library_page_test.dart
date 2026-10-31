@@ -684,6 +684,40 @@ void main() {
     },
   );
 
+  for (final listView in [false, true]) {
+    testWidgets(
+      'library filters stay fixed while ${listView ? 'list' : 'grid'} scrolls',
+      (tester) async {
+        await _pumpLibrary(tester, const Size(1000, 560), expandFilters: true);
+        if (listView) {
+          await tester.tap(find.byKey(const ValueKey('library-list-view')));
+          await tester.pumpAndSettle();
+        }
+        final filters = find.byKey(const ValueKey('library-filter-panel'));
+        final search = find.byKey(const ValueKey('library-search'));
+        final scrollView = find.byType(CustomScrollView);
+        final filterRect = tester.getRect(filters);
+        final searchRect = tester.getRect(search);
+        expect(
+          tester.getRect(scrollView).top,
+          greaterThanOrEqualTo(filterRect.bottom),
+        );
+        final scrollable = find.descendant(
+          of: scrollView,
+          matching: find.byType(Scrollable),
+        );
+        final position = tester.state<ScrollableState>(scrollable).position;
+        expect(position.maxScrollExtent, greaterThan(0));
+        await tester.drag(scrollView, const Offset(0, -180));
+        await tester.pumpAndSettle();
+        expect(position.pixels, greaterThan(0));
+        expect(tester.getRect(filters), filterRect);
+        expect(tester.getRect(search), searchRect);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('resizing the library keeps poster URLs stable for cache hits', (
     tester,
   ) async {
