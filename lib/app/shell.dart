@@ -38,13 +38,15 @@ class AppShell extends ConsumerWidget {
         : isHomeRoute || isLibraryRootRoute
         ? watchHomePosterBackground(ref)
         : null;
-    final activeServer = isLibraryRootRoute
+    final activeServer = isLibraryRootRoute || isHomeRoute
         ? ref.watch(activeServerProvider)
         : null;
     final canRefreshLibrary =
         isLibraryRootRoute &&
         activeServer != null &&
         activeServer.apiKey.isNotEmpty;
+    final canRefreshHome =
+        isHomeRoute && activeServer != null && activeServer.apiKey.isNotEmpty;
     final l = context.l10n;
     final labels = [l.home, l.library, l.settings];
     const icons = [
@@ -346,18 +348,26 @@ class AppShell extends ConsumerWidget {
                                                 ],
                                               ),
                                               suffixes: [
-                                                if (canRefreshLibrary)
+                                                if (canRefreshLibrary ||
+                                                    canRefreshHome)
                                                   FButton.icon(
-                                                    key: const ValueKey(
-                                                      'library-refresh',
+                                                    key: ValueKey(
+                                                      canRefreshHome
+                                                          ? 'home-refresh'
+                                                          : 'library-refresh',
                                                     ),
                                                     variant: .outline,
                                                     size: .sm,
                                                     semanticsLabel: l.refresh,
-                                                    onPress: () =>
+                                                    onPress: () {
+                                                      if (canRefreshHome) {
+                                                        refreshHome(ref);
+                                                      } else {
                                                         ref.invalidate(
                                                           libraryViewsProvider,
-                                                        ),
+                                                        );
+                                                      }
+                                                    },
                                                     child: const Icon(
                                                       FLucideIcons.refreshCw,
                                                     ),

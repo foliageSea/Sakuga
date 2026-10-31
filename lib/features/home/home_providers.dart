@@ -6,6 +6,13 @@ import '../../shared/poster_background.dart';
 import '../library/library_providers.dart';
 import '../player/playback_progress_repository.dart';
 
+void refreshHome(WidgetRef ref) {
+  ref.invalidate(libraryViewsProvider);
+  ref.invalidate(randomItemsProvider);
+  ref.invalidate(resumeItemsProvider);
+  ref.invalidate(latestItemsProvider);
+}
+
 final resumeItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   ref,
 ) async {

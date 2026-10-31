@@ -30,7 +30,18 @@ class HomePage extends ConsumerWidget {
     final content = PageContent(
       transparent: true,
       children: [
-        PageHeading(l.home, hideTitleOnMobile: true),
+        PageHeading(
+          l.home,
+          hideTitleOnMobile: true,
+          action: FButton.icon(
+            key: const ValueKey('home-refresh'),
+            variant: .outline,
+            size: .sm,
+            semanticsLabel: l.refresh,
+            onPress: () => refreshHome(ref),
+            child: const Icon(FLucideIcons.refreshCw),
+          ),
+        ),
         servers.when(
           data: (items) {
             if (items.isEmpty) {
