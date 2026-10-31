@@ -24,6 +24,7 @@ import 'playback_progress_repository.dart';
 import 'player_controls.dart';
 import 'player_controls_controller.dart';
 import 'player_exit.dart';
+import 'player_errors.dart';
 import 'player_subtitles.dart';
 import 'player_track_format.dart';
 import 'player_screenshot.dart';
@@ -183,6 +184,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     _subscriptions.add(
       _player.stream.error.listen((error) {
         debugPrint('PLAYER_ERROR $error');
+        if (isExternalSubtitleLoadError(
+          error,
+          _pendingSubtitles.map((subtitle) => subtitle.url),
+        )) {
+          return;
+        }
         if (mounted) {
           setState(() {
             _loading = false;
