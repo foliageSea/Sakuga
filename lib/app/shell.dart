@@ -481,24 +481,7 @@ class DesktopTitleBar extends StatelessWidget {
         children: [
           if (controller.macOS) ...[
             const SizedBox(width: 12),
-            _MacWindowButton(
-              key: const ValueKey('mac-close'),
-              label: l.close,
-              color: const Color(0xffff5f57),
-              callback: controller.close,
-            ),
-            _MacWindowButton(
-              key: const ValueKey('mac-minimize'),
-              label: l.minimize,
-              color: const Color(0xffffbd2e),
-              callback: controller.minimize,
-            ),
-            _MacWindowButton(
-              key: const ValueKey('mac-maximize'),
-              label: controller.maximized ? l.restore : l.maximize,
-              color: const Color(0xff28c840),
-              callback: controller.toggleMaximize,
-            ),
+            _MacWindowControls(controller: controller),
             const SizedBox(width: 12),
           ],
           if (onToggleCompactSidebar != null)
@@ -664,15 +647,122 @@ class _WindowButton extends StatelessWidget {
   );
 }
 
+class _MacWindowControls extends StatefulWidget {
+  const _MacWindowControls({required this.controller});
+  final DesktopWindowController controller;
+
+  @override
+  State<_MacWindowControls> createState() => _MacWindowControlsState();
+}
+
+class _MacWindowControlsState extends State<_MacWindowControls> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final controller = widget.controller;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MacWindowButton(
+            key: const ValueKey('mac-close'),
+            label: l.close,
+            color: const Color(0xffff5f57),
+            callback: controller.close,
+            glyph: _MacWindowGlyph.close,
+            hovered: _hovered,
+          ),
+          _MacWindowButton(
+            key: const ValueKey('mac-minimize'),
+            label: l.minimize,
+            color: const Color(0xffffbd2e),
+            callback: controller.minimize,
+            glyph: _MacWindowGlyph.minimize,
+            hovered: _hovered,
+          ),
+          _MacWindowButton(
+            key: const ValueKey('mac-maximize'),
+            label: controller.maximized ? l.restore : l.maximize,
+            color: const Color(0xff28c840),
+            callback: controller.toggleMaximize,
+            glyph: _MacWindowGlyph.maximize,
+            hovered: _hovered,
+            maximized: controller.maximized,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _MacWindowGlyph { close, minimize, maximize }
+
+class _MacWindowGlyphPainter extends CustomPainter {
+  const _MacWindowGlyphPainter(this.glyph, this.maximized);
+  final _MacWindowGlyph glyph;
+  final bool maximized;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 12, size.height / 12);
+    final paint = Paint()
+      ..color = const Color(0x99000000)
+      ..strokeWidth = 1.15
+      ..strokeCap = StrokeCap.round;
+    switch (glyph) {
+      case _MacWindowGlyph.close:
+        canvas.drawLine(const Offset(3.8, 3.8), const Offset(8.2, 8.2), paint);
+        canvas.drawLine(const Offset(8.2, 3.8), const Offset(3.8, 8.2), paint);
+      case _MacWindowGlyph.minimize:
+        canvas.drawLine(const Offset(3, 6), const Offset(9, 6), paint);
+      case _MacWindowGlyph.maximize:
+        final path = Path();
+        if (maximized) {
+          path.moveTo(5, 5);
+          path.lineTo(1.5, 5);
+          path.lineTo(5, 1.5);
+          path.close();
+          path.moveTo(7, 7);
+          path.lineTo(10.5, 7);
+          path.lineTo(7, 10.5);
+        } else {
+          path.moveTo(3, 3);
+          path.lineTo(7, 3);
+          path.lineTo(3, 7);
+          path.close();
+          path.moveTo(9, 9);
+          path.lineTo(5, 9);
+          path.lineTo(9, 5);
+        }
+        path.close();
+        canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_MacWindowGlyphPainter oldDelegate) =>
+      glyph != oldDelegate.glyph || maximized != oldDelegate.maximized;
+}
+
 class _MacWindowButton extends StatelessWidget {
   const _MacWindowButton({
     required this.label,
     required this.color,
     required this.callback,
+    required this.glyph,
+    required this.hovered,
+    this.maximized = false,
     super.key,
   });
   final String label;
   final Color color;
+  final _MacWindowGlyph glyph;
+  final bool hovered;
+  final bool maximized;
   final Future<void> Function() callback;
   @override
   Widget build(BuildContext context) {
@@ -710,7 +800,16 @@ class _MacWindowButton extends StatelessWidget {
             child: Center(
               child: DecoratedBox(
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                child: const SizedBox(width: 12, height: 12),
+                child: SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: hovered
+                      ? CustomPaint(
+                          key: ValueKey('mac-glyph-${glyph.name}'),
+                          painter: _MacWindowGlyphPainter(glyph, maximized),
+                        )
+                      : null,
+                ),
               ),
             ),
           ),
