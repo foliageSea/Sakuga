@@ -59,10 +59,27 @@ if [[ ! "$VERSION" =~ ^[A-Za-z0-9._-]+$ || ! "$BUILD_NUMBER" =~ ^[A-Za-z0-9._-]+
   exit 1
 fi
 
+ICON_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$INFO_PLIST")
+[[ "$ICON_NAME" == *.icns ]] || ICON_NAME="$ICON_NAME.icns"
+ICON_PATH="$APP_PATH/Contents/Resources/$ICON_NAME"
+if [[ ! -f "$ICON_PATH" ]]; then
+  printf 'Error: app icon not found: %s\n' "$ICON_PATH" >&2
+  exit 1
+fi
+SET_FILE=$(xcrun --find SetFile)
+
 OUTPUT_DIR="$ROOT_DIR/build/macos/dmg"
 mkdir -p "$OUTPUT_DIR"
 WORK_DIR=$(mktemp -d "$OUTPUT_DIR/.dmg-XXXXXX")
+MOUNT_DIR="$WORK_DIR/mount"
+MOUNTED=false
 cleanup() {
+  if [[ "$MOUNTED" == true ]]; then
+    if ! hdiutil detach "$MOUNT_DIR"; then
+      printf 'Error: could not unmount %s; keeping temporary files.\n' "$MOUNT_DIR" >&2
+      return 1
+    fi
+  fi
   # Only remove the exact temporary directory created above.
   if [[ "$WORK_DIR" == "$OUTPUT_DIR"/.dmg-* && -d "$WORK_DIR" ]]; then
     rm -rf -- "$WORK_DIR"
@@ -76,8 +93,22 @@ mkdir "$WORK_DIR/staging"
 ditto "$APP_PATH" "$WORK_DIR/staging/Sakuga.app"
 ln -s /Applications "$WORK_DIR/staging/Applications"
 DMG_NAME="Sakuga-${VERSION}+${BUILD_NUMBER}-macos-${ARCH}.dmg"
-hdiutil create -volname Sakuga -srcfolder "$WORK_DIR/staging"   -format UDZO -ov "$WORK_DIR/$DMG_NAME"
+# Set the icon on the mounted volume before compressing the final image.
+hdiutil create -volname Sakuga -srcfolder "$WORK_DIR/staging" \
+  -format UDRW "$WORK_DIR/writable.dmg"
+mkdir "$MOUNT_DIR"
+hdiutil attach "$WORK_DIR/writable.dmg" -readwrite -nobrowse \
+  -mountpoint "$MOUNT_DIR"
+MOUNTED=true
+cp "$ICON_PATH" "$MOUNT_DIR/.VolumeIcon.icns"
+"$SET_FILE" -a C "$MOUNT_DIR"
+hdiutil detach "$MOUNT_DIR"
+MOUNTED=false
+hdiutil convert "$WORK_DIR/writable.dmg" -format UDZO \
+  -o "$WORK_DIR/$DMG_NAME"
 hdiutil verify "$WORK_DIR/$DMG_NAME"
+xcrun swift "$ROOT_DIR/tool/set_macos_icon.swift" \
+  "$ICON_PATH" "$WORK_DIR/$DMG_NAME"
 # Publish only after creation and verification succeed.
 mv -f "$WORK_DIR/$DMG_NAME" "$OUTPUT_DIR/$DMG_NAME"
 printf '\nDMG created: %s\n' "$OUTPUT_DIR/$DMG_NAME"

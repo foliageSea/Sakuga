@@ -62,7 +62,7 @@ tool/build_dmg.sh
 tool/build_dmg.sh --build-name=0.1.0 --build-number=2
 ```
 
-脚本优先使用 FVM，否则使用 PATH 中的 Flutter，先构建 Release 应用，再用系统自带的 `hdiutil` 创建并校验压缩 DMG，无需安装额外打包工具。DMG 中包含 `Sakuga.app` 和 `Applications` 快捷入口，打开后拖入 Applications 即可安装。
+脚本优先使用 FVM，否则使用 PATH 中的 Flutter，先构建 Release 应用，再用系统自带的 `hdiutil` 创建并校验压缩 DMG，无需安装额外打包工具。DMG 中包含 `Sakuga.app` 和 `Applications` 快捷入口，打开后拖入 Applications 即可安装。DMG 文件及挂载后的磁盘卷均使用构建产物中的应用图标。
 
 输出目录为 `build/macos/dmg/`，文件名包含实际构建版本、构建号和架构，例如 `Sakuga-0.1.0+1-macos-arm64.dmg`；同时包含 arm64 和 x86_64 的应用使用 `universal` 后缀。构建产物已由 Git 忽略。
 
