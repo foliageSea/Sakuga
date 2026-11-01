@@ -306,7 +306,7 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
                                             Semantics(
                                               label: l.playbackPosition,
                                               child: Stack(
-                                                alignment: Alignment.center,
+                                                alignment: Alignment.centerLeft,
                                                 children: [
                                                   if (duration > 0)
                                                     Padding(
@@ -324,6 +324,9 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
                                                                     duration)
                                                                 .clamp(0, 1),
                                                         child: Container(
+                                                          key: const ValueKey(
+                                                            'player-buffer',
+                                                          ),
                                                           height: 4,
                                                           decoration: BoxDecoration(
                                                             color: const Color(

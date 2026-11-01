@@ -161,6 +161,19 @@ void main() {
       // Exercise actual pointer dragging, including FSlider's onEnd callback.
       final seek = find.byKey(const ValueKey('player-seek'));
       final bounds = tester.getRect(seek);
+      // The buffer starts at the left edge for empty, partial, and full tracks.
+      for (final seconds in [0, 30, 90, 120, 150]) {
+        controller.buffer = Duration(seconds: seconds);
+        controller.updateBuffering(false);
+        await tester.pump();
+        final buffered = tester.getRect(
+          find.byKey(const ValueKey('player-buffer')),
+        );
+        final fraction = (seconds / controller.duration.inSeconds).clamp(0, 1);
+        expect(buffered.left, closeTo(bounds.left + 6, 0.01));
+        expect(buffered.center.dy, closeTo(bounds.center.dy, 0.01));
+        expect(buffered.width, closeTo((bounds.width - 12) * fraction, 0.01));
+      }
       final drag = await tester.startGesture(
         Offset(bounds.left + bounds.width * 0.25, bounds.center.dy),
       );
