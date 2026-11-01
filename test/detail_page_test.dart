@@ -312,7 +312,7 @@ void main() {
 
   for (final size in [const Size(390, 844), const Size(1280, 1000)]) {
     testWidgets(
-      'season loading keeps the known series heading when full metadata omits it at ${size.width}',
+      'season banner omits the duplicate series heading during loading and after completion at ${size.width}',
       (tester) async {
         final seasonData = Completer<MediaItem>();
         await pumpDetailPage(
@@ -329,8 +329,8 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
         final seriesHeading = find.byKey(const ValueKey('detail-series-name'));
-        expect(seriesHeading, findsOneWidget);
-        final previewRect = tester.getRect(seriesHeading);
+        expect(seriesHeading, findsNothing);
+        expect(find.byKey(const ValueKey('detail-title')), findsOneWidget);
         seasonData.complete(
           const MediaItem(
             id: 'season-1',
@@ -341,12 +341,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(
-          seriesHeading,
-          findsOneWidget,
-          reason: 'known parent context should not disappear when omitted by the item response',
-        );
-        expect(tester.getRect(seriesHeading), previewRect);
+        expect(seriesHeading, findsNothing);
+        expect(find.byKey(const ValueKey('detail-title')), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );
@@ -439,10 +435,7 @@ void main() {
           (userId: 'user-1', seriesId: 'series-1', seasonId: 'season-1'),
         ]);
         expect(find.text('Season 1'), findsOneWidget);
-        expect(
-          find.byKey(const ValueKey('detail-series-name')),
-          findsOneWidget,
-        );
+        expect(find.byKey(const ValueKey('detail-series-name')), findsNothing);
         final episode = find.byKey(const ValueKey('detail-episode-episode-1'));
         await tester.ensureVisible(episode);
         await tester.pumpAndSettle();

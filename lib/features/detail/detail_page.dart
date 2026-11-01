@@ -602,28 +602,11 @@ class _TitleBlock extends StatelessWidget {
         ? const Color(0xCCFFFFFF)
         : theme.colors.mutedForeground;
     final background = onDark ? const Color(0x33FFFFFF) : theme.colors.muted;
-    final seriesName = item.seriesName?.trim().isNotEmpty == true
-        ? item.seriesName
-        : fallbackItem?.seriesName;
     final logo = item.logo ?? fallbackItem?.logo;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (item.type == MediaType.season &&
-            seriesName?.trim().isNotEmpty == true) ...[
-          Text(
-            seriesName!,
-            key: const ValueKey('detail-series-name'),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.typography.body.lg.copyWith(
-              color: onDark ? const Color(0xFFFFFFFF) : theme.colors.foreground,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
         if (logo != null) ...[
           SizedBox(
             width: 420,
