@@ -77,7 +77,7 @@ class _PlayedStatusButtonState extends ConsumerState<PlayedStatusButton> {
     final server = client.server;
     final userId = widget.userId;
     final itemId = widget.item.id;
-    final played = !(_played ?? widget.item.played);
+    final played = widget.iconOnly || !(_played ?? widget.item.played);
     if (played) {
       setState(() => _confirming = true);
       bool? confirmed;
@@ -197,7 +197,7 @@ class _PlayedStatusButtonState extends ConsumerState<PlayedStatusButton> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final label = (_played ?? widget.item.played)
+    final label = !widget.iconOnly && (_played ?? widget.item.played)
         ? l.markAsUnplayed
         : l.markAsPlayed;
     if (widget.iconOnly) {
@@ -223,9 +223,7 @@ class _PlayedStatusButtonState extends ConsumerState<PlayedStatusButton> {
                 : Icon(
                     _error != null
                         ? FLucideIcons.circleAlert
-                        : ((_played ?? widget.item.played)
-                              ? FLucideIcons.undo2
-                              : FLucideIcons.check),
+                        : FLucideIcons.check,
                     color: _error != null
                         ? context.theme.colors.destructive
                         : const Color(0xFFFFFFFF),

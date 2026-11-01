@@ -37,7 +37,7 @@ const _server = ServerProfile(
   apiKey: 'test-key',
 );
 
-MediaItem _resumableEpisode() => const MediaItem(
+MediaItem _resumableEpisode({bool played = false}) => MediaItem(
   id: 'episode-1',
   name: 'Pilot',
   type: MediaType.episode,
@@ -47,6 +47,7 @@ MediaItem _resumableEpisode() => const MediaItem(
   indexNumber: 1,
   parentIndexNumber: 1,
   reportedPlayedPercentage: 42.0,
+  played: played,
 );
 
 MediaItem _series() => const MediaItem(
@@ -188,6 +189,30 @@ class _NoProgress extends Fake implements PlaybackProgressRepository {
 }
 
 void main() {
+  testWidgets('already played resume items can be marked played again', (
+    tester,
+  ) async {
+    final client = _PlayedClient();
+    await pumpHome(
+      tester,
+      client: client,
+      resume: [_resumableEpisode(played: true)],
+      progress: _NoProgress(),
+    );
+    final button = find.byKey(const ValueKey('played-status-episode-1'));
+    expect(button, findsOneWidget);
+    expect(find.bySemanticsLabel('Pilot: Mark as played'), findsOneWidget);
+    expect(find.byIcon(FLucideIcons.undo2), findsNothing);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(client.calls, isEmpty);
+    await tester.tap(find.byKey(const ValueKey('played-status-confirm')));
+    await tester.pumpAndSettle();
+    expect(client.calls, [('user-1', 'episode-1', true)]);
+    expect(find.bySemanticsLabel('Pilot: Mark as played'), findsOneWidget);
+    expect(find.byIcon(FLucideIcons.undo2), findsNothing);
+  });
+
   for (final width in [390.0, 1280.0]) {
     testWidgets(
       'resume poster ghost action marks played without navigating at $width',
