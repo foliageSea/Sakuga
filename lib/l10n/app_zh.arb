@@ -3,6 +3,7 @@
   "appTitle": "Sakuga",
   "home": "首页",
   "library": "媒体库",
+  "backToLibrary": "返回媒体库",
   "search": "搜索",
   "downloads": "下载",
   "noServer": "未连接服务器",

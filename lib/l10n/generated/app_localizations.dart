@@ -116,6 +116,12 @@ abstract class AppLocalizations {
   /// **'Library'**
   String get library;
 
+  /// No description provided for @backToLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to library'**
+  String get backToLibrary;
+
   /// No description provided for @search.
   ///
   /// In en, this message translates to:

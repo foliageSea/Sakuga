@@ -232,6 +232,41 @@ Future<void> expectBackButtonPinned(
 }
 
 void main() {
+  for (final width in [390.0, 1280.0]) {
+    testWidgets('season can return directly to library at width $width', (
+      tester,
+    ) async {
+      final router = await pumpDetailPage(
+        tester,
+        item: _series,
+        size: Size(width, 1000),
+        seasons: [_season()],
+        episodes: [],
+        itemById: (id) => id == 'season-1' ? _season() : _series(),
+      );
+      expect(
+        find.byKey(const ValueKey('detail-back-to-library')),
+        findsNothing,
+      );
+      final season = find.byKey(const ValueKey('detail-season-season-1'));
+      await tester.ensureVisible(season);
+      await tester.tap(season);
+      await tester.pumpAndSettle();
+      expect(router.canPop(), isTrue);
+      final libraryButton = find.byKey(
+        const ValueKey('detail-back-to-library'),
+      );
+      expect(libraryButton.hitTestable(), findsOneWidget);
+      expect(find.bySemanticsLabel('Back to library'), findsOneWidget);
+      await tester.tap(libraryButton);
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, '/library');
+      expect(router.canPop(), isFalse);
+      expect(find.byType(DetailPage), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final size in [const Size(390, 844), const Size(1280, 1000)]) {
     testWidgets(
       'cancelling a season push restores the series scroll and poster at ${size.width}',

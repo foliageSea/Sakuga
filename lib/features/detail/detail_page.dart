@@ -153,6 +153,7 @@ class DetailPage extends ConsumerWidget {
         if (server != null && preview != null) {
           return _DetailScaffold(
             title: preview.name,
+            showLibrary: preview.type == MediaType.season,
             slivers: [
               SliverToBoxAdapter(
                 child: _Hero(
@@ -171,6 +172,7 @@ class DetailPage extends ConsumerWidget {
       },
       error: (error, _) => _DetailScaffold(
         title: preview?.name,
+        showLibrary: preview?.type == MediaType.season,
         slivers: [
           SliverToBoxAdapter(
             child: ErrorNotice(
@@ -231,6 +233,7 @@ class _DetailBody extends ConsumerWidget {
                 preview?.poster?.cacheKey;
         return _DetailScaffold(
           title: _detailItemTitle(context, value),
+          showLibrary: value.type == MediaType.season,
           slivers: [
             SliverToBoxAdapter(
               child: _Hero(
@@ -263,6 +266,7 @@ class _DetailBody extends ConsumerWidget {
       },
       loading: () => _DetailScaffold(
         title: preview?.name,
+        showLibrary: preview?.type == MediaType.season,
         slivers: [
           if (preview != null)
             SliverToBoxAdapter(
@@ -277,6 +281,7 @@ class _DetailBody extends ConsumerWidget {
       ),
       error: (error, _) => _DetailScaffold(
         title: preview?.name,
+        showLibrary: preview?.type == MediaType.season,
         slivers: [
           if (preview != null)
             SliverToBoxAdapter(
@@ -304,10 +309,15 @@ class _DetailBody extends ConsumerWidget {
 /// The detail page shell: the back bar is pinned above the scrolling content
 /// so it stays reachable in every state, including loading and errors.
 class _DetailScaffold extends StatelessWidget {
-  const _DetailScaffold({required this.slivers, this.title});
+  const _DetailScaffold({
+    required this.slivers,
+    this.title,
+    this.showLibrary = false,
+  });
 
   final List<Widget> slivers;
   final String? title;
+  final bool showLibrary;
 
   @override
   Widget build(BuildContext context) {
@@ -315,7 +325,9 @@ class _DetailScaffold extends StatelessWidget {
         isMobileLayout(context) &&
         WindowPosterBackgroundScope.hasShell(context);
     return PageScrollView(
-      header: mobileShell ? null : _BackBar(title: title),
+      header: mobileShell
+          ? null
+          : _BackBar(title: title, showLibrary: showLibrary),
       animate: false,
       transparent: true,
       slivers: slivers,
@@ -376,7 +388,19 @@ class DetailHeaderTitle extends ConsumerWidget {
               )
               .value;
     final value = item ?? spec.initialItem;
-    return _DetailTitle(value == null ? '' : _detailItemTitle(context, value));
+    return Row(
+      children: [
+        Expanded(
+          child: _DetailTitle(
+            value == null ? '' : _detailItemTitle(context, value),
+          ),
+        ),
+        if (value?.type == MediaType.season) ...[
+          const SizedBox(width: 8),
+          const _BackToLibraryButton(),
+        ],
+      ],
+    );
   }
 }
 
@@ -396,9 +420,10 @@ class _DetailTitle extends StatelessWidget {
 }
 
 class _BackBar extends StatelessWidget {
-  const _BackBar({this.title});
+  const _BackBar({this.title, this.showLibrary = false});
 
   final String? title;
+  final bool showLibrary;
 
   @override
   Widget build(BuildContext context) {
@@ -418,9 +443,31 @@ class _BackBar extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: _DetailTitle(title!)),
         ],
+        if (showLibrary) ...[
+          const SizedBox(width: 12),
+          const _BackToLibraryButton(),
+        ],
       ],
     );
   }
+}
+
+class _BackToLibraryButton extends StatelessWidget {
+  const _BackToLibraryButton();
+
+  @override
+  Widget build(BuildContext context) => FTooltip(
+    tipBuilder: (context, controller) => Text(context.l10n.backToLibrary),
+    child: FButton.icon(
+      key: const ValueKey('detail-back-to-library'),
+      variant: .outline,
+      size: .sm,
+      style: detailOutlineButtonStyle(context),
+      semanticsLabel: context.l10n.backToLibrary,
+      onPress: () => context.go('/library'),
+      child: const Icon(FLucideIcons.film),
+    ),
+  );
 }
 
 /// Pops the detail route, falling back to the library when the page was opened

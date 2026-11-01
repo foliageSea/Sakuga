@@ -19,6 +19,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get library => '媒体库';
 
   @override
+  String get backToLibrary => '返回媒体库';
+
+  @override
   String get search => '搜索';
 
   @override

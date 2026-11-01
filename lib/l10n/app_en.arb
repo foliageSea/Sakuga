@@ -3,6 +3,7 @@
   "appTitle": "Sakuga",
   "home": "Home",
   "library": "Library",
+  "backToLibrary": "Back to library",
   "search": "Search",
   "downloads": "Downloads",
   "noServer": "No server connected",
