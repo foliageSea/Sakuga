@@ -118,6 +118,7 @@ class MediaPosterCard extends StatefulWidget {
     this.framed = true,
     this.textAlign = TextAlign.start,
     this.showRating = false,
+    this.reserveMetadataSpace = false,
     this.posterAction,
     super.key,
   }) : assert(onTap != null || onPosterTap != null);
@@ -141,6 +142,9 @@ class MediaPosterCard extends StatefulWidget {
 
   /// Frame shape; defaults to 2:3.
   final double? aspectRatio;
+
+  /// Reserve progress and subtitle rows so grid cards have equal heights.
+  final bool reserveMetadataSpace;
 
   /// Whether the card surface is semi-transparent over an ambient background.
   final bool translucent;
@@ -331,7 +335,8 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
                   if (watched != null && watched > 0) ...[
                     const SizedBox(height: 6),
                     MediaProgressBar(value: watched),
-                  ],
+                  ] else if (widget.reserveMetadataSpace)
+                    const SizedBox(height: 9),
                   const SizedBox(height: 8),
                   Text(
                     widget.item.displayTitle,
@@ -340,10 +345,10 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
                     overflow: TextOverflow.ellipsis,
                     style: theme.typography.body.sm,
                   ),
-                  if (subtitle != null) ...[
+                  if (subtitle != null || widget.reserveMetadataSpace) ...[
                     const SizedBox(height: 2),
                     Text(
-                      subtitle,
+                      subtitle ?? '',
                       textAlign: widget.textAlign,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

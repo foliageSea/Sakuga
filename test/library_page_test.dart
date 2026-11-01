@@ -38,9 +38,11 @@ MediaItem _item(String id, double ratio) => MediaItem(
   name: 'Series $id',
   type: MediaType.series,
   primaryImageAspectRatio: ratio,
-  productionYear: 2023,
+  productionYear: id == 'd' ? null : 2023,
   communityRating: 8.4,
-  recursiveItemCount: 12,
+  recursiveItemCount: id == 'd' ? null : 12,
+  runtime: id == 'a' ? const Duration(minutes: 24) : null,
+  playbackPosition: id == 'a' ? const Duration(minutes: 6) : null,
 );
 
 class _FakeItems extends LibraryItemsController {
@@ -254,12 +256,14 @@ void main() {
             card.framed &&
             card.showRating &&
             card.textAlign == TextAlign.start &&
-            card.subtitle == '2023 · 12 episodes',
+            card.subtitle ==
+                (card.item.id == 'd' ? null : '2023 · 12 episodes'),
       ),
       isTrue,
     );
     expect(find.text('8.4'), findsNWidgets(4));
-    expect(find.text('2023 · 12 episodes'), findsNWidgets(4));
+    expect(find.text('2023 · 12 episodes'), findsNWidgets(3));
+    expect(find.byType(MediaProgressBar), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -639,15 +643,11 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('mobile library flows posters into two staggered columns', (
+  testWidgets('mobile library aligns equal-height posters in two columns', (
     tester,
   ) async {
     await _pumpLibrary(tester, const Size(390, 900));
 
-    expect(
-      find.byKey(const ValueKey('library-mobile-masonry')),
-      findsOneWidget,
-    );
     final first = tester.getTopLeft(
       find.byKey(const ValueKey('library-mobile-card-a')),
     );
@@ -660,16 +660,17 @@ void main() {
 
     expect(second.dx, greaterThan(first.dx));
     expect(second.dy, first.dy);
-    expect(third.dx, second.dx);
+    expect(third.dx, first.dx);
     expect(third.dy, greaterThan(second.dy));
     expect(
       tester
           .getSize(find.byKey(const ValueKey('library-mobile-card-a')))
           .height,
-      greaterThan(
+      closeTo(
         tester
             .getSize(find.byKey(const ValueKey('library-mobile-card-b')))
             .height,
+        0.01,
       ),
     );
     expect(tester.takeException(), isNull);
@@ -678,7 +679,6 @@ void main() {
   testWidgets('desktop library keeps the aligned grid', (tester) async {
     await _pumpLibrary(tester, const Size(1280, 900));
 
-    expect(find.byKey(const ValueKey('library-mobile-masonry')), findsNothing);
     final headingRect = tester.getRect(find.text('Library'));
     final refreshButton = find.ancestor(
       of: find.byIcon(FLucideIcons.refreshCw),
@@ -696,6 +696,7 @@ void main() {
     );
     expect(firstCardRect.top, fourthCardRect.top);
     expect(firstCardRect.width, closeTo(fourthCardRect.width, 0.01));
+    expect(firstCardRect.height, closeTo(fourthCardRect.height, 0.01));
     expect(tester.takeException(), isNull);
   });
 
@@ -922,7 +923,7 @@ void main() {
   );
 
   testWidgets(
-    'mobile masonry poster morphs into detail page and back on return',
+    'mobile grid poster animates into detail page and back on return',
     (tester) async {
       await _pumpRoutedLibrary(
         tester,
@@ -936,19 +937,17 @@ void main() {
         ),
       );
 
-      // Card 'b' has a landscape 1.2 ratio in the masonry grid, while the
-      // detail page renders a 2:3 portrait poster.
+      // Scraped landscape artwork uses the same 2:3 frame in both views.
       final posterFrame = _posterFrameFinder('b');
       final cardRect = tester.getRect(posterFrame);
-      expect(cardRect.width / cardRect.height, closeTo(1.2, 0.01));
+      expect(cardRect.width / cardRect.height, closeTo(2 / 3, 0.01));
 
       await tester.tap(find.text('Series b'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 120));
 
       final pushMidRect = tester.getRect(posterFrame);
-      final pushMidRatio = pushMidRect.width / pushMidRect.height;
-      expect(_isStrictlyBetween(pushMidRatio, 1.2, 2 / 3), isTrue);
+      expect(pushMidRect, isNot(cardRect));
 
       await tester.pumpAndSettle();
       final detailRect = tester.getRect(posterFrame);
@@ -959,8 +958,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       final popMidRect = tester.getRect(posterFrame);
-      final popMidRatio = popMidRect.width / popMidRect.height;
-      expect(_isStrictlyBetween(popMidRatio, 2 / 3, 1.2), isTrue);
+
+      expect(
+        _isStrictlyBetween(popMidRect.width, cardRect.width, detailRect.width),
+        isTrue,
+      );
 
       await tester.pumpAndSettle();
       expect(tester.getRect(posterFrame), cardRect);

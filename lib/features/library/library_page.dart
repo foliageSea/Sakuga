@@ -537,33 +537,33 @@ class _LibraryGrid extends StatelessWidget {
         ),
       );
     }
-    if (isMobileLayout(context)) {
-      return SliverToBoxAdapter(
-        child: _MobileMasonryGrid(client: client, items: items, onTap: onTap),
-      );
-    }
+    final mobile = isMobileLayout(context);
+    final spacing = mobile ? 12.0 : 20.0;
     return SliverLayoutBuilder(
       builder: (context, constraints) {
-        final columns = ((constraints.crossAxisExtent + 20) / 240)
-            .floor()
-            .clamp(2, 6);
+        final columns = mobile
+            ? 2
+            : ((constraints.crossAxisExtent + spacing) / 240).floor().clamp(
+                2,
+                6,
+              );
         final rows = (items.length / columns).ceil();
         return SliverList(
           delegate: SliverChildBuilderDelegate((context, row) {
             final start = row * columns;
             final end = math.min(start + columns, items.length);
             return Padding(
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: EdgeInsets.only(bottom: mobile ? 12 : 24),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (var column = 0; column < columns; column++) ...[
-                    if (column > 0) const SizedBox(width: 20),
+                    if (column > 0) SizedBox(width: spacing),
                     Expanded(
                       child: start + column < end
                           ? _LibraryPoster(
                               cardKey: ValueKey(
-                                'library-desktop-card-${items[start + column].id}',
+                                'library-${mobile ? 'mobile' : 'desktop'}-card-${items[start + column].id}',
                               ),
                               client: client,
                               item: items[start + column],
@@ -590,69 +590,6 @@ class _LibraryGrid extends StatelessWidget {
   }
 }
 
-class _MobileMasonryGrid extends StatelessWidget {
-  const _MobileMasonryGrid({
-    required this.client,
-    required this.items,
-    required this.onTap,
-  });
-
-  static const _spacing = 12.0;
-  static const _cardChromeHeight = 75.0;
-
-  final MediaServerClient client;
-  final List<MediaItem> items;
-  final _OpenLibraryItem onTap;
-
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final cardWidth = (constraints.maxWidth - _spacing) / 2;
-      final columns = <List<MediaItem>>[[], []];
-      final heights = [0.0, 0.0];
-      for (final item in items) {
-        final column = heights[0] <= heights[1] ? 0 : 1;
-        columns[column].add(item);
-        heights[column] +=
-            (cardWidth - 20) / item.posterAspectRatio +
-            _cardChromeHeight +
-            _spacing;
-      }
-      return Row(
-        key: const ValueKey('library-mobile-masonry'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var column = 0; column < columns.length; column++) ...[
-            if (column > 0) const SizedBox(width: _spacing),
-            Expanded(
-              child: Column(
-                children: [
-                  for (
-                    var index = 0;
-                    index < columns[column].length;
-                    index++
-                  ) ...[
-                    if (index > 0) const SizedBox(height: _spacing),
-                    _LibraryPoster(
-                      cardKey: ValueKey(
-                        'library-mobile-card-${columns[column][index].id}',
-                      ),
-                      client: client,
-                      item: columns[column][index],
-                      aspectRatio: columns[column][index].posterAspectRatio,
-                      onTap: onTap,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ],
-      );
-    },
-  );
-}
-
 String? _libraryMetadata(BuildContext context, MediaItem item) {
   final parts = <String>[
     if (item.productionYear != null) '${item.productionYear}',
@@ -674,13 +611,11 @@ class _LibraryPoster extends StatelessWidget {
     required this.client,
     required this.item,
     required this.onTap,
-    this.aspectRatio,
   });
   final Key cardKey;
   final MediaServerClient client;
   final MediaItem item;
   final _OpenLibraryItem onTap;
-  final double? aspectRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -690,7 +625,7 @@ class _LibraryPoster extends StatelessWidget {
       item: item,
       subtitle: _libraryMetadata(context, item),
       showRating: true,
-      aspectRatio: aspectRatio,
+      reserveMetadataSpace: true,
       progress: item.progressFraction,
       heroTag: posterHeroTag(item.id),
       onPosterTap: (posterUrl) => onTap(item, posterUrl),
