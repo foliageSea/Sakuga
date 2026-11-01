@@ -432,9 +432,8 @@ class _BackBar extends StatelessWidget {
       children: [
         FButton.icon(
           key: const ValueKey('detail-back'),
-          variant: .outline,
+          variant: .ghost,
           size: .sm,
-          style: detailOutlineButtonStyle(context),
           semanticsLabel: l.back,
           onPress: () => popDetailRoute(context),
           child: const Icon(FLucideIcons.arrowLeft),
@@ -460,9 +459,8 @@ class _BackToLibraryButton extends StatelessWidget {
     tipBuilder: (context, controller) => Text(context.l10n.backToLibrary),
     child: FButton.icon(
       key: const ValueKey('detail-back-to-library'),
-      variant: .outline,
+      variant: .ghost,
       size: .sm,
-      style: detailOutlineButtonStyle(context),
       semanticsLabel: context.l10n.backToLibrary,
       onPress: () => context.go('/library'),
       child: const Icon(FLucideIcons.film),

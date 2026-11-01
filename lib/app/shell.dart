@@ -315,12 +315,8 @@ class AppShell extends ConsumerWidget {
                                                       key: const ValueKey(
                                                         'detail-back',
                                                       ),
-                                                      variant: .outline,
+                                                      variant: .ghost,
                                                       size: .sm,
-                                                      style:
-                                                          detailOutlineButtonStyle(
-                                                            headerContext,
-                                                          ),
                                                       semanticsLabel: l.back,
                                                       onPress: () =>
                                                           popDetailRoute(
