@@ -55,6 +55,7 @@ class MediaItem {
     required this.name,
     required this.type,
     this.poster,
+    this.seriesPoster,
     this.backdrop,
     this.logo,
     this.seriesId,
@@ -82,6 +83,7 @@ class MediaItem {
   final String name;
   final MediaType type;
   final MediaImageResource? poster;
+  final MediaImageResource? seriesPoster;
   final MediaImageResource? backdrop;
   final MediaImageResource? logo;
   final String? seriesId;
@@ -131,6 +133,7 @@ class MediaItem {
       name: name,
       type: type,
       poster: poster,
+      seriesPoster: seriesPoster,
       backdrop: backdrop,
       logo: logo,
       seriesId: seriesId,

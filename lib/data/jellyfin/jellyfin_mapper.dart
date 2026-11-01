@@ -53,6 +53,7 @@ class JellyfinMapper {
         orElse: () => MediaType.unknown,
       ),
       poster: poster,
+      seriesPoster: _image(json['SeriesId'], json['SeriesPrimaryImageTag']),
       backdrop: backdrops.isEmpty
           ? null
           : _image(id, backdrops.first, kind: 'Backdrop/0'),

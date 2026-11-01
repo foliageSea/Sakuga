@@ -114,6 +114,7 @@ class MediaPosterCard extends StatefulWidget {
     this.progress,
     this.subtitle,
     this.aspectRatio,
+    this.posterOverride,
     this.translucent = true,
     this.framed = true,
     this.textAlign = TextAlign.start,
@@ -142,6 +143,9 @@ class MediaPosterCard extends StatefulWidget {
 
   /// Frame shape; defaults to 2:3.
   final double? aspectRatio;
+
+  /// Artwork override for views that show a series poster for an episode.
+  final MediaImageResource? posterOverride;
 
   /// Reserve progress and subtitle rows so grid cards have equal heights.
   final bool reserveMetadataSpace;
@@ -186,7 +190,8 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final posterUrl = widget.item.poster?.url();
+    final poster = widget.posterOverride ?? widget.item.poster;
+    final posterUrl = poster?.url();
     final subtitle = widget.subtitle ?? widget.item.displaySubtitle;
     final watched = widget.progress;
     final rating = widget.item.communityRating;
@@ -196,7 +201,7 @@ class _MediaPosterCardState extends State<MediaPosterCard> {
         : null;
     final image = MediaImage(
       url: posterUrl,
-      headers: widget.item.poster?.headers ?? const {},
+      headers: poster?.headers ?? const {},
     );
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return MouseRegion(

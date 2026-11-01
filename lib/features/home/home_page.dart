@@ -730,37 +730,34 @@ class _MediaSection extends StatelessWidget {
                     horizontal: 6,
                     vertical: 12,
                   ),
-                  child: IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (var index = 0; index < values.length; index++) ...[
-                          if (index > 0) const SizedBox(width: 12),
-                          Builder(
-                            builder: (context) {
-                              final item = values[index];
-                              final landscape = compact || item.isEpisode;
-                              return SizedBox(
-                                width: compact ? 220 : (landscape ? 260 : 160),
-                                child: MediaPosterCard(
-                                  client: client,
-                                  item: item,
-                                  progress: item.progressFraction,
-                                  posterAction: posterAction?.call(item),
-                                  aspectRatio: compact
-                                      ? 16 / 9
-                                      : (landscape
-                                            ? item.thumbnailAspectRatio
-                                            : null),
-                                  onPosterTap: (posterUrl) =>
-                                      onTap(item, posterUrl),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var index = 0; index < values.length; index++) ...[
+                        if (index > 0) const SizedBox(width: 12),
+                        Builder(
+                          builder: (context) {
+                            final item = values[index];
+                            final aspectRatio = compact ? 16 / 9 : 2 / 3;
+                            return SizedBox(
+                              width: compact ? 220 : 160,
+                              child: MediaPosterCard(
+                                client: client,
+                                item: item,
+                                progress: item.progressFraction,
+                                posterAction: posterAction?.call(item),
+                                aspectRatio: aspectRatio,
+                                posterOverride: compact
+                                    ? null
+                                    : item.seriesPoster,
+                                onPosterTap: (posterUrl) =>
+                                    onTap(item, posterUrl),
+                              ),
+                            );
+                          },
+                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
               ),

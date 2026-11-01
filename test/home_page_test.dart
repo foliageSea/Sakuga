@@ -632,37 +632,53 @@ void main() {
   });
 
   for (final width in [390.0, 1280.0]) {
-    testWidgets('recent cards keep equal heights at width $width', (
+    testWidgets('recent cards use portrait series artwork at width $width', (
       tester,
     ) async {
       await pumpHome(
         tester,
         size: Size(width, 1200),
         resume: [],
-        latest: [
-          const MediaItem(
-            id: 'in-progress',
-            name: 'In progress',
-            type: MediaType.series,
+        latest: const [
+          MediaItem(
+            id: 'portrait-episode',
+            name: 'Portrait episode',
+            type: MediaType.episode,
+            primaryImageAspectRatio: 2 / 3,
             reportedPlayedPercentage: 42,
           ),
-          _series(),
-          const MediaItem(
-            id: 'other-series',
-            name: 'Another series with a long title',
-            type: MediaType.series,
+          MediaItem(
+            id: 'landscape-episode',
+            name: 'Landscape episode',
+            type: MediaType.episode,
+            primaryImageAspectRatio: 16 / 9,
+            seriesPoster: MediaImageResource(
+              urlTemplate: 'https://media.test/series-poster',
+              cacheKey: 'series-poster',
+            ),
           ),
+          MediaItem(id: 'series', name: 'Series', type: MediaType.series),
         ],
       );
       final cards = find.byType(MediaPosterCard);
       expect(cards, findsNWidgets(3));
-      final firstRect = tester.getRect(cards.at(0));
-      for (var index = 1; index < 3; index++) {
-        final rect = tester.getRect(cards.at(index));
-        expect(rect.top, firstRect.top);
-        expect(rect.bottom, firstRect.bottom);
-        expect(rect.height, firstRect.height);
-      }
+      final portrait = tester.getRect(cards.at(0));
+      final landscape = tester.getRect(cards.at(1));
+      final series = tester.getRect(cards.at(2));
+      expect(portrait.width, 160);
+      expect(landscape.width, 160);
+      expect(series.width, 160);
+      expect(landscape.top, portrait.top);
+      expect(series.top, portrait.top);
+      expect(portrait.height, lessThan(310));
+      expect(landscape.height, lessThan(310));
+      expect(series.height, lessThan(310));
+      final episodeCard = cards.at(1);
+      final artwork = tester.widget<MediaImage>(
+        find.descendant(of: episodeCard, matching: find.byType(MediaImage)),
+      );
+      expect(artwork.url, 'https://media.test/series-poster');
+      expect(tester.widget<MediaPosterCard>(episodeCard).aspectRatio, 2 / 3);
       expect(find.byType(MediaProgressBar), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
