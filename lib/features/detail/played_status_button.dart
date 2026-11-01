@@ -54,6 +54,7 @@ class PlayedStatusButton extends ConsumerStatefulWidget {
 
 class _PlayedStatusButtonState extends ConsumerState<PlayedStatusButton> {
   bool _busy = false;
+  bool _confirming = false;
   bool? _played;
   Object? _error;
 
@@ -71,12 +72,29 @@ class _PlayedStatusButtonState extends ConsumerState<PlayedStatusButton> {
   }
 
   Future<void> _toggle() async {
-    if (_busy) return;
+    if (_busy || _confirming) return;
     final client = widget.client;
     final server = client.server;
     final userId = widget.userId;
     final itemId = widget.item.id;
     final played = !(_played ?? widget.item.played);
+    if (played) {
+      setState(() => _confirming = true);
+      bool? confirmed;
+      try {
+        confirmed = await _confirmPlayed(
+          widget.item.displayTitle,
+          episode: widget.item.displaySubtitle,
+        );
+      } finally {
+        if (mounted) setState(() => _confirming = false);
+      }
+      if (confirmed != true ||
+          !_matches(client, userId, itemId) ||
+          ref.read(activeServerProvider) != server) {
+        return;
+      }
+    }
     final repository = ref.read(playbackProgressRepositoryProvider);
     final refresh = ref.read(_refreshPlayedItemsProvider);
     setState(() {
@@ -113,6 +131,63 @@ class _PlayedStatusButtonState extends ConsumerState<PlayedStatusButton> {
     }
   }
 
+  Future<bool?> _confirmPlayed(String name, {String? episode}) {
+    final l = context.l10n;
+    return showFDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      builder: (context, style, animation) => FDialog(
+        constraints: const BoxConstraints(maxWidth: 400),
+        animation: animation,
+        builder: (context, style) => SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l.markAsPlayed,
+                style: context.theme.typography.body.lg.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l.markAsPlayedConfirm(
+                  episode == null ? name : '$name · $episode',
+                ),
+              ),
+              const SizedBox(height: 20),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FButton(
+                    key: const ValueKey('played-status-cancel'),
+                    builder: responsiveButtonContent,
+                    mainAxisSize: MainAxisSize.min,
+                    variant: .ghost,
+                    onPress: () => Navigator.of(context).pop(false),
+                    child: Text(l.cancel),
+                  ),
+                  FButton(
+                    key: const ValueKey('played-status-confirm'),
+                    builder: responsiveButtonContent,
+                    mainAxisSize: MainAxisSize.min,
+                    onPress: () => Navigator.of(context).pop(true),
+                    child: Text(l.markAsPlayed),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   bool _matches(MediaServerClient client, String userId, String itemId) =>
       mounted &&
       widget.client == client &&
@@ -137,7 +212,7 @@ class _PlayedStatusButtonState extends ConsumerState<PlayedStatusButton> {
             key: ValueKey('played-status-${widget.item.id}'),
             variant: .ghost,
             size: .sm,
-            onPress: _busy ? null : _toggle,
+            onPress: _busy || _confirming ? null : _toggle,
             semanticsLabel: '${widget.item.name}: $hint',
             child: _busy
                 ? const SizedBox(
@@ -171,7 +246,7 @@ class _PlayedStatusButtonState extends ConsumerState<PlayedStatusButton> {
           variant: .outline,
           mainAxisSize: MainAxisSize.min,
           builder: responsiveButtonContent,
-          onPress: _busy ? null : _toggle,
+          onPress: _busy || _confirming ? null : _toggle,
           semanticsLabel: '${widget.item.name}: $label',
           prefix: _busy
               ? const SizedBox(

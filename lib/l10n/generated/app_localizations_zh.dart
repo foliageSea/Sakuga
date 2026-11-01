@@ -97,6 +97,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get markAsPlayed => '标为已播放';
 
   @override
+  String markAsPlayedConfirm(String name) {
+    return '确定将《$name》标记为已播放吗？';
+  }
+
+  @override
   String get markAsUnplayed => '标为未播放';
 
   @override

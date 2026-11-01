@@ -29,6 +29,8 @@
   "libraryUnwatched": "Unwatched",
   "libraryWatched": "Watched",
   "markAsPlayed": "Mark as played",
+  "markAsPlayedConfirm": "Mark “{name}” as played?",
+  "@markAsPlayedConfirm": { "placeholders": { "name": { "type": "String" } } },
   "markAsUnplayed": "Mark as unplayed",
   "libraryDuration": "{count} min",
   "@libraryDuration": { "placeholders": { "count": { "type": "int" } } },

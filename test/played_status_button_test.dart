@@ -134,7 +134,48 @@ ProviderContainer _container(_Client client, _Progress progress) {
   return container;
 }
 
+Future<void> _markPlayed(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('played-status-movie')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('played-status-confirm')));
+  await tester.pump();
+}
+
 void main() {
+  for (final dismiss in [false, true]) {
+    testWidgets(
+      'mark played waits for confirmation and cancellation preserves progress ($dismiss)',
+      (tester) async {
+        final client = _Client();
+        final progress = _Progress();
+        final container = _container(client, progress);
+        await _pump(tester, container, client);
+        final callback = tester.widget<FButton>(find.byType(FButton)).onPress!;
+        callback();
+        callback();
+        await tester.pumpAndSettle();
+        expect(find.byType(FDialog), findsOneWidget);
+        expect(find.text('Mark “Movie” as played?'), findsOneWidget);
+        expect(client.calls, isEmpty);
+        expect(progress.pending, 123);
+        expect(progress.cleared, isEmpty);
+        if (dismiss) {
+          await tester.binding.handlePopRoute();
+        } else {
+          await tester.tap(find.byKey(const ValueKey('played-status-cancel')));
+        }
+        await tester.pumpAndSettle();
+        expect(find.byType(FDialog), findsNothing);
+        expect(client.calls, isEmpty);
+        expect(progress.pending, 123);
+        expect(progress.cleared, isEmpty);
+        await _markPlayed(tester);
+        await tester.pumpAndSettle();
+        expect(client.calls, [('user', 'movie', true)]);
+      },
+    );
+  }
+
   testWidgets(
     'success clears matching pending progress, refreshes data and toggles',
     (tester) async {
@@ -190,7 +231,7 @@ void main() {
       await container.read(libraryViewsProvider.future);
       await _pump(tester, container, client);
       expect(find.bySemanticsLabel('Movie: Mark as played'), findsOneWidget);
-      await tester.tap(find.text('Mark as played'));
+      await _markPlayed(tester);
       await tester.pumpAndSettle();
       expect(client.calls, [('user', 'movie', true)]);
       expect(progress.pending, isNull);
@@ -233,14 +274,14 @@ void main() {
     final progress = _Progress();
     final container = _container(client, progress);
     await _pump(tester, container, client);
-    await tester.tap(find.text('Mark as played'));
+    await _markPlayed(tester);
     await tester.pumpAndSettle();
     expect(find.byType(ErrorNotice), findsOneWidget);
     expect(progress.pending, 123);
     expect(progress.cleared, isEmpty);
     expect(find.text('Mark as played'), findsOneWidget);
     client.error = null;
-    await tester.tap(find.text('Mark as played'));
+    await _markPlayed(tester);
     await tester.pumpAndSettle();
     expect(find.byType(ErrorNotice), findsNothing);
     expect(find.text('Mark as unplayed'), findsOneWidget);
@@ -253,7 +294,7 @@ void main() {
       final progress = _Progress()..concurrentSave = 456;
       final container = _container(client, progress);
       await _pump(tester, container, client);
-      await tester.tap(find.text('Mark as played'));
+      await _markPlayed(tester);
       await tester.pumpWidget(const SizedBox());
       client.pending!.complete();
       await tester.pumpAndSettle();
@@ -298,7 +339,7 @@ void main() {
       addTearDown(resumeSubscription.close);
       await container.read(libraryViewsProvider.future);
       await _pump(tester, container, client);
-      await tester.tap(find.text('Mark as played'));
+      await _markPlayed(tester);
       container.updateOverrides([
         activeServerProvider.overrideWithValue(
           const ServerProfile(
@@ -326,7 +367,7 @@ void main() {
       final progress = _Progress();
       final container = _container(client, progress);
       await _pump(tester, container, client);
-      await tester.tap(find.text('Mark as played'));
+      await _markPlayed(tester);
       await tester.pump();
       progress.pending = 456;
       client.pending!.complete();
@@ -343,7 +384,7 @@ void main() {
       final progress = _Progress();
       final container = _container(client, progress);
       await _pump(tester, container, client);
-      await tester.tap(find.text('Mark as played'));
+      await _markPlayed(tester);
       await tester.pumpWidget(const SizedBox());
       container.dispose();
       client.pending!.complete();

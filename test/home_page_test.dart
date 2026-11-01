@@ -219,6 +219,18 @@ void main() {
         expect(bounds.contains(action.center), isTrue);
         await tester.tap(button);
         await tester.pumpAndSettle();
+        expect(client.calls, isEmpty);
+        expect(
+          find.descendant(
+            of: find.byType(FDialog),
+            matching: find.text(
+              'Mark “Resumed Series · S01E01 · Pilot” as played?',
+            ),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('played-status-confirm')));
+        await tester.pumpAndSettle();
         expect(client.calls, [('user-1', 'episode-1', true)]);
         expect(find.text('Resumed Series'), findsNothing);
         expect(find.text('player:episode-1'), findsNothing);
@@ -240,6 +252,8 @@ void main() {
       );
       final button = find.byKey(const ValueKey('played-status-episode-1'));
       await tester.tap(button);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('played-status-confirm')));
       await tester.pump();
       expect(tester.widget<FButton>(button).onPress, isNull);
       expect(
@@ -271,6 +285,8 @@ void main() {
     final button = find.byKey(const ValueKey('played-status-episode-1'));
     await tester.tap(button);
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('played-status-confirm')));
+    await tester.pumpAndSettle();
     expect(find.text('Resumed Series'), findsOneWidget);
     expect(
       find.descendant(
@@ -282,6 +298,8 @@ void main() {
     expect(find.byType(HomePage), findsOneWidget);
     client.error = null;
     await tester.tap(button);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('played-status-confirm')));
     await tester.pumpAndSettle();
     expect(client.calls.length, 2);
     expect(find.text('Resumed Series'), findsNothing);

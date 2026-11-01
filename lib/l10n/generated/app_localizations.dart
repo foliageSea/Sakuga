@@ -272,6 +272,12 @@ abstract class AppLocalizations {
   /// **'Mark as played'**
   String get markAsPlayed;
 
+  /// No description provided for @markAsPlayedConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark “{name}” as played?'**
+  String markAsPlayedConfirm(String name);
+
   /// No description provided for @markAsUnplayed.
   ///
   /// In en, this message translates to:

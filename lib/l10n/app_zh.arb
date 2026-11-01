@@ -29,6 +29,8 @@
   "libraryUnwatched": "未观看",
   "libraryWatched": "已观看",
   "markAsPlayed": "标为已播放",
+  "markAsPlayedConfirm": "确定将《{name}》标记为已播放吗？",
+  "@markAsPlayedConfirm": { "placeholders": { "name": { "type": "String" } } },
   "markAsUnplayed": "标为未播放",
   "libraryDuration": "{count} 分钟",
   "@libraryDuration": { "placeholders": { "count": { "type": "int" } } },

@@ -97,6 +97,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get markAsPlayed => 'Mark as played';
 
   @override
+  String markAsPlayedConfirm(String name) {
+    return 'Mark “$name” as played?';
+  }
+
+  @override
   String get markAsUnplayed => 'Mark as unplayed';
 
   @override
