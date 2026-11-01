@@ -23,8 +23,10 @@ Future<void> showPlayerEpisodeDrawer(
     context: context,
     side: .rtl,
     useRootNavigator: true,
-    mainAxisMaxRatio: 0.9,
-    constraints: const BoxConstraints(maxWidth: 420),
+    mainAxisMaxRatio: null,
+    constraints: BoxConstraints.tightFor(
+      width: math.min(320, MediaQuery.sizeOf(context).width - 32),
+    ),
     builder: (context) => DecoratedBox(
       decoration: BoxDecoration(
         color: context.theme.colors.background,
@@ -32,7 +34,6 @@ Future<void> showPlayerEpisodeDrawer(
       ),
       child: SizedBox(
         key: const ValueKey('player-episodes-drawer'),
-        width: 420,
         height: double.infinity,
         child: SafeArea(
           left: false,
@@ -45,6 +46,8 @@ Future<void> showPlayerEpisodeDrawer(
                     Expanded(
                       child: Text(
                         context.l10n.selectEpisode,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: context.theme.typography.body.lg.copyWith(
                           fontWeight: FontWeight.w600,
                         ),

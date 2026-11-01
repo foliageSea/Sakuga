@@ -37,7 +37,13 @@ MediaItem _episode(
 Finder _row(String id) => find.byKey(ValueKey('player-episode-$id'));
 
 void main() {
-  for (final size in const [Size(390, 844), Size(844, 390), Size(1280, 800)]) {
+  for (final size in const [
+    Size(390, 844),
+    Size(440, 844),
+    Size(844, 390),
+    Size(1280, 800),
+    Size(1920, 1080),
+  ]) {
     testWidgets('drawer fills the right edge at $size', (tester) async {
       final host = await _pumpHost(
         tester,
@@ -50,7 +56,7 @@ void main() {
       expect(bounds.top, closeTo(0, 0.5));
       expect(bounds.bottom, closeTo(size.height, 0.5));
       expect(bounds.right, closeTo(size.width, 0.5));
-      expect(bounds.width, closeTo(math.min(420, size.width * 0.9), 0.5));
+      expect(bounds.width, closeTo(math.min(320, size.width - 32), 0.5));
       expect(find.byKey(_closeKey).hitTestable(), findsOneWidget);
       expect(_row('first').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
