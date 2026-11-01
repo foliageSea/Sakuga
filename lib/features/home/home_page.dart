@@ -747,6 +747,7 @@ class _MediaSection extends StatelessWidget {
                                 progress: item.progressFraction,
                                 posterAction: posterAction?.call(item),
                                 aspectRatio: aspectRatio,
+                                reserveMetadataSpace: !compact,
                                 posterOverride: compact
                                     ? null
                                     : item.seriesPoster,
