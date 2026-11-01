@@ -23,7 +23,7 @@ M0（工程基建与内核验证）进行中。当前已完成：
 待完成：
 
 - 服务器登录（用户名密码）、API 密钥安全存储（Keychain/Keystore）、服务器切换、播放（下一步 M1/M2）。
-- macOS arm64 构建与本地包（需 Mac/CI）。
+- macOS DMG 的 Developer ID 签名与 Apple 公证（公开分发前配置）。
 - 测试在 Linux 上受 media_kit native assets 编译问题阻塞（见 `docs/m0-status.md`）。
 - Android 真机运行验证（当前环境无设备/模拟器）。
 
@@ -47,9 +47,26 @@ fvm flutter run -d <android-device>
 
 ```sh
 fvm flutter build apk --debug --target-platform android-arm64
-fvm flutter build macos --release --arch arm64
+tool/build_dmg.sh
 fvm flutter build linux --debug
 ```
+
+### macOS DMG
+
+在 macOS 上安装 Xcode（完成首次启动配置）及 FVM 后执行：
+
+```sh
+fvm install
+tool/build_dmg.sh
+# 可传入 Flutter 构建参数，覆盖版本或添加 dart-define：
+tool/build_dmg.sh --build-name=0.1.0 --build-number=2
+```
+
+脚本优先使用 FVM，否则使用 PATH 中的 Flutter，先构建 Release 应用，再用系统自带的 `hdiutil` 创建并校验压缩 DMG，无需安装额外打包工具。DMG 中包含 `Sakuga.app` 和 `Applications` 快捷入口，打开后拖入 Applications 即可安装。
+
+输出目录为 `build/macos/dmg/`，文件名包含实际构建版本、构建号和架构，例如 `Sakuga-0.1.0+1-macos-arm64.dmg`；同时包含 arm64 和 x86_64 的应用使用 `universal` 后缀。构建产物已由 Git 忽略。
+
+当前沿用 Xcode 工程的本地 ad-hoc 签名，脚本不执行 Developer ID 签名或 Apple 公证；对外公开分发前需另行配置，下载后的应用可能受到 Gatekeeper 限制。
 
 ### Android 发布签名
 

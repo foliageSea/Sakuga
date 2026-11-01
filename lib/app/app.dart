@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 
 import '../core/settings/settings.dart';
 import '../l10n/generated/app_localizations.dart';
+import 'mouse_back_navigation.dart';
 import 'router.dart';
 import 'text_scaler.dart';
 import 'theme.dart';
@@ -13,6 +14,7 @@ class SakugaApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    final router = ref.watch(routerProvider);
     final (:light, :dark) = ref.watch(appThemesProvider);
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
@@ -26,7 +28,7 @@ class SakugaApp extends ConsumerWidget {
       themeMode: settings.themeMode,
       theme: light.toApproximateMaterialTheme(),
       darkTheme: dark.toApproximateMaterialTheme(),
-      routerConfig: ref.watch(routerProvider),
+      routerConfig: router,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(
           textScaler: AppTextScaler(
@@ -39,7 +41,10 @@ class SakugaApp extends ConsumerWidget {
         ),
         child: FTheme(
           data: Theme.brightnessOf(context) == Brightness.dark ? dark : light,
-          child: FToaster(child: FTooltipGroup(child: child!)),
+          child: MouseBackNavigation(
+            onBack: router.routerDelegate.popRoute,
+            child: FToaster(child: FTooltipGroup(child: child!)),
+          ),
         ),
       ),
     );
