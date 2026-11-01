@@ -259,6 +259,7 @@ class _SubtitleStyleSettingsState
           Text('${l.fontSize} · ${_fontSize.round()}'),
           const SizedBox(height: 8),
           PlayerSlider(
+            inactiveColor: context.theme.colors.mutedForeground,
             key: const ValueKey('subtitle-font-size'),
             value: (_fontSize - 16) / 48,
             tooltipBuilder: (value) => Text('${(16 + value * 48).round()}'),
@@ -270,6 +271,7 @@ class _SubtitleStyleSettingsState
           Text('${l.subtitleBackgroundOpacity} · ${(_opacity * 100).round()}%'),
           const SizedBox(height: 8),
           PlayerSlider(
+            inactiveColor: context.theme.colors.mutedForeground,
             key: const ValueKey('subtitle-background-opacity'),
             value: _opacity,
             onChange: (value) => setState(() => _opacity = value),
@@ -281,6 +283,7 @@ class _SubtitleStyleSettingsState
           ),
           const SizedBox(height: 8),
           PlayerSlider(
+            inactiveColor: context.theme.colors.mutedForeground,
             key: const ValueKey('subtitle-vertical-position'),
             value: _verticalPosition,
             onChange: (value) => setState(() => _verticalPosition = value),

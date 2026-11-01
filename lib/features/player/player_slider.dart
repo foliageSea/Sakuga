@@ -8,6 +8,7 @@ class PlayerSlider extends StatelessWidget {
     this.onEnd,
     this.enabled = true,
     this.tooltipBuilder,
+    this.inactiveColor,
     super.key,
   });
 
@@ -15,6 +16,9 @@ class PlayerSlider extends StatelessWidget {
   final ValueChanged<double> onChange;
   final ValueChanged<double>? onEnd;
   final bool enabled;
+
+  /// Track color for solid panels; defaults to translucent white over video.
+  final Color? inactiveColor;
   final Widget Function(double)? tooltipBuilder;
 
   @override
@@ -33,7 +37,7 @@ class PlayerSlider extends StatelessWidget {
         crossAxisExtent: 4,
         thumbSize: 12,
         activeColor: FVariants.all(primary),
-        inactiveColor: const FVariants.all(Color(0x33FFFFFF)),
+        inactiveColor: FVariants.all(inactiveColor ?? const Color(0x33FFFFFF)),
         thumbStyle: .delta(
           color: FVariants.all(primary),
           borderColor: FVariants.all(primary),
