@@ -1076,7 +1076,7 @@ class _EpisodeTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AspectRatio(
-          aspectRatio: item.thumbnailAspectRatio,
+          aspectRatio: 16 / 9,
           child: ClipRRect(
             borderRadius: theme.style.borderRadius.md,
             child: Stack(
