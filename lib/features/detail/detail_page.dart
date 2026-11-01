@@ -498,7 +498,8 @@ class _Hero extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.theme;
     final mobile = isMobileLayout(context);
-    final posterWidth = mobile ? 96.0 : 132.0;
+    final seriesDetail = item.isSeries || item.type == MediaType.season;
+    final posterWidth = mobile ? 96.0 : (seriesDetail ? 160.0 : 132.0);
     final poster = AspectRatio(
       aspectRatio: 2 / 3,
       child: PosterHero(
@@ -543,7 +544,7 @@ class _Hero extends StatelessWidget {
     return ClipRRect(
       borderRadius: theme.style.borderRadius.lg,
       child: SizedBox(
-        height: 340,
+        height: seriesDetail ? 420 : 340,
         child: Stack(
           fit: StackFit.expand,
           children: [

@@ -166,7 +166,7 @@ class _PosterCarouselSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(randomItemsProvider);
-    final height = isMobileLayout(context) ? 216.0 : 320.0;
+    final height = isMobileLayout(context) ? 216.0 : 400.0;
     return items.when(
       data: (values) => values.isEmpty
           ? const SizedBox.shrink()
@@ -501,7 +501,7 @@ class _CarouselSlide extends StatelessWidget {
     final backdropUrl = item.backdrop?.url(width: 1920);
     final overview = item.overview?.trim() ?? '';
     final pad = mobile ? 14.0 : 24.0;
-    final posterWidth = mobile ? 80.0 : 120.0;
+    final posterWidth = mobile ? 80.0 : 160.0;
     final tags = <String>[
       if (item.productionYear != null) '${item.productionYear}',
       if (item.officialRating != null && item.officialRating!.isNotEmpty)
