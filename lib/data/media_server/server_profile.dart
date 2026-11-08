@@ -26,6 +26,12 @@ class ServerProfile {
   final String deviceId;
   final String remoteServerId;
 
+  bool get usesAccount =>
+      type == MediaServerType.emby ||
+      accessToken.isNotEmpty ||
+      userId.isNotEmpty ||
+      username.isNotEmpty;
+
   ServerProfile copyWith({
     String? id,
     String? name,
@@ -54,9 +60,9 @@ class ServerProfile {
     'id': id,
     'name': name,
     'baseUrl': baseUrl,
-    'apiKey': type == MediaServerType.jellyfin ? apiKey : '',
+    'apiKey': usesAccount ? '' : apiKey,
     'type': type.name,
-    if (type == MediaServerType.emby) ...{
+    if (usesAccount) ...{
       'accessToken': accessToken,
       'userId': userId,
       'username': username,

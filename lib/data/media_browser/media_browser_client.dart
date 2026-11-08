@@ -380,7 +380,7 @@ abstract class MediaBrowserClient implements MediaServerClient {
     if (!isConfigured) {
       throw const AppException(FailureKind.auth);
     }
-    if (emby) {
+    if (server.usesAccount) {
       final response = await _dio.get<Map<String, dynamic>>(
         '/Users/${Uri.encodeComponent(server.userId)}',
       );

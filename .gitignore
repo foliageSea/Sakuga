@@ -55,3 +55,9 @@ app.*.map.json
 /tool/emby-test/.env
 /tool/emby-test/session.json
 /tool/emby-test/results/
+
+# Local Jellyfin runtime and private credentials
+/tool/jellyfin-test/config/
+/tool/jellyfin-test/cache/
+/tool/jellyfin-test/session.json
+/tool/jellyfin-test/results/

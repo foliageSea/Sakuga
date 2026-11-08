@@ -67,6 +67,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get serverType => '服务器类型';
 
   @override
+  String get serverAuthMethod => '认证方式';
+
+  @override
+  String get serverAccountPassword => '账号/密码';
+
+  @override
   String get serverUsername => '用户名';
 
   @override
@@ -76,10 +82,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get serverUsernameRequired => '请输入用户名。';
 
   @override
-  String get embyPasswordHelp => '密码仅用于登录，不会保存。留空可保留现有登录会话。';
+  String get serverPasswordHelp => '密码仅用于登录，不会保存。留空可保留现有登录会话。';
 
   @override
-  String get embyLoginRequired => '登录失败或会话已过期。请输入密码并保存以重新登录。';
+  String get serverLoginRequired => '登录失败或会话已过期。请输入密码并保存以重新登录。';
 
   @override
   String get apiKey => 'API 密钥';

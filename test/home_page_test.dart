@@ -331,60 +331,77 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final width in [390.0, 1280.0]) {
-    testWidgets('home refresh reloads all sections at width $width', (
-      tester,
-    ) async {
-      tester.view.physicalSize = Size(width, 1000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final calls = <String, int>{};
-      Future<List<MediaItem>> load(String section) async {
-        calls.update(section, (value) => value + 1, ifAbsent: () => 1);
-        return [];
-      }
+  for (final (width, accountLogin) in [
+    (390.0, false),
+    (1280.0, false),
+    (390.0, true),
+    (1280.0, true),
+  ]) {
+    testWidgets(
+      'home refresh reloads all sections at width $width (account: $accountLogin)',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final calls = <String, int>{};
+        Future<List<MediaItem>> load(String section) async {
+          calls.update(section, (value) => value + 1, ifAbsent: () => 1);
+          return [];
+        }
 
-      final servers = MemoryServerRepository()..items = [_server];
-      final container = ProviderContainer(
-        overrides: [
-          initialSettingsProvider.overrideWithValue(
-            const AppSettings(language: 'en'),
-          ),
-          settingsRepositoryProvider.overrideWithValue(MemorySettings()),
-          desktopWindowProvider.overrideWithValue(FakeWindow(available: false)),
-          serverRepositoryProvider.overrideWithValue(servers),
-          libraryViewsProvider.overrideWith(
-            (ref) async => LibraryData(
-              client: FakeMediaServerClient(server: _server),
-              userId: 'user-1',
-              views: const [],
+        final server = accountLogin
+            ? _server.copyWith(
+                apiKey: '',
+                accessToken: 'account-token',
+                userId: 'user-1',
+                username: 'Alice',
+                deviceId: 'device',
+              )
+            : _server;
+        final servers = MemoryServerRepository()..items = [server];
+        final container = ProviderContainer(
+          overrides: [
+            initialSettingsProvider.overrideWithValue(
+              const AppSettings(language: 'en'),
             ),
+            settingsRepositoryProvider.overrideWithValue(MemorySettings()),
+            desktopWindowProvider.overrideWithValue(
+              FakeWindow(available: false),
+            ),
+            serverRepositoryProvider.overrideWithValue(servers),
+            libraryViewsProvider.overrideWith(
+              (ref) async => LibraryData(
+                client: FakeMediaServerClient(server: server),
+                userId: 'user-1',
+                views: const [],
+              ),
+            ),
+            randomItemsProvider.overrideWith((ref) => load('carousel')),
+            resumeItemsProvider.overrideWith((ref) => load('resume')),
+            latestItemsProvider.overrideWith((ref) => load('latest')),
+          ],
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const SakugaApp(),
           ),
-          randomItemsProvider.overrideWith((ref) => load('carousel')),
-          resumeItemsProvider.overrideWith((ref) => load('resume')),
-          latestItemsProvider.overrideWith((ref) => load('latest')),
-        ],
-      );
-      addTearDown(container.dispose);
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: const SakugaApp(),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final refresh = find.byKey(const ValueKey('home-refresh'));
-      expect(refresh, findsOneWidget);
-      final before = Map<String, int>.from(calls);
-      expect(before.keys, containsAll(['carousel', 'resume', 'latest']));
-      await tester.tap(refresh);
-      await tester.pumpAndSettle();
-      for (final section in before.keys) {
-        expect(calls[section], greaterThan(before[section]!));
-      }
-      expect(tester.takeException(), isNull);
-    });
+        );
+        await tester.pumpAndSettle();
+        final refresh = find.byKey(const ValueKey('home-refresh'));
+        expect(refresh, findsOneWidget);
+        final before = Map<String, int>.from(calls);
+        expect(before.keys, containsAll(['carousel', 'resume', 'latest']));
+        await tester.tap(refresh);
+        await tester.pumpAndSettle();
+        for (final section in before.keys) {
+          expect(calls[section], greaterThan(before[section]!));
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('carousel arrows cross boundaries in the same direction', (

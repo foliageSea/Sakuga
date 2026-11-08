@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 
 import '../core/settings/settings.dart';
 import '../core/window/desktop_window.dart';
+import '../data/media_server/media_server_factory.dart';
 import '../features/detail/detail_page.dart';
 import '../features/home/home_providers.dart';
 import '../features/library/library_providers.dart';
@@ -41,12 +42,11 @@ class AppShell extends ConsumerWidget {
     final activeServer = isLibraryRootRoute || isHomeRoute
         ? ref.watch(activeServerProvider)
         : null;
-    final canRefreshLibrary =
-        isLibraryRootRoute &&
+    final serverConfigured =
         activeServer != null &&
-        activeServer.apiKey.isNotEmpty;
-    final canRefreshHome =
-        isHomeRoute && activeServer != null && activeServer.apiKey.isNotEmpty;
+        ref.watch(mediaServerClientProvider(activeServer)).isConfigured;
+    final canRefreshLibrary = isLibraryRootRoute && serverConfigured;
+    final canRefreshHome = isHomeRoute && serverConfigured;
     final l = context.l10n;
     final labels = [l.home, l.library, l.settings];
     const icons = [

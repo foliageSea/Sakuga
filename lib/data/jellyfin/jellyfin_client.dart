@@ -1,21 +1,51 @@
+import 'package:dio/dio.dart';
+
 import '../media_browser/media_browser_client.dart';
+import '../media_server/server_profile.dart';
 import '../media_server/playback_models.dart';
 import 'jellyfin_playback_session.dart';
+import 'jellyfin_protocol.dart';
 
 class JellyfinClient extends MediaBrowserClient {
-  JellyfinClient({required super.server, super.dio})
-    : super(headers: _headers(server.apiKey));
+  JellyfinClient({required super.server, Dio? dio})
+    : super(dio: _configure(server, dio), headers: _headers(server));
+
+  static Map<String, String> _headers(ServerProfile server) =>
+      jellyfinAuthHeaders(
+        token: server.usesAccount ? server.accessToken : server.apiKey,
+        deviceId: server.deviceId.isEmpty ? 'sakuga' : server.deviceId,
+        username: server.usesAccount ? server.username : '',
+      );
+
+  static Dio _configure(ServerProfile server, Dio? dio) {
+    final client =
+        dio ??
+        Dio(
+          BaseOptions(
+            connectTimeout: const Duration(seconds: 10),
+            receiveTimeout: const Duration(seconds: 20),
+            sendTimeout: const Duration(seconds: 10),
+          ),
+        );
+    client.options.baseUrl = server.baseUrl;
+    client.options.headers = {
+      for (final entry in client.options.headers.entries)
+        if (entry.key.toLowerCase() != 'authorization' &&
+            !entry.key.toLowerCase().startsWith('x-emby-'))
+          entry.key: entry.value,
+      ..._headers(server),
+    };
+    client.options.followRedirects = false;
+    return client;
+  }
 
   @override
-  bool get isConfigured => server.apiKey.isNotEmpty;
+  bool get isConfigured => server.usesAccount
+      ? server.accessToken.isNotEmpty && server.userId.isNotEmpty
+      : server.apiKey.isNotEmpty;
 
   @override
-  Map<String, String> get authHeaders => _headers(server.apiKey);
-
-  static Map<String, String> _headers(String apiKey) => {
-    'Authorization':
-        'MediaBrowser Token="$apiKey", Client="Sakuga", Device="Sakuga", DeviceId="sakuga", Version="0.1.0"',
-  };
+  Map<String, String> get authHeaders => _headers(server);
 
   @override
   bool acceptsSession(dynamic session) => session is JellyfinPlaybackSession;

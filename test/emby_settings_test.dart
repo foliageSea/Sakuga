@@ -139,11 +139,12 @@ Future<void> _enter(WidgetTester tester, String key, String value) async {
 
 Future<void> _add(WidgetTester tester) async {
   await _tap(tester, 'add-server');
-  expect(_key('server-api-key'), findsOneWidget);
+  expect(_key('server-password'), findsOneWidget);
   await _tap(tester, 'server-type');
   await tester.tap(find.text('Emby').last);
   await tester.pumpAndSettle();
   expect(_key('server-api-key'), findsNothing);
+  expect(_key('server-auth-method'), findsNothing);
   await _enter(tester, 'server-name', 'Home');
   await _enter(tester, 'server-url', 'media.example');
   await _enter(tester, 'server-username', 'alice');
@@ -361,13 +362,16 @@ void main() {
     },
   );
 
-  testWidgets('Jellyfin remains the default and saves its API key', (
+  testWidgets('Jellyfin API key mode can be explicitly selected', (
     tester,
   ) async {
     final repo = MemoryServerRepository();
     final auth = _Auth();
     await _pump(tester, repo, auth);
     await _tap(tester, 'add-server');
+    await _tap(tester, 'server-auth-method');
+    await tester.tap(find.text('API key').last);
+    await tester.pumpAndSettle();
     expect(_key('server-api-key'), findsOneWidget);
     expect(_key('server-password'), findsNothing);
     await _enter(tester, 'server-name', 'Jellyfin Home');

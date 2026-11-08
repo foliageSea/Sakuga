@@ -67,6 +67,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get serverType => 'Server type';
 
   @override
+  String get serverAuthMethod => 'Authentication method';
+
+  @override
+  String get serverAccountPassword => 'Account/password';
+
+  @override
   String get serverUsername => 'Username';
 
   @override
@@ -76,11 +82,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get serverUsernameRequired => 'Enter a username.';
 
   @override
-  String get embyPasswordHelp =>
+  String get serverPasswordHelp =>
       'Your password is used only to sign in and is never saved. Leave it blank to keep an existing session.';
 
   @override
-  String get embyLoginRequired =>
+  String get serverLoginRequired =>
       'Sign-in failed or your session expired. Enter your password and save to sign in again.';
 
   @override

@@ -62,7 +62,7 @@ class HomePage extends ConsumerWidget {
                   .watch(mediaServerClientProvider(items.first))
                   .isConfigured) {
                 return EmptyNotice(
-                  l.noApiKey,
+                  items.first.usesAccount ? l.serverLoginRequired : l.noApiKey,
                   child: FButton(
                     builder: responsiveButtonContent,
                     mainAxisSize: MainAxisSize.min,

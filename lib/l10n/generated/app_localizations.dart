@@ -212,6 +212,18 @@ abstract class AppLocalizations {
   /// **'Server type'**
   String get serverType;
 
+  /// No description provided for @serverAuthMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication method'**
+  String get serverAuthMethod;
+
+  /// No description provided for @serverAccountPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Account/password'**
+  String get serverAccountPassword;
+
   /// No description provided for @serverUsername.
   ///
   /// In en, this message translates to:
@@ -230,17 +242,17 @@ abstract class AppLocalizations {
   /// **'Enter a username.'**
   String get serverUsernameRequired;
 
-  /// No description provided for @embyPasswordHelp.
+  /// No description provided for @serverPasswordHelp.
   ///
   /// In en, this message translates to:
   /// **'Your password is used only to sign in and is never saved. Leave it blank to keep an existing session.'**
-  String get embyPasswordHelp;
+  String get serverPasswordHelp;
 
-  /// No description provided for @embyLoginRequired.
+  /// No description provided for @serverLoginRequired.
   ///
   /// In en, this message translates to:
   /// **'Sign-in failed or your session expired. Enter your password and save to sign in again.'**
-  String get embyLoginRequired;
+  String get serverLoginRequired;
 
   /// No description provided for @apiKey.
   ///

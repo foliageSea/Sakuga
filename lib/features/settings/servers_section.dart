@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_exception.dart';
 import '../../data/emby/emby_auth.dart';
+import '../../data/jellyfin/jellyfin_auth.dart';
 import '../../data/media_server/media_server_factory.dart';
 import '../../data/media_server/server_probe.dart';
 import '../../data/media_server/server_profile.dart';
@@ -208,6 +209,8 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
   final _password = TextEditingController();
   late MediaServerType _type;
   late bool _secure;
+  late bool _account;
+  bool _identityReset = false;
   bool _busy = false;
   bool _saving = false;
   bool _sessionRejected = false;
@@ -227,6 +230,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
     _apiKey = TextEditingController(text: server?.apiKey ?? '');
     _username = TextEditingController(text: server?.username ?? '');
     _type = server?.type ?? MediaServerType.jellyfin;
+    _account = server?.usesAccount ?? true;
     _secure = isSecureBaseUrl(server?.baseUrl ?? '');
     for (final controller in [_name, _url, _apiKey, _username, _password]) {
       controller.addListener(_inputsChanged);
@@ -240,6 +244,16 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
       _result = null;
       _error = null;
     });
+  }
+
+  void _changeAuthentication(bool account) {
+    _account = account;
+    _identityReset = true;
+    _apiKey.clear();
+    _username.clear();
+    _password.clear();
+    _sessionRejected = false;
+    _inputsChanged();
   }
 
   @override
@@ -274,14 +288,16 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
     final old = widget.server;
     final username = _username.text.trim();
     final password = _password.text;
-    final emby = _type == MediaServerType.emby;
+    final account = _account;
     final identityChanged =
         old == null ||
+        _identityReset ||
         old.type != _type ||
+        old.usesAccount != account ||
         old.baseUrl != baseUrl ||
-        (emby && old.username != username);
+        (account && old.username != username);
     final needsLogin =
-        emby &&
+        account &&
         (identityChanged ||
             _sessionRejected ||
             password.isNotEmpty ||
@@ -305,26 +321,41 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
         name: _name.text.trim(),
         baseUrl: baseUrl,
         type: _type,
-        apiKey: emby ? '' : _apiKey.text.trim(),
-        accessToken: emby && !identityChanged ? old.accessToken : '',
-        userId: emby && !identityChanged ? old.userId : '',
-        username: emby ? username : '',
-        deviceId: emby && !identityChanged ? old.deviceId : '',
-        remoteServerId: emby && !identityChanged ? old.remoteServerId : '',
+        apiKey: account ? '' : _apiKey.text.trim(),
+        accessToken: account && !identityChanged ? old.accessToken : '',
+        userId: account && !identityChanged ? old.userId : '',
+        username: account ? username : '',
+        deviceId: account && !identityChanged ? old.deviceId : '',
+        remoteServerId: account && !identityChanged ? old.remoteServerId : '',
       );
       if (needsLogin) {
         if (_authenticated != null) {
           profile = _authenticated!;
         } else {
-          final auth = ref.read(embyAuthProvider);
-          final deviceId = await ref.read(embyDeviceIdProvider.future);
-          if (!_acceptsResponse(revision)) return;
-          final result = await auth.authenticate(
-            baseUrl: baseUrl,
-            username: username,
-            password: password,
-            deviceId: deviceId,
+          final emby = _type == MediaServerType.emby;
+          final deviceId = await ref.read(
+            emby
+                ? embyDeviceIdProvider.future
+                : jellyfinDeviceIdProvider.future,
           );
+          if (!_acceptsResponse(revision)) return;
+          final result = await (emby
+              ? ref
+                    .read(embyAuthProvider)
+                    .authenticate(
+                      baseUrl: baseUrl,
+                      username: username,
+                      password: password,
+                      deviceId: deviceId,
+                    )
+              : ref
+                    .read(jellyfinAuthProvider)
+                    .authenticate(
+                      baseUrl: baseUrl,
+                      username: username,
+                      password: password,
+                      deviceId: deviceId,
+                    ));
           if (!_acceptsResponse(revision)) return;
           // The authenticated user ID is authoritative if a server renamed an account.
           final accountChanged =
@@ -337,7 +368,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
                 : profile.id,
             name: profile.name,
             baseUrl: baseUrl,
-            type: MediaServerType.emby,
+            type: _type,
             accessToken: result.accessToken,
             userId: result.userId,
             username: result.username,
@@ -346,7 +377,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
           );
           _authenticated = profile;
         }
-      } else if (!save && emby) {
+      } else if (!save && account) {
         // Public server information does not validate a saved user session.
         await ref
             .read(mediaServerFactoryProvider)
@@ -376,7 +407,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
     } catch (error) {
       if (_acceptsResponse(revision)) {
         final rejected =
-            emby &&
+            account &&
             (error is AppException && error.kind == FailureKind.auth ||
                 error is DioException && error.response?.statusCode == 401);
         setState(() {
@@ -385,7 +416,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
             _authenticated = null;
           }
           _error = rejected
-              ? l.embyLoginRequired
+              ? l.serverLoginRequired
               : failureMessage(context, error);
         });
       }
@@ -426,7 +457,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
               onChange: (value) {
                 if (value == null || value == _type) return;
                 _type = value;
-                _inputsChanged();
+                _changeAuthentication(true);
               },
             ),
             children: const [
@@ -437,6 +468,26 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
               FSelectItem(title: Text('Emby'), value: MediaServerType.emby),
             ],
           ),
+          if (_type == MediaServerType.jellyfin) ...[
+            const SizedBox(height: 12),
+            FSelect<bool>.rich(
+              key: const ValueKey('server-auth-method'),
+              label: Text(l.serverAuthMethod),
+              enabled: !_saving,
+              format: (value) => value ? l.serverAccountPassword : l.apiKey,
+              control: .lifted(
+                value: _account,
+                onChange: (value) {
+                  if (value == null || value == _account) return;
+                  _changeAuthentication(value);
+                },
+              ),
+              children: [
+                FSelectItem(title: Text(l.serverAccountPassword), value: true),
+                FSelectItem(title: Text(l.apiKey), value: false),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           FTextField(
             key: const ValueKey('server-name'),
@@ -454,7 +505,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
             keyboardType: TextInputType.url,
           ),
           const SizedBox(height: 12),
-          if (_type == MediaServerType.emby) ...[
+          if (_account) ...[
             FTextField(
               key: const ValueKey('server-username'),
               enabled: !_saving,
@@ -469,7 +520,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
               label: Text(l.serverPassword),
             ),
             const SizedBox(height: 8),
-            Text(l.embyPasswordHelp, style: context.theme.typography.body.sm),
+            Text(l.serverPasswordHelp, style: context.theme.typography.body.sm),
           ] else
             FTextField.password(
               key: const ValueKey('server-api-key'),
@@ -578,9 +629,8 @@ class _ServerTile extends StatelessWidget {
               children: [
                 Text(server.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                 Text(
-                  server.type == MediaServerType.emby
-                      ? 'Emby · ${server.username}'
-                      : 'Jellyfin',
+                  '${server.type == MediaServerType.emby ? 'Emby' : 'Jellyfin'}'
+                  '${server.usesAccount ? ' · ${server.username}' : ''}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: context.theme.typography.body.sm,

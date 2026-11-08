@@ -154,7 +154,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         children: [
           PageHeading(l.library, hideTitleOnMobile: true),
           EmptyNotice(
-            l.noApiKey,
+            server.usesAccount ? l.serverLoginRequired : l.noApiKey,
             child: FButton(
               builder: responsiveButtonContent,
               mainAxisSize: MainAxisSize.min,
