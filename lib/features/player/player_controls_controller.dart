@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../../core/platform/system_volume.dart';
+
 abstract class PlayerControlsController extends ChangeNotifier {
   bool get playing;
   bool get buffering;
@@ -31,10 +33,16 @@ class MediaKitControlsController extends PlayerControlsController {
       player.stream.volume.listen((_) => notifyListeners()),
       player.stream.rate.listen((_) => notifyListeners()),
     ]);
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      _systemVolume = SystemVolume()..addListener(_onSystemVolumeChanged);
+    }
     _onBufferingChanged(player.state.buffering);
   }
 
   final Player player;
+  SystemVolume? _systemVolume;
+
+  void _onSystemVolumeChanged() => notifyListeners();
   final _subscriptions = <StreamSubscription<dynamic>>[];
   Timer? _downloadSpeedTimer;
   double? _downloadBytesPerSecond;
@@ -93,7 +101,7 @@ class MediaKitControlsController extends PlayerControlsController {
   @override
   Duration get buffer => player.state.buffer;
   @override
-  double get volume => player.state.volume;
+  double get volume => _systemVolume?.volume ?? player.state.volume;
   @override
   double get rate => player.state.rate;
   @override
@@ -101,13 +109,16 @@ class MediaKitControlsController extends PlayerControlsController {
   @override
   Future<void> seek(Duration position) => player.seek(position);
   @override
-  Future<void> setVolume(double volume) => player.setVolume(volume);
+  Future<void> setVolume(double volume) =>
+      _systemVolume?.setVolume(volume) ?? player.setVolume(volume);
   @override
   Future<void> setRate(double rate) => player.setRate(rate);
 
   @override
   void dispose() {
     _disposed = true;
+    _systemVolume?.removeListener(_onSystemVolumeChanged);
+    _systemVolume?.dispose();
     _downloadSpeedTimer?.cancel();
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());

@@ -407,7 +407,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final persistedTicks = finished ? 0 : rawTicks;
     final sessionTicks = finished && runtime > 0 ? runtime : rawTicks;
     final isPaused = !_playing;
-    final volume = _player.state.volume;
+    final volume = _controlsController.volume;
     final revision = ++_progressRevision;
     final localSave = _serializeLocal(() async {
       try {

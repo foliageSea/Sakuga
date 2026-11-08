@@ -7,6 +7,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.media.AudioManager
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
@@ -16,6 +17,7 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
     private var originalScreenBrightness: Float? = null
+    private var systemVolume: SystemVolume? = null
     private val imageGallery by lazy { ImageGallery(applicationContext) }
     private var pendingGallerySave: Pair<ByteArray, MethodChannel.Result>? = null
 
@@ -55,6 +57,8 @@ class MainActivity : FlutterActivity() {
         pendingGallerySave?.second?.error("permission_denied", "Activity closed before storage permission was granted.", null)
         pendingGallerySave = null
         imageGallery.close()
+        systemVolume?.close()
+        systemVolume = null
         super.onDestroy()
     }
 
@@ -62,8 +66,17 @@ class MainActivity : FlutterActivity() {
         private const val GALLERY_PERMISSION_REQUEST = 7314
     }
 
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        systemVolume?.close()
+        systemVolume = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        volumeControlStream = AudioManager.STREAM_MUSIC
+        systemVolume?.close()
+        systemVolume = SystemVolume(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.foliage.sakuga/image_gallery",
