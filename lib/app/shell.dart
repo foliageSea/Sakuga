@@ -205,12 +205,17 @@ class AppShell extends ConsumerWidget {
                                                 i++
                                               )
                                                 FSidebarItem(
-                                                  icon: Icon(
-                                                    icons[i],
-                                                    semanticLabel: compact
-                                                        ? labels[i]
-                                                        : null,
-                                                  ),
+                                                  icon: compact
+                                                      ? Expanded(
+                                                          child: Center(
+                                                            child: Icon(
+                                                              icons[i],
+                                                              semanticLabel:
+                                                                  labels[i],
+                                                            ),
+                                                          ),
+                                                        )
+                                                      : Icon(icons[i]),
                                                   label: compact
                                                       ? null
                                                       : Text(labels[i]),
