@@ -64,6 +64,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get secureConnection => 'Secure connection';
 
   @override
+  String get serverType => 'Server type';
+
+  @override
+  String get serverUsername => 'Username';
+
+  @override
+  String get serverPassword => 'Password';
+
+  @override
+  String get serverUsernameRequired => 'Enter a username.';
+
+  @override
+  String get embyPasswordHelp =>
+      'Your password is used only to sign in and is never saved. Leave it blank to keep an existing session.';
+
+  @override
+  String get embyLoginRequired =>
+      'Sign-in failed or your session expired. Enter your password and save to sign in again.';
+
+  @override
   String get apiKey => 'API key';
 
   @override
@@ -252,7 +272,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectedServer => 'Connected';
 
   @override
-  String get authError => 'API key rejected.';
+  String get authError =>
+      'Authentication expired or rejected. Edit the server in Settings to sign in again or update its API key.';
+
+  @override
+  String get permissionError =>
+      'This account does not have permission to access this resource.';
 
   @override
   String get overview => 'Overview';

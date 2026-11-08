@@ -1,5 +1,6 @@
 import 'responsive_button.dart';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -307,6 +308,16 @@ class AdaptiveGrid extends StatelessWidget {
 String failureMessage(BuildContext context, Object error) {
   final l = context.l10n;
   return switch (error) {
+    AppException(cause: 403) => l.permissionError,
+    DioException(response: Response(statusCode: 401)) => l.authError,
+    DioException(response: Response(statusCode: 403)) => l.permissionError,
+    DioException(
+      type: DioExceptionType.connectionTimeout ||
+          DioExceptionType.sendTimeout ||
+          DioExceptionType.receiveTimeout,
+    ) =>
+      l.timeoutError,
+    DioException(type: DioExceptionType.badResponse) => l.serverError,
     AppException(kind: FailureKind.storage) => l.storageError,
     AppException(kind: FailureKind.timeout) => l.timeoutError,
     AppException(kind: FailureKind.auth) => l.authError,

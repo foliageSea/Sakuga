@@ -48,3 +48,10 @@ app.*.map.json
 /android/app/release
 
 .fvm/
+
+# Local Emby integration server, credentials and downloaded media
+/tool/emby-test/config/
+/tool/emby-test/media/
+/tool/emby-test/.env
+/tool/emby-test/session.json
+/tool/emby-test/results/

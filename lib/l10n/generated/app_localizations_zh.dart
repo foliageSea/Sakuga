@@ -64,6 +64,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get secureConnection => '安全连接';
 
   @override
+  String get serverType => '服务器类型';
+
+  @override
+  String get serverUsername => '用户名';
+
+  @override
+  String get serverPassword => '密码';
+
+  @override
+  String get serverUsernameRequired => '请输入用户名。';
+
+  @override
+  String get embyPasswordHelp => '密码仅用于登录，不会保存。留空可保留现有登录会话。';
+
+  @override
+  String get embyLoginRequired => '登录失败或会话已过期。请输入密码并保存以重新登录。';
+
+  @override
   String get apiKey => 'API 密钥';
 
   @override
@@ -234,7 +252,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get connectedServer => '已连接';
 
   @override
-  String get authError => 'API 密钥无效。';
+  String get authError => '认证已过期或被拒绝，请在设置中编辑服务器，重新登录或更新 API 密钥。';
+
+  @override
+  String get permissionError => '当前账号没有访问此内容的权限。';
 
   @override
   String get overview => '概览';

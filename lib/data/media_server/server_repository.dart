@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/app_exception.dart';
 import '../../core/settings/settings.dart';
 import 'server_profile.dart';
 
@@ -19,23 +20,31 @@ class PreferencesServerRepository implements ServerRepository {
 
   @override
   Future<List<ServerProfile>> load() async {
-    final raw = await preferences.getString(key);
-    if (raw == null || raw.isEmpty) return const [];
-    final decoded = jsonDecode(raw);
-    if (decoded is! List) return const [];
-    return decoded
-        .whereType<Map<String, dynamic>>()
-        .map(ServerProfile.fromJson)
-        .where((server) => server.id.isNotEmpty && server.baseUrl.isNotEmpty)
-        .toList();
+    try {
+      final raw = await preferences.getString(key);
+      if (raw == null || raw.isEmpty) return const [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(ServerProfile.fromJson)
+          .where((server) => server.id.isNotEmpty && server.baseUrl.isNotEmpty)
+          .toList();
+    } catch (_) {
+      throw const AppException(FailureKind.storage);
+    }
   }
 
   @override
   Future<void> save(List<ServerProfile> servers) async {
-    await preferences.setString(
-      key,
-      jsonEncode(servers.map((server) => server.toJson()).toList()),
-    );
+    try {
+      await preferences.setString(
+        key,
+        jsonEncode(servers.map((server) => server.toJson()).toList()),
+      );
+    } catch (_) {
+      throw const AppException(FailureKind.storage);
+    }
   }
 }
 
@@ -73,11 +82,11 @@ class ServersNotifier extends AsyncNotifier<List<ServerProfile>> {
     await _save([...current, server]);
   }
 
-  Future<void> upsert(ServerProfile server) async {
+  Future<void> upsert(ServerProfile server, {String? replacingId}) async {
     final current = state.value ?? await future;
     await _save([
       for (final item in current)
-        if (item.id == server.id) server else item,
+        if (item.id == (replacingId ?? server.id)) server else item,
     ]);
   }
 

@@ -1,6 +1,6 @@
 # Sakuga
 
-Jellyfin 第三方客户端，目标平台 macOS（Apple Silicon / arm64）与 Android（arm64-v8a）。
+Jellyfin / Emby 第三方客户端，目标平台 macOS（Apple Silicon / arm64）与 Android（arm64-v8a）。
 基于 `forui_app` 模板（Flutter 3.47.6 + Forui 0.27.5 + Riverpod 3.4.3），播放内核为 media_kit / libmpv，支持 Anime4K 超分辨率。
 
 ## 状态
@@ -14,7 +14,8 @@ M0（工程基建与内核验证）进行中。当前已完成：
 - `flutter analyze` 通过；Android arm64 debug APK 构建成功，16KB 对齐校验通过。
 - Jellyfin 10.10.7 测试服联调通过（认证、UserViews、Items、PlaybackInfo 直连）。
 - Linux 本地开发 runner 已加回；debug 构建与本地播放验证通过（WSLg 需 X11 + 软件 GL）。
-- 设置页新增 **服务器** 配置入口：名称/URL/API 密钥、测试连接、编辑/删除；首页显示已保存服务器。
+- 设置页支持 **Jellyfin / Emby 服务器**：Jellyfin 使用 API 密钥，Emby 使用用户名/密码登录；支持测试连接、编辑、删除与切换，服务器卡片显示类型与账户。
+- Emby 密码仅用于登录，不会保存；访问令牌与服务器信息统一通过 `shared_preferences` 持久化到配置 JSON。测试登录不会保存配置，点击「保存」后才写入。名称修改保留现有登录，修改地址或账户需要重新登录并更新本地身份；会话过期时可编辑服务器，输入密码后保存以重新登录。
 - 媒体库页面已接入：`/Users` → `/UserViews` → `/Items`，支持媒体库切换、刷新与海报网格；配置服务器后会自动重新加载。
 - 媒体库支持按库类型查询、分页滚动加载、剧集/季/集下钻，以及海报父级回退与 DPR 自适应。
 - 详情页（背景图/简介/演职员/分集）与海报磁盘缓存已接入。
@@ -22,10 +23,20 @@ M0（工程基建与内核验证）进行中。当前已完成：
 
 待完成：
 
-- 服务器登录（用户名密码）、API 密钥安全存储（Keychain/Keystore）、服务器切换、播放（下一步 M1/M2）。
+- Jellyfin 用户名密码登录与后续播放功能完善。
 - macOS DMG 的 Developer ID 签名与 Apple 公证（公开分发前配置）。
 - 测试在 Linux 上受 media_kit native assets 编译问题阻塞（见 `docs/m0-status.md`）。
 - Android 真机运行验证（当前环境无设备/模拟器）。
+
+## Emby 使用
+
+在「设置 → 服务器」添加服务器，类型选择 **Emby**，填写服务器地址、用户名和密码，再点击「登录并保存」。地址可包含反向代理子路径或末尾的 /emby；「安全连接」开关用于选择 HTTPS。无密码账号可留空密码。
+
+支持普通视频媒体库的浏览、分页筛选、搜索、详情、季/集、直接播放、服务端转码、内封/外部字幕，以及播放进度和已看状态同步。查询使用登录账号的用户 ID，无需管理员权限。Emby Connect、直播和需要额外打开/关闭流程的动态媒体源暂不支持。
+
+密码不会落盘；Emby 访问令牌、Jellyfin API 密钥和服务器信息统一使用 `shared_preferences` 持久化，重启后从配置恢复。此前单独存储的 Emby 令牌需重新登录后写入配置。修改服务器地址或账号需要重新登录；删除服务器会清理对应的本地令牌。401 提示重新登录，403 显示权限错误。
+
+已使用本地 Docker Emby 4.9.3.0 普通账号完成真实联调：媒体库/搜索/筛选、电影和两集剧集的原生播放、续播拖动、图片和中英文字幕、继续观看、进度写回及已看状态通过。可复用的测试服、账号和开放授权资源见 [Emby 联调环境](tool/emby-test/README.md)；详情见 [联调结果](tool/emby-test/RESULTS.md)。
 
 ## 开发
 
@@ -141,7 +152,7 @@ fvm dart run icons_launcher:create
 lib/
   app/          应用根、路由、响应式外壳、主题
   core/         设置、日志、网络、窗口、平台能力
-  data/         Jellyfin API 与本地存储（M1 起）
+  data/         Jellyfin / Emby API、认证与本地存储
   features/     首页、媒体库、搜索、下载、设置、播放器
   shared/       跨功能 UI 与本地化
   l10n/         中英文 ARB
@@ -166,7 +177,7 @@ test/           单元与 Widget 测试
 - media_kit / libmpv / FFmpeg：见 `about` 页与各包许可。
 - Anime4K：MIT，`assets/shaders/LICENSE`。
 - MiSans：遵循 MiSans 字体知识产权许可协议。
-- Jellyfin：本项目为非官方客户端。
+- Jellyfin / Emby：本项目为非官方客户端。
 
 ## 文档
 

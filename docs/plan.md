@@ -66,7 +66,7 @@ Sakuga 是一个 **Jellyfin 第三方客户端**，不是媒体服务器，也�
 
 ### 1.3 本期范围（P0，v1.0）
 
-- 服务器：手动地址、局域网发现（UDP 7359）、HTTPS/自签名提示、用户名密码登录、Quick Connect、多服务器切换、token 安全存储。
+- 服务器：手动地址、局域网发现（UDP 7359）、HTTPS/自签名提示、用户名密码登录、Quick Connect、多服务器切换、token 持久化。
 - 浏览：首页（继续观看/最近添加/收藏）、媒体库网格、剧集/季/集、详情页（简介/演职员/相似）、搜索、排序筛选。
 - 播放：PlaybackInfo 协商、直连/直连流/转码、HLS、进度上报与续播、音轨/字幕切换、ASS/PGS 字幕、倍速、画面比例、全屏/横屏、PiP、后台音频、媒体通知、错误恢复。
 - 超分：关/自动/效率/质量四档、运行时切换、按设备默认、性能守卫与自动降级、Anime4K 许可声明。
@@ -111,7 +111,7 @@ Sakuga 是一个 **Jellyfin 第三方客户端**，不是媒体服务器，也�
 | --- | --- | --- |
 | `lib/app/` | 应用根、主题、路由、响应式 Shell、桌面标题栏 | **保留并改造**：路由换成 Sakuga 的 5 个分区；桌面标题栏保留；新增播放器全屏路由（需根 `navigatorKey`）。 |
 | `lib/core/logging/` | 分级日志、按日文件、7 天保留、ZIP 导出、实时日志视图 | **原样保留**，播放器诊断直接复用。 |
-| `lib/core/settings/` | SharedPreferences + JSON、写入队列、失败回滚 | **保留并扩展**：新增播放器设置、服务器列表；token 改走 Keychain/Keystore。 |
+| `lib/core/settings/` | SharedPreferences + JSON、写入队列、失败回滚 | **保留并扩展**：新增播放器设置、服务器列表；token 与配置统一使用 SharedPreferences 持久化。 |
 | `lib/core/network/` | Dio + 超时 + 取消 + Mock | **保留骨架，替换为 Jellyfin API Client**；拦截器改为 MediaBrowser 认证。 |
 | `lib/core/window/` | window_manager 封装、macOS 自绘红黄绿 | **保留**；接口目前只有读 `fullScreen`，需补 `setFullScreen(bool)`，并同步 `test/fakes.dart`。 |
 | `lib/shared/` | 本地化访问、响应式按钮、通用 widgets | **保留**，补充媒体卡片、骨架屏、空态。 |
@@ -137,7 +137,7 @@ Sakuga 是一个 **Jellyfin 第三方客户端**，不是媒体服务器，也�
 8. **无后台能力**：Android 清单只有 INTERNET；需补前台服务、WAKE_LOCK、POST_NOTIFICATIONS、PiP、extractNativeLibs。
 9. **局域网 http 默认不通**：Android targetSdk 36 无 `usesCleartextTraffic`；macOS Info.plist 无 ATS。Jellyfin 常见 `http://192.168.x.x:8096` 会失败。
 10. **release 仍用 debug 签名**：Android 必须换正式 keystore；macOS 无 `DEVELOPMENT_TEAM`，需补。
-11. **媒体库 token 不能放 SharedPreferences**：用 `flutter_secure_storage`（Keychain/Keystore）。
+11. **媒体库 token 与服务器配置统一使用 SharedPreferences 持久化**；密码仅用于登录请求，不保存。
 12. **示例删除顺序**：删 catalog 必须同时删 `assets/snippets/`、`tool/sync_snippets.dart`、pubspec assets 条目与相关测试，否则 README 的 `--check` 流程会红。
 
 ### 2.2 Kazumi 的超分与播放器：能借鉴什么，不能拿什么
@@ -443,7 +443,7 @@ tool/
 | --- | --- | --- | --- |
 | media_kit | git fork pin `83b7ca6` | 播放内核 | 只加 `media_kit` + `media_kit_video`；不要加 `media_kit_libs_*`；fork 的 media_kit_video 自带 SwiftPM 包 |
 | media_kit_video | 同 fork 同 commit | 视频渲染 | `vo`/`hwdec`/`enableAndroidSurfaceProducer` |
-| flutter_secure_storage | ^9/^10 | token/密码 | Keychain / Keystore |
+| shared_preferences | 沿用项目版本 | 设置、服务器、API 密钥与访问令牌持久化 | 密码不持久化 |
 | audio_session | ^0.2 | 音频焦点/中断 | Android/iOS/macOS |
 | audio_service | ^0.18 | 后台音频/媒体通知 | Android 前台服务 |
 | wakelock_plus | ^1.2 | 播放时保持唤醒 | 全平台 |
@@ -869,7 +869,7 @@ abstract interface class PlayerEngine {
 ### 3.9 数据、缓存与离线
 
 - 设置：SharedPreferences（模板）；播放器设置单独 key/版本；迁移策略。
-- Token：`flutter_secure_storage`；多服务器 `serverId -> {url, token, userId, deviceId}`；退出登录清除。
+- Token：`shared_preferences`；多服务器 `serverId -> {url, token, userId, deviceId}`；删除服务器时清除对应配置。
 - 图片：磁盘缓存（cached_network_image 或自建 LRU）；按 maxWidth 请求；弱网降级占位图。
 - 播放进度：服务器 `UserData` 为准，本地记录最近位置（离线/失败兜底）；冲突时取较新/较大值（可配置）。
 - 历史/继续观看：服务器 API + 本地缓存。
@@ -882,7 +882,7 @@ abstract interface class PlayerEngine {
 - 自签名证书仅对用户确认的服务器放行；展示 SHA-256 指纹。
 - 默认无遥测；崩溃上报（若启用）需明确开关与隐私说明。
 - 测试服凭据只放本地环境变量/CI secret，不写入仓库、不写进日志。
-- 服务器 API 密钥：当前开发期临时存 `SharedPreferences`（`sakuga.servers.v1`），**仅用于内测**；M1 必须迁移到 Keychain/Keystore（`flutter_secure_storage`），并避免写入日志/导出。
+- 服务器 API 密钥与访问令牌：统一存入 `SharedPreferences`（`sakuga.servers.v1`），避免写入日志/导出；密码不持久化。
 - 许可证：
   - Anime4K shader：MIT，保留 `LICENSE` 与关于页声明。
   - media_kit / libmpv / FFmpeg：MIT/LGPL/GPL 组合，随包附许可；FFmpeg 的 LGPL/GPL 取决于编译选项，需在关于页说明。
@@ -942,7 +942,7 @@ abstract interface class PlayerEngine {
 
 **连接**
 - [ ] 服务器地址输入/校验/子路径/自签名确认。
-- [ ] 用户名密码登录 + token 安全存储 + 401 处理 + deviceId 派生。
+- [ ] 用户名密码登录 + token 持久化 + 401 处理 + deviceId 派生。
 - [ ] Quick Connect。
 - [ ] 多服务器列表/切换/删除。
 - [ ] UDP 7359 发现（可选，手动兜底）。

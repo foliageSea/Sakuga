@@ -1,14 +1,10 @@
-import '../media_server/playback_models.dart';
+import '../media_browser/media_browser_playback_session.dart';
 
-class JellyfinPlaybackSession implements PlaybackSession {
+class JellyfinPlaybackSession extends MediaBrowserPlaybackSession {
   const JellyfinPlaybackSession({
-    required this.itemId,
-    required this.mediaSourceId,
-    required this.playSessionId,
-    required this.playMethod,
+    required super.itemId,
+    required super.mediaSourceId,
+    required super.playSessionId,
+    required super.playMethod,
   });
-  final String itemId;
-  final String mediaSourceId;
-  final String playSessionId;
-  final PlayMethod playMethod;
 }

@@ -80,13 +80,13 @@ Linux 运行依赖（WSL 最小镜像）：`libva2`、`libva-drm2`、`libva-x11-
   - 删除确认；
   - 测试连接：无 API 密钥时调用 `GET /System/Info/Public`；有密钥时带 `Authorization: MediaBrowser` 调 `GET /System/Info` 并校验 401。
 - 首页显示已保存的第一台服务器；未配置时显示“添加服务器”入口。
-- 存储：`SharedPreferences` 键 `sakuga.servers.v1`，当前包含名称/URL/API 密钥。**开发期临时方案**；M1 需把 API 密钥迁移到 Keychain/Keystore（`flutter_secure_storage`）。
+- 存储：统一使用 `SharedPreferences` 键 `sakuga.servers.v1`，保存名称、URL、Jellyfin API 密钥及 Emby 访问令牌等服务器配置；密码不持久化。
 - 相关文件：
   - `lib/data/jellyfin/server_profile.dart`
   - `lib/data/jellyfin/server_repository.dart`
   - `lib/data/jellyfin/jellyfin_probe.dart`
   - `lib/features/settings/servers_section.dart`
-- 待办：登录（`/Users/AuthenticateByName`）、API 密钥/Token 安全存储、服务器切换、连接状态。
+- 待办：登录（`/Users/AuthenticateByName`）、API 密钥/Token 持久化、服务器切换、连接状态。
 
 ### 1.8 媒体库内容
 

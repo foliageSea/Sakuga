@@ -206,6 +206,42 @@ abstract class AppLocalizations {
   /// **'Secure connection'**
   String get secureConnection;
 
+  /// No description provided for @serverType.
+  ///
+  /// In en, this message translates to:
+  /// **'Server type'**
+  String get serverType;
+
+  /// No description provided for @serverUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get serverUsername;
+
+  /// No description provided for @serverPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get serverPassword;
+
+  /// No description provided for @serverUsernameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a username.'**
+  String get serverUsernameRequired;
+
+  /// No description provided for @embyPasswordHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Your password is used only to sign in and is never saved. Leave it blank to keep an existing session.'**
+  String get embyPasswordHelp;
+
+  /// No description provided for @embyLoginRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in failed or your session expired. Enter your password and save to sign in again.'**
+  String get embyLoginRequired;
+
   /// No description provided for @apiKey.
   ///
   /// In en, this message translates to:
@@ -521,8 +557,14 @@ abstract class AppLocalizations {
   /// No description provided for @authError.
   ///
   /// In en, this message translates to:
-  /// **'API key rejected.'**
+  /// **'Authentication expired or rejected. Edit the server in Settings to sign in again or update its API key.'**
   String get authError;
+
+  /// No description provided for @permissionError.
+  ///
+  /// In en, this message translates to:
+  /// **'This account does not have permission to access this resource.'**
+  String get permissionError;
 
   /// No description provided for @overview.
   ///

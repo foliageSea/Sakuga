@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../emby/emby_client.dart';
+import '../emby/emby_probe.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/jellyfin_probe.dart';
 import 'media_server_client.dart';
@@ -10,9 +12,11 @@ class MediaServerFactory {
   const MediaServerFactory();
   MediaServerClient createClient(ServerProfile server) => switch (server.type) {
     MediaServerType.jellyfin => JellyfinClient(server: server),
+    MediaServerType.emby => EmbyClient(server: server),
   };
   ServerProbe createProbe(MediaServerType type) => switch (type) {
     MediaServerType.jellyfin => JellyfinProbe(),
+    MediaServerType.emby => EmbyProbe(),
   };
 }
 

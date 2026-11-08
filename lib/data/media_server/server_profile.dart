@@ -1,4 +1,4 @@
-enum MediaServerType { jellyfin }
+enum MediaServerType { jellyfin, emby }
 
 class ServerProfile {
   const ServerProfile({
@@ -7,6 +7,11 @@ class ServerProfile {
     required this.baseUrl,
     this.apiKey = '',
     this.type = MediaServerType.jellyfin,
+    this.accessToken = '',
+    this.userId = '',
+    this.username = '',
+    this.deviceId = '',
+    this.remoteServerId = '',
   });
 
   final String id;
@@ -15,21 +20,49 @@ class ServerProfile {
   final String apiKey;
   final MediaServerType type;
 
-  ServerProfile copyWith({String? name, String? baseUrl, String? apiKey}) =>
-      ServerProfile(
-        id: id,
-        name: name ?? this.name,
-        baseUrl: baseUrl ?? this.baseUrl,
-        apiKey: apiKey ?? this.apiKey,
-        type: type,
-      );
+  final String accessToken;
+  final String userId;
+  final String username;
+  final String deviceId;
+  final String remoteServerId;
+
+  ServerProfile copyWith({
+    String? id,
+    String? name,
+    String? baseUrl,
+    String? apiKey,
+    MediaServerType? type,
+    String? accessToken,
+    String? userId,
+    String? username,
+    String? deviceId,
+    String? remoteServerId,
+  }) => ServerProfile(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    baseUrl: baseUrl ?? this.baseUrl,
+    apiKey: apiKey ?? this.apiKey,
+    type: type ?? this.type,
+    accessToken: accessToken ?? this.accessToken,
+    userId: userId ?? this.userId,
+    username: username ?? this.username,
+    deviceId: deviceId ?? this.deviceId,
+    remoteServerId: remoteServerId ?? this.remoteServerId,
+  );
 
   Map<String, Object> toJson() => {
     'id': id,
     'name': name,
     'baseUrl': baseUrl,
-    'apiKey': apiKey,
+    'apiKey': type == MediaServerType.jellyfin ? apiKey : '',
     'type': type.name,
+    if (type == MediaServerType.emby) ...{
+      'accessToken': accessToken,
+      'userId': userId,
+      'username': username,
+      'deviceId': deviceId,
+      'remoteServerId': remoteServerId,
+    },
   };
 
   factory ServerProfile.fromJson(Map<String, dynamic> json) => ServerProfile(
@@ -40,5 +73,10 @@ class ServerProfile {
     type: json['type'] == null
         ? MediaServerType.jellyfin
         : MediaServerType.values.byName(json['type'] as String),
+    accessToken: json['accessToken'] as String? ?? '',
+    userId: json['userId'] as String? ?? '',
+    username: json['username'] as String? ?? '',
+    deviceId: json['deviceId'] as String? ?? '',
+    remoteServerId: json['remoteServerId'] as String? ?? '',
   );
 }

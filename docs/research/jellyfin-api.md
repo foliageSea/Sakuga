@@ -62,7 +62,7 @@ schema：`QuickConnectResult{Authenticated,Secret,Code,DeviceId,DeviceName,AppNa
 ### 2.4 Token 生命周期与 401
 - 无 refresh token → 长期 access token，只能 `POST /Sessions/Logout` 主动失效。
 - 401 处理：拦截器标记该档案失效 → 引导重登；**不要**自动重试登录循环（会撞 deviceId 单 token 限制）。
-- 存储：token 用 Keychain / EncryptedSharedPreferences（`flutter_secure_storage`）；baseUrl、userId、deviceId、用户名存普通存储，供"最近服务器"列表。
+- 项目存储策略：token、API 密钥、baseUrl、userId、deviceId、用户名统一使用 `shared_preferences` 持久化到服务器档案，供“最近服务器”列表及会话恢复；密码不持久化。
 
 ## 3. 浏览
 

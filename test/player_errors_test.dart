@@ -2,6 +2,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sakuga/features/player/player_errors.dart';
 
 void main() {
+  test('native playback logs omit authenticated URLs and raw credentials', () {
+    final message = redactPlaybackError(
+      'Failed https://media.test/stream?api_key=private-token X-Emby-Token: private-token',
+      secrets: ['private-token'],
+    );
+    expect(message, isNot(contains('private-token')));
+    expect(message, isNot(contains('https://')));
+    expect(message, contains('Failed'));
+  });
+
   const subtitle =
       'http://media.test/Videos/item/source/Subtitles/2/0/Stream.dvdsub?api_key=test';
   const video = 'http://media.test/Videos/item/stream.mkv?api_key=test';

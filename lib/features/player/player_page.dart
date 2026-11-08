@@ -183,7 +183,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     );
     _subscriptions.add(
       _player.stream.error.listen((error) {
-        debugPrint('PLAYER_ERROR $error');
+        debugPrint('PLAYER_ERROR ${_errorForLog(error)}');
         if (isExternalSubtitleLoadError(
           error,
           _pendingSubtitles.map((subtitle) => subtitle.url),
@@ -217,6 +217,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     unawaited(_openMedia());
   }
 
+  String _errorForLog(Object error) => redactPlaybackError(
+    error,
+    secrets: [_client?.server.accessToken ?? '', _client?.server.apiKey ?? ''],
+  );
+
   static Duration _resumeThreshold(Duration target) =>
       target > const Duration(seconds: 2)
       ? target - const Duration(seconds: 2)
@@ -237,7 +242,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             subtitle.language ?? 'und',
           ]);
         } catch (error, stackTrace) {
-          debugPrint('PLAYER_SUBTITLE_ADD_ERROR $error\n$stackTrace');
+          debugPrint(
+            'PLAYER_SUBTITLE_ADD_ERROR ${_errorForLog(error)}\n$stackTrace',
+          );
         }
       }
     }
@@ -345,7 +352,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       if (!mounted || generation != _openGeneration) return;
       await _startTracking();
     } catch (error, stackTrace) {
-      debugPrint('PLAYER_OPEN_ERROR $error\n$stackTrace');
+      debugPrint('PLAYER_OPEN_ERROR ${_errorForLog(error)}\n$stackTrace');
       if (mounted && generation == _openGeneration) {
         setState(() {
           _loading = false;
@@ -418,7 +425,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           positionTicks: persistedTicks,
         );
       } catch (error, stackTrace) {
-        debugPrint('PLAYER_LOCAL_PROGRESS_WRITE_ERROR $error\n$stackTrace');
+        debugPrint(
+          'PLAYER_LOCAL_PROGRESS_WRITE_ERROR ${_errorForLog(error)}\n$stackTrace',
+        );
       }
     });
 
@@ -454,7 +463,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             );
           }
         } catch (error, stackTrace) {
-          debugPrint('PLAYER_SESSION_SYNC_ERROR $error\n$stackTrace');
+          debugPrint(
+            'PLAYER_SESSION_SYNC_ERROR ${_errorForLog(error)}\n$stackTrace',
+          );
         }
         await client.updatePlaybackPosition(
           userId,
@@ -470,7 +481,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           positionTicks: persistedTicks,
         );
       } catch (error, stackTrace) {
-        debugPrint('PLAYER_PROGRESS_SYNC_ERROR $error\n$stackTrace');
+        debugPrint(
+          'PLAYER_PROGRESS_SYNC_ERROR ${_errorForLog(error)}\n$stackTrace',
+        );
       }
     });
   }
@@ -494,7 +507,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   Future<void> _serializeLocal(Future<void> Function() operation) {
     final next = _localTail.then((_) => operation());
     _localTail = next.catchError((Object error, StackTrace stackTrace) {
-      debugPrint('PLAYER_LOCAL_PROGRESS_QUEUE_ERROR $error\n$stackTrace');
+      debugPrint(
+        'PLAYER_LOCAL_PROGRESS_QUEUE_ERROR ${_errorForLog(error)}\n$stackTrace',
+      );
     });
     return next;
   }
@@ -502,7 +517,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   Future<void> _serializeSync(Future<void> Function() operation) {
     final next = _syncTail.then((_) => operation());
     _syncTail = next.catchError((Object error, StackTrace stackTrace) {
-      debugPrint('PLAYER_PROGRESS_QUEUE_ERROR $error\n$stackTrace');
+      debugPrint(
+        'PLAYER_PROGRESS_QUEUE_ERROR ${_errorForLog(error)}\n$stackTrace',
+      );
     });
     return next;
   }
@@ -539,7 +556,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
     unawaited(
       _player.pause().catchError((Object error, StackTrace stackTrace) {
-        debugPrint('PLAYER_PAUSE_ON_EXIT_ERROR $error\n$stackTrace');
+        debugPrint(
+          'PLAYER_PAUSE_ON_EXIT_ERROR ${_errorForLog(error)}\n$stackTrace',
+        );
       }),
     );
     leavePlayer(
@@ -586,7 +605,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       await _applySuperResolution(mode);
       if (mounted) setState(() => _superResolutionMode = mode);
     } catch (error, stackTrace) {
-      debugPrint('PLAYER_SHADER_ERROR $error\n$stackTrace');
+      debugPrint('PLAYER_SHADER_ERROR ${_errorForLog(error)}\n$stackTrace');
       if (mounted) notifyUser(context, context.l10n.superResolutionError);
     }
   }
@@ -618,7 +637,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     try {
       await _player.setAudioTrack(track);
     } catch (error, stackTrace) {
-      debugPrint('PLAYER_AUDIO_ERROR $error\n$stackTrace');
+      debugPrint('PLAYER_AUDIO_ERROR ${_errorForLog(error)}\n$stackTrace');
       if (mounted && generation == _openGeneration) {
         notifyUser(context, context.l10n.audioTrackError);
       }
@@ -650,7 +669,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           );
         })
         .catchError((Object error, StackTrace stackTrace) {
-          debugPrint('PLAYER_SUBTITLE_RENDER_ERROR $error\n$stackTrace');
+          debugPrint(
+            'PLAYER_SUBTITLE_RENDER_ERROR ${_errorForLog(error)}\n$stackTrace',
+          );
         });
   }
 
@@ -658,7 +679,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     try {
       await _player.setSubtitleTrack(track);
     } catch (error, stackTrace) {
-      debugPrint('PLAYER_SUBTITLE_ERROR $error\n$stackTrace');
+      debugPrint('PLAYER_SUBTITLE_ERROR ${_errorForLog(error)}\n$stackTrace');
       if (mounted) notifyUser(context, context.l10n.subtitleError);
     }
   }
@@ -688,7 +709,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       setState(() {});
       await _openMedia();
     } catch (error, stackTrace) {
-      debugPrint('PLAYER_EPISODE_ERROR $error\n$stackTrace');
+      debugPrint('PLAYER_EPISODE_ERROR ${_errorForLog(error)}\n$stackTrace');
       if (mounted) notifyUser(context, failureMessage(context, error));
     } finally {
       if (mounted) _switchingEpisode.value = false;
