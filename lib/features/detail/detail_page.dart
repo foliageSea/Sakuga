@@ -916,6 +916,10 @@ class _SeasonCard extends StatelessWidget {
       genres: season.genres,
     );
     final count = season.childCount ?? season.recursiveItemCount;
+    final metadata = [
+      if (season.productionYear != null) '${season.productionYear}',
+      if (count != null) context.l10n.libraryEpisodeCount(count),
+    ].join(' · ');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -935,10 +939,10 @@ class _SeasonCard extends StatelessWidget {
             ),
           ),
         ),
-        if (count != null) ...[
+        if (metadata.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
-            context.l10n.libraryEpisodeCount(count),
+            metadata,
             textAlign: TextAlign.center,
             style: context.theme.typography.body.xs.copyWith(
               color: context.theme.colors.mutedForeground,
