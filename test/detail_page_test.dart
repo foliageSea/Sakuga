@@ -426,6 +426,23 @@ void main() {
         );
         final season = find.byKey(const ValueKey('detail-season-season-1'));
         expect(season, findsOneWidget);
+        final card = tester.widget<MediaPosterCard>(season);
+        expect(card.framed, isTrue);
+        expect(card.textAlign, TextAlign.start);
+        expect(card.subtitle, '13 episodes');
+        final surface = find.descendant(
+          of: season,
+          matching: find.byType(Surface),
+        );
+        expect(surface, findsOneWidget);
+        expect(
+          find.descendant(of: surface, matching: find.text('Season 1')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: surface, matching: find.text('13 episodes')),
+          findsOneWidget,
+        );
         expect(find.text('13 episodes'), findsOneWidget);
         expect(queries, isEmpty);
         await tester.ensureVisible(season);

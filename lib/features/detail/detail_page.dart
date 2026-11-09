@@ -920,36 +920,20 @@ class _SeasonCard extends StatelessWidget {
       if (season.productionYear != null) '${season.productionYear}',
       if (count != null) context.l10n.libraryEpisodeCount(count),
     ].join(' · ');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        MediaPosterCard(
-          key: ValueKey('detail-season-${season.id}'),
-          client: client,
+    return MediaPosterCard(
+      key: ValueKey('detail-season-${season.id}'),
+      client: client,
+      item: preview,
+      subtitle: metadata.isNotEmpty ? metadata : null,
+      heroTag: posterHeroTag(season.id),
+      onPosterTap: (posterUrl) => context.push(
+        '/library/${season.id}',
+        extra: DetailRouteExtra(
           item: preview,
-          framed: false,
-          textAlign: TextAlign.center,
-          heroTag: posterHeroTag(season.id),
-          onPosterTap: (posterUrl) => context.push(
-            '/library/${season.id}',
-            extra: DetailRouteExtra(
-              item: preview,
-              posterUrl: posterUrl,
-              seriesId: series.id,
-            ),
-          ),
+          posterUrl: posterUrl,
+          seriesId: series.id,
         ),
-        if (metadata.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(
-            metadata,
-            textAlign: TextAlign.center,
-            style: context.theme.typography.body.xs.copyWith(
-              color: context.theme.colors.mutedForeground,
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
