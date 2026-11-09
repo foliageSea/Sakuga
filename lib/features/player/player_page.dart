@@ -28,6 +28,7 @@ import 'player_errors.dart';
 import 'player_subtitles.dart';
 import 'player_subtitle_rendering.dart';
 import 'player_track_format.dart';
+import 'player_quality.dart';
 import 'player_screenshot.dart';
 
 // This provider outlives the route so pending saves can refresh the library
@@ -102,6 +103,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   bool _stopped = false;
   bool _exiting = false;
   bool _backgroundCheckpointed = false;
+
+  /// User bitrate cap (bits per second); null keeps maximum quality. It stays
+  /// in effect for later episodes opened in this player.
+  int? _maxStreamingBitrate;
+  PlayMethod? _playMethod;
+  bool _switchingQuality = false;
   int _lastLocalSaveTicks = -1;
   int _lastReportedTicks = -1;
   Timer? _progressTimer;
@@ -267,7 +274,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     }
   }
 
-  Future<void> _openMedia() async {
+  Future<void> _openMedia({Duration? resumeAt}) async {
     if (_exiting || !mounted) return;
     if (_tracking) {
       await _stopTracking(failed: _error != null)
@@ -280,8 +287,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       setState(() {
         _loading = true;
         _error = null;
+        _playMethod = null;
       });
     }
+    MediaServerClient? openedClient;
+    PlaybackSource? source;
+    var tracked = false;
     try {
       final assets = await PlayerAssets.prepare();
       if (!mounted || generation != _openGeneration) return;
@@ -319,15 +330,20 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         userId: library.userId,
         itemId: itemId,
       );
-      final ticks = localTicks ?? serverTicks;
+      final ticks = resumeAt == null
+          ? localTicks ?? serverTicks
+          : _durationToTicks(resumeAt);
       if (!mounted || generation != _openGeneration) return;
-      final source = await library.client.playbackSource(
+      openedClient = library.client;
+      source = await library.client.playbackSource(
         library.userId,
         itemId,
         startPosition: Duration(microseconds: ticks ~/ 10),
+        maxStreamingBitrate: _maxStreamingBitrate,
       );
       if (!mounted || generation != _openGeneration) return;
       _client = library.client;
+      setState(() => _playMethod = source!.playMethod);
       _playbackSession = source.session;
       _serverId = library.client.server.id;
       _userId = library.userId;
@@ -364,6 +380,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       }
       if (!mounted || generation != _openGeneration) return;
       _syncSubtitleRendering();
+      // From here a Stopped report (and its cleanup) owns this session.
+      tracked = true;
       await _startTracking();
     } catch (error, stackTrace) {
       debugPrint('PLAYER_OPEN_ERROR ${_errorForLog(error)}\n$stackTrace');
@@ -373,6 +391,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           _error = error;
         });
       }
+    } finally {
+      // Superseded, disposed or failed opens never send a Stopped report.
+      if (!tracked) _releaseUntrackedSource(openedClient, source);
     }
   }
 
@@ -385,6 +406,53 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     userId: userId,
     itemId: itemId,
   );
+
+  /// A negotiated stream that never reached playback tracking will not send a
+  /// Stopped report, so release any transcoding job it may have started.
+  void _releaseUntrackedSource(
+    MediaServerClient? client,
+    PlaybackSource? source,
+  ) {
+    if (client == null || source == null) return;
+    unawaited(
+      client.stopTranscoding(source.session).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        debugPrint(
+          'PLAYER_TRANSCODE_CLEANUP_ERROR ${_errorForLog(error)}\n$stackTrace',
+        );
+      }),
+    );
+  }
+
+  /// Renegotiates the current item with a new bitrate cap and resumes from the
+  /// current position. Also usable after a failed open as a manual fallback.
+  Future<void> _setQuality(int? bitrate, int generation) async {
+    if (!mounted ||
+        generation != _openGeneration ||
+        _loading ||
+        _switchingQuality ||
+        _switchingEpisode.value ||
+        _exiting ||
+        bitrate == _maxStreamingBitrate) {
+      return;
+    }
+    final resumeAt = Duration(microseconds: _positionTicks ~/ 10);
+    _switchingQuality = true;
+    setState(() => _maxStreamingBitrate = bitrate);
+    try {
+      try {
+        await _player.pause();
+      } catch (error) {
+        debugPrint('PLAYER_PAUSE_ON_QUALITY_ERROR ${_errorForLog(error)}');
+      }
+      await _openMedia(resumeAt: resumeAt);
+    } finally {
+      _switchingQuality = false;
+      if (mounted) setState(() {});
+    }
+  }
 
   Future<void> _startTracking() async {
     _tracking = true;
@@ -455,12 +523,24 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       try {
         try {
           if (stopped) {
-            await client.reportPlaybackStopped(
-              session,
-              position: Duration(microseconds: sessionTicks ~/ 10),
-              failed: failed,
-              volume: volume,
-            );
+            try {
+              await client.reportPlaybackStopped(
+                session,
+                position: Duration(microseconds: sessionTicks ~/ 10),
+                failed: failed,
+                volume: volume,
+              );
+            } finally {
+              // Do not leave a server transcoding job behind when switching
+              // quality, changing episodes or leaving the player.
+              try {
+                await client.stopTranscoding(session);
+              } catch (error, stackTrace) {
+                debugPrint(
+                  'PLAYER_TRANSCODE_CLEANUP_ERROR ${_errorForLog(error)}\n$stackTrace',
+                );
+              }
+            }
           } else if (started) {
             await client.reportPlaybackStarted(
               session,
@@ -880,6 +960,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           mode: _superResolutionMode,
           onChanged: _setSuperResolution,
         ),
+        if (_devMediaUrl.isEmpty) ...[
+          const SizedBox(width: 8),
+          ValueListenableBuilder<bool>(
+            valueListenable: _switchingEpisode,
+            builder: (context, switching, _) => PlayerQualityMenu(
+              selected: _maxStreamingBitrate,
+              playMethod: _playMethod,
+              enabled:
+                  !_loading && !_switchingQuality && !switching && !_exiting,
+              onChanged: (bitrate) => _setQuality(bitrate, generation),
+            ),
+          ),
+        ],
         const SizedBox(width: 8),
         ValueListenableBuilder<bool>(
           valueListenable: _switchingEpisode,

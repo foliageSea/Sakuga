@@ -492,6 +492,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get audioTrackError => 'Could not switch audio tracks.';
 
   @override
+  String get playbackQuality => 'Playback quality';
+
+  @override
+  String get playbackQualityMaximum => 'Maximum';
+
+  @override
+  String get playbackQualityHint =>
+      'Lower limits may make the server transcode.';
+
+  @override
+  String get playMethodDirectPlay => 'Direct play';
+
+  @override
+  String get playMethodDirectStream => 'Direct stream';
+
+  @override
+  String get playMethodTranscode => 'Transcoding';
+
+  @override
   String get trackLanguageChinese => 'Chinese';
 
   @override

@@ -468,6 +468,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get audioTrackError => '无法切换音轨。';
 
   @override
+  String get playbackQuality => '播放质量';
+
+  @override
+  String get playbackQualityMaximum => '最高画质';
+
+  @override
+  String get playbackQualityHint => '限制码率后，服务器可能转码。';
+
+  @override
+  String get playMethodDirectPlay => '直接播放';
+
+  @override
+  String get playMethodDirectStream => '直接串流';
+
+  @override
+  String get playMethodTranscode => '转码';
+
+  @override
   String get trackLanguageChinese => '中文';
 
   @override

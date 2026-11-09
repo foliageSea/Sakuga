@@ -60,6 +60,9 @@ abstract class MediaBrowserClient implements MediaServerClient {
 
   String get apiBaseUrl => server.baseUrl;
 
+  /// Device identity sent in authorization; transcoding jobs are keyed by it.
+  String get playbackDeviceId;
+
   String absoluteUrl(String path) {
     final uri = Uri.parse(path);
     if (uri.hasScheme) return path;
@@ -88,8 +91,10 @@ abstract class MediaBrowserClient implements MediaServerClient {
     String userId,
     String itemId, {
     Duration startPosition = Duration.zero,
+    int? maxStreamingBitrate,
   }) async {
     final startTimeTicks = mediaBrowserTicks(startPosition);
+    final bitrate = maxStreamingBitrate ?? defaultMaxStreamingBitrate;
     final response = await _dio.post<Map<String, dynamic>>(
       '/Items/$itemId/PlaybackInfo',
       queryParameters: {'userId': userId},
@@ -97,13 +102,18 @@ abstract class MediaBrowserClient implements MediaServerClient {
         'UserId': userId,
         if (emby) 'IsPlayback': true,
         'StartTimeTicks': startTimeTicks,
-        'MaxStreamingBitrate': 120000000,
+        // Servers fall back to transcoding when the source exceeds this limit.
+        'MaxStreamingBitrate': bitrate,
         'EnableDirectPlay': true,
         'EnableDirectStream': true,
         'EnableTranscoding': true,
         'AllowVideoStreamCopy': true,
         'AllowAudioStreamCopy': true,
-        'DeviceProfile': _mpvDeviceProfile,
+        'DeviceProfile': {
+          ..._mpvDeviceProfile,
+          'MaxStreamingBitrate': bitrate,
+          'MaxStaticBitrate': bitrate,
+        },
       },
     );
     final data = response.data ?? const <String, dynamic>{};
@@ -148,15 +158,16 @@ abstract class MediaBrowserClient implements MediaServerClient {
           entry.key.toString(): entry.value.toString(),
     };
     final subtitles = _subtitleSources(source, itemId);
+    final playMethod = source['SupportsDirectPlay'] == true
+        ? PlayMethod.directPlay
+        : (source['TranscodingUrl'] as String?)?.isNotEmpty == true
+        ? PlayMethod.transcode
+        : PlayMethod.directStream;
     final session = createSession(
       itemId: itemId,
       mediaSourceId: mediaSourceId,
       playSessionId: playSessionId,
-      playMethod: source['SupportsDirectPlay'] == true
-          ? PlayMethod.directPlay
-          : (source['TranscodingUrl'] as String?)?.isNotEmpty == true
-          ? PlayMethod.transcode
-          : PlayMethod.directStream,
+      playMethod: playMethod,
     );
 
     if (source['SupportsDirectPlay'] == true) {
@@ -173,6 +184,7 @@ abstract class MediaBrowserClient implements MediaServerClient {
         startPosition: _durationFromTicks(startTimeTicks),
         subtitles: subtitles,
         session: session,
+        playMethod: playMethod,
       );
     }
 
@@ -194,6 +206,7 @@ abstract class MediaBrowserClient implements MediaServerClient {
         positionOffset: transcodeOffset,
         subtitles: subtitles,
         session: session,
+        playMethod: playMethod,
       );
     }
 
@@ -211,10 +224,42 @@ abstract class MediaBrowserClient implements MediaServerClient {
         startPosition: _durationFromTicks(startTimeTicks),
         subtitles: subtitles,
         session: session,
+        playMethod: playMethod,
       );
     }
 
     throw const AppException(FailureKind.invalidData, 'No playable source');
+  }
+
+  @override
+  Future<void> stopTranscoding(PlaybackSession session) async {
+    if (session is! MediaBrowserPlaybackSession ||
+        !acceptsSession(session) ||
+        session.playMethod != PlayMethod.transcode ||
+        session.playSessionId.isEmpty) {
+      return;
+    }
+    final cancelToken = CancelToken();
+    try {
+      await _dio
+          .delete<void>(
+            '/Videos/ActiveEncodings',
+            queryParameters: {
+              'deviceId': playbackDeviceId,
+              'playSessionId': session.playSessionId,
+            },
+            cancelToken: cancelToken,
+            options: Options(
+              connectTimeout: _playbackReportTimeout,
+              sendTimeout: _playbackReportTimeout,
+              receiveTimeout: _playbackReportTimeout,
+            ),
+          )
+          .timeout(_playbackReportTimeout);
+    } on TimeoutException {
+      cancelToken.cancel('Transcoding cleanup timed out');
+      rethrow;
+    }
   }
 
   @override

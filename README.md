@@ -38,6 +38,20 @@ M0（工程基建与内核验证）进行中。当前已完成：
 
 已使用本地 Docker Emby 4.9.3.0 普通账号完成真实联调：媒体库/搜索/筛选、电影和两集剧集的原生播放、续播拖动、图片和中英文字幕、继续观看、进度写回及已看状态通过。可复用的测试服、账号和开放授权资源见 [Emby 联调环境](tool/emby-test/README.md)；详情见 [联调结果](tool/emby-test/RESULTS.md)。Jellyfin 账号登录也已通过 Docker Jellyfin 12.4.0 普通账号的真实浏览、原生播放、字幕和进度同步验证，见 [Jellyfin 联调环境](tool/jellyfin-test/README.md) 与 [结果](tool/jellyfin-test/RESULTS.md)。
 
+## 播放质量
+
+播放器顶部的「播放质量」可选择最高画质或 40 / 20 / 10 / 4 / 1.5 Mbps、720 kbps 码率上限。切换时停止当前会话并清理服务端转码任务，以新上限重新请求 PlaybackInfo，从当前位置继续播放；菜单显示当前为直接播放、直接串流还是转码。源码率未超过上限且格式兼容时，服务器仍可直接播放。选择在本次播放器内的后续剧集中保持，重新进入播放器恢复最高画质。
+
+退出、切集和换画质时会在停止上报后调用 `DELETE /Videos/ActiveEncodings` 清理转码；协商成功但未进入播放（失败、被新的打开操作取代）的会话同样清理。目前不保留切换前手动选择的音轨／字幕，暂不支持直播放失败后的自动回退。
+
+可选真实联调测试（需本地 Docker Jellyfin / Emby 及其 live-config）：
+
+```sh
+fvm flutter test integration_test/transcode_quality_test.dart -d <device> \
+  --dart-define-from-file=tool/jellyfin-test/results/live-config.json \
+  --dart-define-from-file=tool/emby-test/results/live-config.json
+```
+
 ## ASS / SSA 字幕
 
 ASS/SSA 与位图字幕使用 mpv/libass 原生渲染，尊重原始样式和内嵌字体；普通文本字幕保留应用样式设置。原生字幕截图已接入。实现、自动测试及目标设备验收边界见 [ASS 字幕说明](docs/ass-subtitles.md)。

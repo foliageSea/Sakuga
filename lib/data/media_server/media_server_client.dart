@@ -42,7 +42,11 @@ abstract interface class MediaServerClient {
     String userId,
     String itemId, {
     Duration startPosition = Duration.zero,
+    int? maxStreamingBitrate,
   });
+
+  /// Best-effort cleanup of a server-side transcoding job; no-op otherwise.
+  Future<void> stopTranscoding(PlaybackSession session);
   Future<void> reportPlaybackStarted(
     PlaybackSession session, {
     required Duration position,

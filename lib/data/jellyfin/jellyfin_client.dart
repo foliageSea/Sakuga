@@ -48,6 +48,12 @@ class JellyfinClient extends MediaBrowserClient {
   Map<String, String> get authHeaders => _headers(server);
 
   @override
+  String get playbackDeviceId => jellyfinDeviceIdentity(
+    server.deviceId.isEmpty ? 'sakuga' : server.deviceId,
+    server.usesAccount ? server.username : '',
+  );
+
+  @override
   bool acceptsSession(dynamic session) => session is JellyfinPlaybackSession;
 
   @override

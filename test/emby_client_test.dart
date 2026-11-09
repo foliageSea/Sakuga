@@ -393,7 +393,49 @@ void main() {
     expect(transcode.startPosition, Duration.zero);
     expect(transcode.initialPosition, const Duration(seconds: 30));
     expect(transcode.positionOffset, const Duration(seconds: 30));
+    expect(transcode.playMethod, PlayMethod.transcode);
   });
+
+  test(
+    'bitrate cap reaches PlaybackInfo and transcoding is cleaned up',
+    () async {
+      final adapter = _Adapter(
+        _playback({
+          'TranscodingUrl': '/videos/movie/master.m3u8?VideoBitrate=1400000',
+          'TranscodingSubProtocol': 'hls',
+        }),
+      );
+      final client = _client(adapter);
+      final source = await client.playbackSource(
+        'user',
+        'movie',
+        maxStreamingBitrate: 1500000,
+      );
+      final body = adapter.last.data as Map<String, dynamic>;
+      expect(body['MaxStreamingBitrate'], 1500000);
+      expect(body['IsPlayback'], isTrue);
+      expect(
+        (body['DeviceProfile'] as Map<String, dynamic>)['MaxStaticBitrate'],
+        1500000,
+      );
+      // The Emby wrapper keeps the negotiated method.
+      expect(source.playMethod, PlayMethod.transcode);
+
+      await client.stopTranscoding(source.session);
+      expect(adapter.last.method, 'DELETE');
+      _expectUri(adapter.last, '/Videos/ActiveEncodings', {
+        'deviceId': 'device',
+        'playSessionId': 'session',
+      });
+
+      adapter.requests.clear();
+      adapter.response = _playback({'SupportsDirectPlay': true});
+      final direct = await client.playbackSource('user', 'movie');
+      expect(direct.playMethod, PlayMethod.directPlay);
+      await client.stopTranscoding(direct.session);
+      expect(adapter.requests.map((request) => request.method), ['POST']);
+    },
+  );
 
   test('external media receives no server authentication headers or subtitle token', () async {
     final adapter = _Adapter(

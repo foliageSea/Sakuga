@@ -3,6 +3,9 @@ abstract interface class PlaybackSession {}
 
 enum PlayMethod { directPlay, directStream, transcode }
 
+/// Upper bound used when the user has not limited playback quality.
+const defaultMaxStreamingBitrate = 120000000;
+
 class PlaybackSource {
   const PlaybackSource({
     required this.url,
@@ -12,8 +15,10 @@ class PlaybackSource {
     Duration? initialPosition,
     this.positionOffset = Duration.zero,
     this.subtitles = const [],
+    this.playMethod = PlayMethod.directPlay,
   }) : initialPosition = initialPosition ?? startPosition;
   final String url;
+  final PlayMethod playMethod;
   final Map<String, String> headers;
   final PlaybackSession session;
   final Duration initialPosition;

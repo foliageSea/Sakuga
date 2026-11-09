@@ -285,6 +285,109 @@ void main() {
     },
   );
 
+  test('defaults to the maximum bitrate and reports direct play', () async {
+    final adapter = _PlaybackAdapter({
+      'MediaSources': [
+        {'Id': 'media-source', 'SupportsDirectPlay': true},
+      ],
+    });
+    final client = JellyfinClient(server: server, dio: _dio(adapter));
+
+    final source = await client.playbackSource('user-1', 'item-1');
+
+    expect(adapter.lastBody['MaxStreamingBitrate'], defaultMaxStreamingBitrate);
+    final profile = adapter.lastBody['DeviceProfile'] as Map<String, dynamic>;
+    expect(profile['MaxStreamingBitrate'], defaultMaxStreamingBitrate);
+    expect(profile['MaxStaticBitrate'], defaultMaxStreamingBitrate);
+    expect(source.playMethod, PlayMethod.directPlay);
+  });
+
+  test(
+    'a bitrate cap is negotiated and exposes the transcoding method',
+    () async {
+      final adapter = _PlaybackAdapter({
+        'PlaySessionId': 'play-session',
+        'MediaSources': [
+          {
+            'Id': 'media-source',
+            'SupportsDirectPlay': false,
+            'SupportsDirectStream': false,
+            'TranscodingSubProtocol': 'hls',
+            'TranscodingUrl': '/videos/item-1/master.m3u8?VideoBitrate=3800000',
+          },
+        ],
+      });
+      final client = JellyfinClient(server: server, dio: _dio(adapter));
+
+      final source = await client.playbackSource(
+        'user-1',
+        'item-1',
+        startPosition: const Duration(seconds: 20),
+        maxStreamingBitrate: 4000000,
+      );
+
+      expect(adapter.lastBody['MaxStreamingBitrate'], 4000000);
+      final profile = adapter.lastBody['DeviceProfile'] as Map<String, dynamic>;
+      expect(profile['MaxStreamingBitrate'], 4000000);
+      expect(profile['MaxStaticBitrate'], 4000000);
+      // Codec support declarations are not altered by the cap.
+      expect(profile['DirectPlayProfiles'], isNotEmpty);
+      expect(source.playMethod, PlayMethod.transcode);
+      expect(source.startPosition, const Duration(seconds: 20));
+    },
+  );
+
+  test(
+    'stops only transcoding sessions using the account device identity',
+    () async {
+      const account = ServerProfile(
+        id: 'server',
+        name: 'Server',
+        baseUrl: 'https://media.example/jellyfin/',
+        accessToken: 'token',
+        userId: 'user-1',
+        username: 'Alice',
+        deviceId: 'device',
+      );
+      final adapter = _PlaybackAdapter({
+        'PlaySessionId': 'play-session',
+        'MediaSources': [
+          {
+            'Id': 'media-source',
+            'TranscodingUrl': '/videos/item-1/master.m3u8',
+          },
+        ],
+      });
+      final client = JellyfinClient(server: account, dio: _dio(adapter));
+      final transcode = await client.playbackSource('user-1', 'item-1');
+
+      await client.stopTranscoding(transcode.session);
+
+      final request = adapter.requests.last;
+      expect(request.method, 'DELETE');
+      expect(request.path, '/Videos/ActiveEncodings');
+      expect(request.queryParameters, {
+        'deviceId': 'device:alice',
+        'playSessionId': 'play-session',
+      });
+      expect(request.connectTimeout, const Duration(seconds: 3));
+
+      adapter.requests.clear();
+      final direct = await JellyfinClient(
+        server: server,
+        dio: _dio(
+          _PlaybackAdapter({
+            'MediaSources': [
+              {'Id': 'media-source', 'SupportsDirectPlay': true},
+            ],
+          }),
+        ),
+      ).playbackSource('user-1', 'item-1');
+      await client.stopTranscoding(direct.session);
+      expect(adapter.requests, isEmpty);
+    },
+  );
+
   test(
     'falls back to legacy user data endpoint on 404 and forwards played state',
     () async {

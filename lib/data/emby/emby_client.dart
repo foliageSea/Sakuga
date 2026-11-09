@@ -51,6 +51,8 @@ class EmbyClient extends MediaBrowserClient {
   @override
   String get apiBaseUrl => embyApiBaseUrl(server.baseUrl);
   @override
+  String get playbackDeviceId => server.deviceId;
+  @override
   Map<String, String> get authHeaders => embyAuthHeaders(
     accessToken: server.accessToken,
     deviceId: server.deviceId,
@@ -117,11 +119,13 @@ class EmbyClient extends MediaBrowserClient {
     String userId,
     String itemId, {
     Duration startPosition = Duration.zero,
+    int? maxStreamingBitrate,
   }) async {
     final source = await super.playbackSource(
       userId,
       itemId,
       startPosition: startPosition,
+      maxStreamingBitrate: maxStreamingBitrate,
     );
     // mpv installs media headers globally, including redirects, HLS segments
     // and sub-add. Authenticate server URLs themselves, never its global headers.
@@ -133,6 +137,7 @@ class EmbyClient extends MediaBrowserClient {
       initialPosition: source.initialPosition,
       positionOffset: source.positionOffset,
       subtitles: source.subtitles,
+      playMethod: source.playMethod,
     );
   }
 
