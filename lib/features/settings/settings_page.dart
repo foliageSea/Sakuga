@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/logging/log_export_service.dart';
+import '../../core/window/desktop_window.dart' show isDesktop;
 import '../../core/logging/runtime_environment_report.dart';
 import '../../core/runtime_environment.dart';
 import '../../core/settings/settings.dart';
@@ -534,6 +535,10 @@ class _SettingsTabs extends StatelessWidget {
       child: FTabs(
         scrollable: true,
         expands: true,
+        // Desktop switches tabs by clicking only; no swipe or wheel paging.
+        contentPhysics: isDesktop
+            ? const NeverScrollableScrollPhysics()
+            : const BouncingScrollPhysics(),
         control: control,
         children: [
           for (final entry in children)
