@@ -84,6 +84,7 @@ class PlayerSubtitles extends ConsumerWidget {
                       text: text,
                       fontSize: settings.subtitleFontSize,
                       backgroundOpacity: settings.subtitleBackgroundOpacity,
+                      shadowStrength: settings.subtitleShadowStrength,
                       textScaler: TextScaler.linear(scale),
                     ),
                   );
@@ -153,6 +154,7 @@ class SubtitleCaption extends StatelessWidget {
     required this.text,
     required this.fontSize,
     required this.backgroundOpacity,
+    this.shadowStrength = 0.5,
     this.textScaler = TextScaler.noScaling,
     super.key,
   });
@@ -160,6 +162,9 @@ class SubtitleCaption extends StatelessWidget {
   final String text;
   final double fontSize;
   final double backgroundOpacity;
+
+  /// 0 disables the text shadow; 0.5 matches the original look.
+  final double shadowStrength;
   final TextScaler textScaler;
 
   @override
@@ -181,7 +186,16 @@ class SubtitleCaption extends StatelessWidget {
           color: const Color(0xFFFFFFFF),
           fontWeight: FontWeight.normal,
           decoration: TextDecoration.none,
-          shadows: const [Shadow(blurRadius: 2, color: Color(0x99000000))],
+          shadows: shadowStrength <= 0
+              ? null
+              : [
+                  Shadow(
+                    blurRadius: 4 * shadowStrength,
+                    color: const Color(0xFF000000).withValues(
+                      alpha: 0.2 + 0.8 * shadowStrength,
+                    ),
+                  ),
+                ],
         ),
       ),
     ),
@@ -213,6 +227,7 @@ class _SubtitleStyleSettingsState
   late double _fontSize;
   late double _opacity;
   late double _verticalPosition;
+  late double _shadowStrength;
 
   @override
   void initState() {
@@ -221,12 +236,14 @@ class _SubtitleStyleSettingsState
     _fontSize = settings.subtitleFontSize;
     _opacity = settings.subtitleBackgroundOpacity;
     _verticalPosition = settings.subtitleVerticalPosition;
+    _shadowStrength = settings.subtitleShadowStrength;
   }
 
   Future<void> _save() async {
     final fontSize = _fontSize;
     final opacity = _opacity;
     final verticalPosition = _verticalPosition;
+    final shadowStrength = _shadowStrength;
     try {
       await ref
           .read(settingsProvider.notifier)
@@ -235,6 +252,7 @@ class _SubtitleStyleSettingsState
               subtitleFontSize: fontSize,
               subtitleBackgroundOpacity: opacity,
               subtitleVerticalPosition: verticalPosition,
+              subtitleShadowStrength: shadowStrength,
             ),
           );
     } catch (error) {
@@ -287,6 +305,16 @@ class _SubtitleStyleSettingsState
             key: const ValueKey('subtitle-vertical-position'),
             value: _verticalPosition,
             onChange: (value) => setState(() => _verticalPosition = value),
+            onEnd: (_) => _save(),
+          ),
+          const SizedBox(height: 16),
+          Text('${l.subtitleShadow} · ${(_shadowStrength * 100).round()}%'),
+          const SizedBox(height: 8),
+          PlayerSlider(
+            inactiveColor: context.theme.colors.mutedForeground,
+            key: const ValueKey('subtitle-shadow-strength'),
+            value: _shadowStrength,
+            onChange: (value) => setState(() => _shadowStrength = value),
             onEnd: (_) => _save(),
           ),
           const SizedBox(height: 20),

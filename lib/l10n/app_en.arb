@@ -198,6 +198,7 @@
   "subtitleStyle": "Subtitle style",
   "subtitleBackgroundOpacity": "Background opacity",
   "subtitleVerticalPosition": "Vertical position",
+  "subtitleShadow": "Text shadow",
   "selected": "Selected",
   "action": "Try it",
   "success": "Success",

@@ -614,6 +614,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subtitleVerticalPosition => 'Vertical position';
 
   @override
+  String get subtitleShadow => 'Text shadow';
+
+  @override
   String get selected => 'Selected';
 
   @override

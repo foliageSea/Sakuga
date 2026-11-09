@@ -198,6 +198,7 @@
   "subtitleStyle": "字幕样式",
   "subtitleBackgroundOpacity": "遮罩不透明度",
   "subtitleVerticalPosition": "垂直位置",
+  "subtitleShadow": "文字阴影",
   "selected": "已选择",
   "action": "试试看",
   "success": "成功",

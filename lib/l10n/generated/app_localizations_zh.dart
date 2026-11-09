@@ -590,6 +590,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get subtitleVerticalPosition => '垂直位置';
 
   @override
+  String get subtitleShadow => '文字阴影';
+
+  @override
   String get selected => '已选择';
 
   @override

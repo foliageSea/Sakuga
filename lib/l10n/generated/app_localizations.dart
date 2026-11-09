@@ -1226,6 +1226,12 @@ abstract class AppLocalizations {
   /// **'Vertical position'**
   String get subtitleVerticalPosition;
 
+  /// No description provided for @subtitleShadow.
+  ///
+  /// In en, this message translates to:
+  /// **'Text shadow'**
+  String get subtitleShadow;
+
   /// No description provided for @selected.
   ///
   /// In en, this message translates to:
