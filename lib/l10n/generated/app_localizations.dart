@@ -1496,12 +1496,6 @@ abstract class AppLocalizations {
   /// **'App language'**
   String get appLocale;
 
-  /// No description provided for @openDocs.
-  ///
-  /// In en, this message translates to:
-  /// **'Forui documentation'**
-  String get openDocs;
-
   /// No description provided for @linkError.
   ///
   /// In en, this message translates to:

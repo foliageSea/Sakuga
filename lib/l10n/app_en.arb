@@ -243,7 +243,6 @@
   "devicePixelRatio": "Device pixel ratio",
   "systemLocale": "System locale",
   "appLocale": "App language",
-  "openDocs": "Forui documentation",
   "linkError": "Could not open the link.",
   "networkDemo": "Network playground",
   "mockMode": "Offline mock",

@@ -726,9 +726,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appLocale => '应用语言';
 
   @override
-  String get openDocs => 'Forui 文档';
-
-  @override
   String get linkError => '无法打开链接。';
 
   @override

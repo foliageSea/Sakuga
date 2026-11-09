@@ -466,18 +466,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             ),
                         const SizedBox(height: 16),
                         FButton(
-                          builder: responsiveButtonContent,
-                          mainAxisSize: MainAxisSize.min,
-                          variant: .outline,
-                          onPress: () => openDocumentation(
-                            context,
-                            'https://forui.dev/docs',
-                          ),
-                          suffix: const Icon(FLucideIcons.externalLink),
-                          child: Text(l.openDocs),
-                        ),
-                        const SizedBox(height: 28),
-                        FButton(
                           key: const ValueKey('font-notice'),
                           builder: responsiveButtonContent,
                           variant: .outline,

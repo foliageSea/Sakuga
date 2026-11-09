@@ -243,7 +243,6 @@
   "devicePixelRatio": "设备像素比",
   "systemLocale": "系统区域设置",
   "appLocale": "应用语言",
-  "openDocs": "Forui 文档",
   "linkError": "无法打开链接。",
   "networkDemo": "网络演示",
   "mockMode": "离线模拟",

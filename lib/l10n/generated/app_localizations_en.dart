@@ -750,9 +750,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appLocale => 'App language';
 
   @override
-  String get openDocs => 'Forui documentation';
-
-  @override
   String get linkError => 'Could not open the link.';
 
   @override
