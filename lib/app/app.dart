@@ -9,6 +9,9 @@ import 'router.dart';
 import 'text_scaler.dart';
 import 'theme.dart';
 
+const _themeTransitionDuration = Duration(milliseconds: 300);
+const _themeTransitionCurve = Curves.easeInOut;
+
 class SakugaApp extends ConsumerWidget {
   const SakugaApp({super.key});
   @override
@@ -26,6 +29,8 @@ class SakugaApp extends ConsumerWidget {
         ...FLocalizations.localizationsDelegates,
       ],
       themeMode: settings.themeMode,
+      themeAnimationDuration: _themeTransitionDuration,
+      themeAnimationCurve: _themeTransitionCurve,
       theme: light.toApproximateMaterialTheme(),
       darkTheme: dark.toApproximateMaterialTheme(),
       routerConfig: router,
@@ -40,7 +45,21 @@ class SakugaApp extends ConsumerWidget {
           ),
         ),
         child: FTheme(
-          data: Theme.brightnessOf(context) == Brightness.dark ? dark : light,
+          // Resolve the target brightness directly: the Material theme's own
+          // brightness flips halfway through its animation, which would delay
+          // and double up the Forui transition.
+          data: switch (settings.themeMode) {
+            ThemeMode.dark => dark,
+            ThemeMode.light => light,
+            ThemeMode.system =>
+              MediaQuery.platformBrightnessOf(context) == Brightness.dark
+                  ? dark
+                  : light,
+          },
+          motion: const FThemeMotion(
+            duration: _themeTransitionDuration,
+            curve: _themeTransitionCurve,
+          ),
           child: MouseBackNavigation(
             onBack: router.routerDelegate.popRoute,
             child: FToaster(child: FTooltipGroup(child: child!)),
