@@ -92,6 +92,7 @@ abstract class MediaBrowserClient implements MediaServerClient {
     String itemId, {
     Duration startPosition = Duration.zero,
     int? maxStreamingBitrate,
+    int? maxVideoHeight,
   }) async {
     final startTimeTicks = mediaBrowserTicks(startPosition);
     final bitrate = maxStreamingBitrate ?? defaultMaxStreamingBitrate;
@@ -113,6 +114,22 @@ abstract class MediaBrowserClient implements MediaServerClient {
           ..._mpvDeviceProfile,
           'MaxStreamingBitrate': bitrate,
           'MaxStaticBitrate': bitrate,
+          // Servers reject direct play above this height and scale the
+          // transcode down to it (TranscodingUrl carries MaxHeight).
+          if (maxVideoHeight != null)
+            'CodecProfiles': [
+              {
+                'Type': 'Video',
+                'Conditions': [
+                  {
+                    'Condition': 'LessThanEqual',
+                    'Property': 'Height',
+                    'Value': '$maxVideoHeight',
+                    'IsRequired': false,
+                  },
+                ],
+              },
+            ],
         },
       },
     );

@@ -43,6 +43,7 @@ abstract interface class MediaServerClient {
     String itemId, {
     Duration startPosition = Duration.zero,
     int? maxStreamingBitrate,
+    int? maxVideoHeight,
   });
 
   /// Best-effort cleanup of a server-side transcoding job; no-op otherwise.

@@ -3,20 +3,37 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
-import '../../data/media_server/playback_models.dart';
-import '../../l10n/generated/app_localizations.dart';
 import '../../shared/localization.dart';
 import 'player_button_style.dart';
 
-/// Bitrate caps offered to the user, in bits per second. "Maximum" (null)
-/// keeps the default negotiation limit and prefers direct play.
-const playbackBitratePresets = <int>[
-  40000000,
-  20000000,
-  10000000,
-  4000000,
-  1500000,
-  720000,
+/// A resolution and bitrate cap requested from the server.
+class PlaybackQuality {
+  const PlaybackQuality(this.height, this.bitrate);
+
+  final int height;
+
+  /// Bits per second.
+  final int bitrate;
+
+  String get label => '${height}p (${formatBitrate(bitrate)})';
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlaybackQuality &&
+      other.height == height &&
+      other.bitrate == bitrate;
+
+  @override
+  int get hashCode => Object.hash(height, bitrate);
+}
+
+/// Caps offered to the user. "Maximum" (null) keeps the default negotiation
+/// limits and prefers direct play.
+const playbackQualityPresets = <PlaybackQuality>[
+  PlaybackQuality(1080, 20000000),
+  PlaybackQuality(720, 8000000),
+  PlaybackQuality(480, 3000000),
+  PlaybackQuality(360, 1000000),
 ];
 
 String formatBitrate(int bitsPerSecond) {
@@ -30,35 +47,23 @@ String formatBitrate(int bitsPerSecond) {
   return '${(bitsPerSecond / 1000).round()} kbps';
 }
 
-String playMethodLabel(AppLocalizations l10n, PlayMethod method) =>
-    switch (method) {
-      PlayMethod.directPlay => l10n.playMethodDirectPlay,
-      PlayMethod.directStream => l10n.playMethodDirectStream,
-      PlayMethod.transcode => l10n.playMethodTranscode,
-    };
-
 class PlayerQualityMenu extends StatelessWidget {
   const PlayerQualityMenu({
     required this.selected,
     required this.onChanged,
-    this.playMethod,
     this.enabled = true,
     super.key,
   });
 
-  /// Selected cap in bits per second; null means maximum quality.
-  final int? selected;
-  final PlayMethod? playMethod;
-  final Future<void> Function(int? bitrate) onChanged;
+  /// Selected cap; null means maximum quality.
+  final PlaybackQuality? selected;
+  final Future<void> Function(PlaybackQuality? quality) onChanged;
   final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final choices = <int?>[null, ...playbackBitratePresets];
-    final current = playMethod == null
-        ? null
-        : playMethodLabel(l10n, playMethod!);
+    final choices = <PlaybackQuality?>[null, ...playbackQualityPresets];
     return FPopoverMenu(
       maxHeight: 420,
       menuAnchor: .topRight,
@@ -68,15 +73,8 @@ class PlayerQualityMenu extends StatelessWidget {
           children: [
             for (final choice in choices)
               FItem(
-                key: ValueKey('quality-${choice ?? 'max'}'),
-                title: Text(
-                  choice == null
-                      ? l10n.playbackQualityMaximum
-                      : formatBitrate(choice),
-                ),
-                subtitle: choice == selected && current != null
-                    ? Text(current)
-                    : null,
+                key: ValueKey('quality-${choice?.height ?? 'max'}'),
+                title: Text(choice?.label ?? l10n.playbackQualityMaximum),
                 selected: choice == selected,
                 suffix: choice == selected
                     ? const Icon(FLucideIcons.check, size: 16)
@@ -86,15 +84,6 @@ class PlayerQualityMenu extends StatelessWidget {
                   if (choice != selected) unawaited(onChanged(choice));
                 },
               ),
-          ],
-        ),
-        FItemGroup(
-          children: [
-            FItem(
-              key: const ValueKey('quality-hint'),
-              enabled: false,
-              title: Text(l10n.playbackQualityHint),
-            ),
           ],
         ),
       ],

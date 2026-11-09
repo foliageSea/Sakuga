@@ -998,30 +998,6 @@ abstract class AppLocalizations {
   /// **'Maximum'**
   String get playbackQualityMaximum;
 
-  /// No description provided for @playbackQualityHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Lower limits may make the server transcode.'**
-  String get playbackQualityHint;
-
-  /// No description provided for @playMethodDirectPlay.
-  ///
-  /// In en, this message translates to:
-  /// **'Direct play'**
-  String get playMethodDirectPlay;
-
-  /// No description provided for @playMethodDirectStream.
-  ///
-  /// In en, this message translates to:
-  /// **'Direct stream'**
-  String get playMethodDirectStream;
-
-  /// No description provided for @playMethodTranscode.
-  ///
-  /// In en, this message translates to:
-  /// **'Transcoding'**
-  String get playMethodTranscode;
-
   /// No description provided for @trackLanguageChinese.
   ///
   /// In en, this message translates to:

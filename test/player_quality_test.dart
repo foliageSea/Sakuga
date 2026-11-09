@@ -3,14 +3,12 @@ import 'package:forui/forui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:sakuga/app/theme.dart';
 import 'package:sakuga/core/settings/settings.dart';
-import 'package:sakuga/data/media_server/playback_models.dart';
 import 'package:sakuga/features/player/player_quality.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
 
 Widget _app({
-  required int? selected,
-  required Future<void> Function(int?) onChanged,
-  PlayMethod? method,
+  required PlaybackQuality? selected,
+  required Future<void> Function(PlaybackQuality?) onChanged,
   bool enabled = true,
   String language = 'en',
 }) => MaterialApp(
@@ -32,7 +30,6 @@ Widget _app({
     alignment: Alignment.topRight,
     child: PlayerQualityMenu(
       selected: selected,
-      playMethod: method,
       enabled: enabled,
       onChanged: onChanged,
     ),
@@ -45,85 +42,89 @@ Future<void> _open(WidgetTester tester) async {
 }
 
 void main() {
-  test('formats bitrate presets', () {
-    expect(formatBitrate(40000000), '40 Mbps');
+  test('labels presets as resolution and bitrate, highest first', () {
+    expect(playbackQualityPresets.map((quality) => quality.label), [
+      '1080p (20 Mbps)',
+      '720p (8 Mbps)',
+      '480p (3 Mbps)',
+      '360p (1 Mbps)',
+    ]);
     expect(formatBitrate(1500000), '1.5 Mbps');
     expect(formatBitrate(720000), '720 kbps');
-    expect(
-      playbackBitratePresets,
-      orderedEquals([...playbackBitratePresets]..sort((a, b) => b - a)),
-    );
+    for (var i = 1; i < playbackQualityPresets.length; i++) {
+      expect(
+        playbackQualityPresets[i].height,
+        lessThan(playbackQualityPresets[i - 1].height),
+      );
+      expect(
+        playbackQualityPresets[i].bitrate,
+        lessThan(playbackQualityPresets[i - 1].bitrate),
+      );
+    }
+    expect(const PlaybackQuality(720, 8000000), playbackQualityPresets[1]);
   });
 
   for (final language in ['en', 'zh']) {
-    testWidgets(
-      'selects a cap, shows the play method and returns to maximum in $language',
-      (tester) async {
-        tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = const Size(390, 800);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        addTearDown(tester.view.resetPhysicalSize);
-        int? selected;
-        var method = PlayMethod.directPlay;
-        final requests = <int?>[];
-        StateSetter? update;
-        await tester.pumpWidget(
-          StatefulBuilder(
-            builder: (context, setState) {
-              update = setState;
-              return _app(
-                language: language,
-                selected: selected,
-                method: method,
-                onChanged: (bitrate) async {
-                  requests.add(bitrate);
-                  update!(() {
-                    selected = bitrate;
-                    method = bitrate == null
-                        ? PlayMethod.directPlay
-                        : PlayMethod.transcode;
-                  });
-                },
-              );
-            },
-          ),
-        );
-        await _open(tester);
-        final zh = language == 'zh';
-        expect(find.text(zh ? '最高画质' : 'Maximum'), findsOneWidget);
-        expect(find.text(zh ? '直接播放' : 'Direct play'), findsOneWidget);
-        expect(find.text('720 kbps'), findsOneWidget);
-        expect(
-          tester
-              .widget<FItem>(find.byKey(const ValueKey('quality-max')))
-              .selected,
-          isTrue,
-        );
+    testWidgets('selects a cap and returns to maximum in $language', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      PlaybackQuality? selected;
+      final requests = <PlaybackQuality?>[];
+      StateSetter? update;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return _app(
+              language: language,
+              selected: selected,
+              onChanged: (quality) async {
+                requests.add(quality);
+                update!(() => selected = quality);
+              },
+            );
+          },
+        ),
+      );
+      await _open(tester);
+      expect(find.text(language == 'zh' ? '最高画质' : 'Maximum'), findsOneWidget);
+      expect(find.text('1080p (20 Mbps)'), findsOneWidget);
+      expect(find.text('360p (1 Mbps)'), findsOneWidget);
+      // Only the options: no play method or explanatory text.
+      expect(find.byType(FItem), findsNWidgets(5));
+      expect(
+        tester
+            .widget<FItem>(find.byKey(const ValueKey('quality-max')))
+            .selected,
+        isTrue,
+      );
 
-        // Re-selecting the active option does not renegotiate.
-        await tester.tap(find.byKey(const ValueKey('quality-max')));
-        await tester.pumpAndSettle();
-        expect(requests, isEmpty);
+      // Re-selecting the active option does not renegotiate.
+      await tester.tap(find.byKey(const ValueKey('quality-max')));
+      await tester.pumpAndSettle();
+      expect(requests, isEmpty);
 
-        await _open(tester);
-        await tester.tap(find.byKey(const ValueKey('quality-4000000')));
-        await tester.pumpAndSettle();
-        expect(requests, [4000000]);
+      await _open(tester);
+      await tester.tap(find.byKey(const ValueKey('quality-720')));
+      await tester.pumpAndSettle();
+      expect(requests, [const PlaybackQuality(720, 8000000)]);
 
-        await _open(tester);
-        expect(
-          tester
-              .widget<FItem>(find.byKey(const ValueKey('quality-4000000')))
-              .selected,
-          isTrue,
-        );
-        expect(find.text(zh ? '转码' : 'Transcoding'), findsOneWidget);
-        await tester.tap(find.byKey(const ValueKey('quality-max')));
-        await tester.pumpAndSettle();
-        expect(requests, [4000000, null]);
-        expect(tester.takeException(), isNull);
-      },
-    );
+      await _open(tester);
+      expect(
+        tester
+            .widget<FItem>(find.byKey(const ValueKey('quality-720')))
+            .selected,
+        isTrue,
+      );
+      await tester.tap(find.byKey(const ValueKey('quality-max')));
+      await tester.pumpAndSettle();
+      expect(requests.last, isNull);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('disabled while loading or switching', (tester) async {

@@ -120,12 +120,14 @@ class EmbyClient extends MediaBrowserClient {
     String itemId, {
     Duration startPosition = Duration.zero,
     int? maxStreamingBitrate,
+    int? maxVideoHeight,
   }) async {
     final source = await super.playbackSource(
       userId,
       itemId,
       startPosition: startPosition,
       maxStreamingBitrate: maxStreamingBitrate,
+      maxVideoHeight: maxVideoHeight,
     );
     // mpv installs media headers globally, including redirects, HLS segments
     // and sub-add. Authenticate server URLs themselves, never its global headers.

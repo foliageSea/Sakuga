@@ -160,6 +160,20 @@ void main() {
         failed: false,
         volume: 0,
       );
+      // A resolution cap below the 180p source forces a scaled transcode.
+      final scaled = await client.playbackSource(
+        userId,
+        movie.id,
+        maxVideoHeight: 144,
+      );
+      expect(scaled.playMethod, PlayMethod.transcode, reason: label);
+      final query = Uri.parse(scaled.url).queryParameters
+          .map((key, value) => MapEntry(key.toLowerCase(), value));
+      expect(query['maxheight'], '144', reason: label);
+      await client.stopTranscoding(scaled.session);
+      debugPrint(
+        'QUALITY_LIVE_OK height cap 144 -> MaxHeight=${query['maxheight']}',
+      );
       debugPrint(
         'QUALITY_LIVE_OK $label: direct play -> ${cap ~/ 1000} kbps transcode, '
         'resumed ${resumeAt.inMilliseconds} ms -> ${played.inMilliseconds} ms, '

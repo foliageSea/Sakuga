@@ -410,6 +410,7 @@ void main() {
         'user',
         'movie',
         maxStreamingBitrate: 1500000,
+        maxVideoHeight: 480,
       );
       final body = adapter.last.data as Map<String, dynamic>;
       expect(body['MaxStreamingBitrate'], 1500000);
@@ -418,6 +419,12 @@ void main() {
         (body['DeviceProfile'] as Map<String, dynamic>)['MaxStaticBitrate'],
         1500000,
       );
+      final conditions =
+          ((body['DeviceProfile'] as Map<String, dynamic>)['CodecProfiles']
+                      as List)
+                  .single['Conditions']
+              as List;
+      expect(conditions.single['Value'], '480');
       // The Emby wrapper keeps the negotiated method.
       expect(source.playMethod, PlayMethod.transcode);
 

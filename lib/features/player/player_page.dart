@@ -72,6 +72,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   late final Player _player;
   late final SubtitleRenderingController _subtitleRendering;
+  late final PlaybackErrorGate _errorGate;
   late final VideoController _controller;
   late final MediaKitControlsController _controlsController;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -106,10 +107,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   bool _exiting = false;
   bool _backgroundCheckpointed = false;
 
-  /// User bitrate cap (bits per second); null keeps maximum quality. It stays
-  /// in effect for later episodes opened in this player.
-  int? _maxStreamingBitrate;
-  PlayMethod? _playMethod;
+  /// User resolution/bitrate cap; null keeps maximum quality. It stays in
+  /// effect for later episodes opened in this player.
+  PlaybackQuality? _quality;
   bool _switchingQuality = false;
   int _lastLocalSaveTicks = -1;
   int _lastReportedTicks = -1;
@@ -132,6 +132,24 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       getProperty: (name) => _nativePlayer.getProperty(name),
       setProperty: (name, value) => _nativePlayer.setProperty(name, value),
     )..addListener(_onSubtitleRenderingChanged);
+    _errorGate = PlaybackErrorGate(
+      isStopped: () async {
+        final native = _nativePlayer;
+        return isPlaybackAborted(
+          idle: await native.getProperty('idle-active') == 'yes',
+          endReached: await native.getProperty('eof-reached') == 'yes',
+          position: _player.state.position,
+          duration: _player.state.duration,
+        );
+      },
+      onFatal: (error) {
+        if (!mounted || _exiting) return;
+        setState(() {
+          _loading = false;
+          _error = error;
+        });
+      },
+    );
     _controller = VideoController(_player);
     _controlsController = MediaKitControlsController(_player);
     _tracks = _player.state.tracks;
@@ -205,12 +223,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         )) {
           return;
         }
-        if (mounted) {
-          setState(() {
-            _loading = false;
-            _error = error;
-          });
-        }
+        _errorGate.report(error);
       }),
     );
     _subscriptions.add(
@@ -285,11 +298,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     if (_exiting || !mounted) return;
     final generation = ++_openGeneration;
     _subtitleRendering.reset();
+    _errorGate.reset();
     if (mounted) {
       setState(() {
         _loading = true;
         _error = null;
-        _playMethod = null;
       });
     }
     MediaServerClient? openedClient;
@@ -345,11 +358,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         library.userId,
         itemId,
         startPosition: Duration(microseconds: ticks ~/ 10),
-        maxStreamingBitrate: _maxStreamingBitrate,
+        maxStreamingBitrate: _quality?.bitrate,
+        maxVideoHeight: _quality?.height,
       );
       if (!mounted || generation != _openGeneration) return;
       _client = library.client;
-      setState(() => _playMethod = source!.playMethod);
       _playbackSession = source.session;
       _serverId = library.client.server.id;
       _userId = library.userId;
@@ -434,19 +447,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   /// Renegotiates the current item with a new bitrate cap and resumes from the
   /// current position. Also usable after a failed open as a manual fallback.
-  Future<void> _setQuality(int? bitrate, int generation) async {
+  Future<void> _setQuality(PlaybackQuality? quality, int generation) async {
     if (!mounted ||
         generation != _openGeneration ||
         _loading ||
         _switchingQuality ||
         _switchingEpisode.value ||
         _exiting ||
-        bitrate == _maxStreamingBitrate) {
+        quality == _quality) {
       return;
     }
     final resumeAt = Duration(microseconds: _positionTicks ~/ 10);
     _switchingQuality = true;
-    setState(() => _maxStreamingBitrate = bitrate);
+    setState(() => _quality = quality);
     try {
       try {
         await _player.pause();
@@ -830,6 +843,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }
+    _errorGate.reset();
     _subtitleRendering.removeListener(_onSubtitleRenderingChanged);
     _subtitleRendering.dispose();
     _controlsController.dispose();
@@ -971,11 +985,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           ValueListenableBuilder<bool>(
             valueListenable: _switchingEpisode,
             builder: (context, switching, _) => PlayerQualityMenu(
-              selected: _maxStreamingBitrate,
-              playMethod: _playMethod,
+              selected: _quality,
               enabled:
                   !_loading && !_switchingQuality && !switching && !_exiting,
-              onChanged: (bitrate) => _setQuality(bitrate, generation),
+              onChanged: (quality) => _setQuality(quality, generation),
             ),
           ),
         ],

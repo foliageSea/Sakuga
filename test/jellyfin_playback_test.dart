@@ -338,6 +338,44 @@ void main() {
   );
 
   test(
+    'a height cap adds a video codec condition and none by default',
+    () async {
+      final adapter = _PlaybackAdapter({
+        'MediaSources': [
+          {'Id': 'media-source', 'SupportsDirectPlay': true},
+        ],
+      });
+      final client = JellyfinClient(server: server, dio: _dio(adapter));
+
+      await client.playbackSource('user-1', 'item-1');
+      var profile = adapter.lastBody['DeviceProfile'] as Map<String, dynamic>;
+      expect(profile.containsKey('CodecProfiles'), isFalse);
+
+      await client.playbackSource(
+        'user-1',
+        'item-1',
+        maxStreamingBitrate: 8000000,
+        maxVideoHeight: 720,
+      );
+      profile = adapter.lastBody['DeviceProfile'] as Map<String, dynamic>;
+      expect(profile['MaxStreamingBitrate'], 8000000);
+      expect(profile['CodecProfiles'], [
+        {
+          'Type': 'Video',
+          'Conditions': [
+            {
+              'Condition': 'LessThanEqual',
+              'Property': 'Height',
+              'Value': '720',
+              'IsRequired': false,
+            },
+          ],
+        },
+      ]);
+    },
+  );
+
+  test(
     'stops only transcoding sessions using the account device identity',
     () async {
       const account = ServerProfile(
