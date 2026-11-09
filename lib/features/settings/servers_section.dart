@@ -623,11 +623,26 @@ class _ServerTile extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
       child: Row(
         children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Icon(
+              FLucideIcons.server,
+              size: 20,
+              color: active
+                  ? context.theme.colors.primary
+                  : context.theme.colors.mutedForeground,
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(server.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  server.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 Text(
                   '${server.type == MediaServerType.emby ? 'Emby' : 'Jellyfin'}'
                   '${server.usesAccount ? ' · ${server.username}' : ''}',
