@@ -29,6 +29,8 @@ import 'player_subtitles.dart';
 import 'player_subtitle_rendering.dart';
 import 'player_track_format.dart';
 import 'player_quality.dart';
+import 'player_buffer.dart';
+import '../../core/settings/settings.dart';
 import 'player_screenshot.dart';
 
 // This provider outlives the route so pending saves can refresh the library
@@ -306,6 +308,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       await platform.setProperty('secondary-sid', 'no');
       await platform.setProperty('secondary-sub-visibility', 'no');
       await platform.setProperty('sub-visibility', 'yes');
+      await applyPlaybackBuffer(
+        platform.setProperty,
+        ref.read(settingsProvider).playbackBufferMiB,
+      );
       await _applySuperResolution(_superResolutionMode);
       if (!mounted || generation != _openGeneration) return;
 

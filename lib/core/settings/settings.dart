@@ -9,6 +9,10 @@ import '../logging.dart';
 
 enum AppThemeColor { neutral, blue, green, violet, orange, rose }
 
+/// Forward playback buffer presets in MiB. The first entry is the default and
+/// matches the previous media_kit default.
+const playbackBufferPresetsMiB = <int>[32, 128, 256];
+
 class AppSettings {
   const AppSettings({
     this.themeMode = ThemeMode.system,
@@ -23,6 +27,7 @@ class AppSettings {
     this.subtitleShadowStrength = 0.5,
     this.seekBackwardSeconds = 5,
     this.seekForwardSeconds = 5,
+    this.playbackBufferMiB = 32,
   }) : assert(radiusScale >= 0 && radiusScale <= 2),
        assert(fontScale >= 0.8 && fontScale <= 1.2),
        assert(subtitleFontSize >= 16 && subtitleFontSize <= 64),
@@ -43,6 +48,9 @@ class AppSettings {
   final double subtitleShadowStrength;
   final int seekBackwardSeconds;
   final int seekForwardSeconds;
+
+  /// Forward demuxer buffer limit, one of [playbackBufferPresetsMiB].
+  final int playbackBufferMiB;
   Locale? get locale => language == 'system' ? null : Locale(language);
   AppSettings copyWith({
     ThemeMode? themeMode,
@@ -57,6 +65,7 @@ class AppSettings {
     double? subtitleShadowStrength,
     int? seekBackwardSeconds,
     int? seekForwardSeconds,
+    int? playbackBufferMiB,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     language: language ?? this.language,
@@ -73,6 +82,7 @@ class AppSettings {
         subtitleShadowStrength ?? this.subtitleShadowStrength,
     seekBackwardSeconds: seekBackwardSeconds ?? this.seekBackwardSeconds,
     seekForwardSeconds: seekForwardSeconds ?? this.seekForwardSeconds,
+    playbackBufferMiB: playbackBufferMiB ?? this.playbackBufferMiB,
   );
   Map<String, Object> toJson() => {
     'theme': themeMode.name,
@@ -87,6 +97,7 @@ class AppSettings {
     'subtitleShadowStrength': subtitleShadowStrength,
     'seekBackwardSeconds': seekBackwardSeconds,
     'seekForwardSeconds': seekForwardSeconds,
+    'playbackBufferMiB': playbackBufferMiB,
   };
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
     themeMode: ThemeMode.values.firstWhere(
@@ -138,6 +149,10 @@ class AppSettings {
     seekForwardSeconds: switch (json['seekForwardSeconds']) {
       int value when value >= 1 && value <= 600 => value,
       _ => 5,
+    },
+    playbackBufferMiB: switch (json['playbackBufferMiB']) {
+      int value when playbackBufferPresetsMiB.contains(value) => value,
+      _ => playbackBufferPresetsMiB.first,
     },
   );
 }

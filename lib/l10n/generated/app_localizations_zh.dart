@@ -875,6 +875,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playbackShortcuts => '播放快捷键';
 
   @override
+  String get playbackBuffer => '缓冲容量';
+
+  @override
+  String get playbackBufferStandard => '标准';
+
+  @override
+  String get playbackBufferLarge => '较大';
+
+  @override
+  String get playbackBufferExtraLarge => '大';
+
+  @override
   String get seekBackwardSeconds => '后退秒数（←）';
 
   @override

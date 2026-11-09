@@ -16,6 +16,7 @@ import '../../app/theme.dart';
 import '../../shared/language_options.dart';
 import '../../shared/localization.dart';
 import '../../shared/widgets.dart';
+import '../player/player_buffer.dart';
 import '../player/player_shortcuts.dart';
 import 'runtime_environment_section.dart';
 import 'live_logs_section.dart';
@@ -207,6 +208,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           children: [
                             for (final (value, label) in options)
                               FSelectItem(title: Text(label), value: value),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        FSelect<int>.rich(
+                          key: const ValueKey('playback-buffer-select'),
+                          label: Text(l.playbackBuffer),
+                          enabled: !_saving,
+                          format: (mib) => playbackBufferLabel(l, mib),
+                          control: .lifted(
+                            value: settings.playbackBufferMiB,
+                            onChange: (value) {
+                              if (value != null &&
+                                  value != settings.playbackBufferMiB) {
+                                _update(
+                                  (s) => s.copyWith(playbackBufferMiB: value),
+                                );
+                              }
+                            },
+                          ),
+                          children: [
+                            for (final mib in playbackBufferPresetsMiB)
+                              FSelectItem(
+                                key: ValueKey('playback-buffer-$mib'),
+                                title: Text(playbackBufferLabel(l, mib)),
+                                value: mib,
+                              ),
                           ],
                         ),
                         const SizedBox(height: 20),

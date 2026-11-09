@@ -52,6 +52,17 @@ fvm flutter test integration_test/transcode_quality_test.dart -d <device> \
   --dart-define-from-file=tool/emby-test/results/live-config.json
 ```
 
+## 缓冲容量
+
+「设置 → 常规 → 缓冲容量」可选标准 32 MiB（默认，与此前一致）、较大 128 MiB、大 256 MiB，用于前向预读上限；已播放部分的后向保留固定为 32 MiB，避免总占用随选项翻倍。设置在下次打开视频时生效（包括切集与切换播放质量）。增大缓冲可缓解短时网络波动，不能解决持续带宽不足；播放器启用了磁盘缓存，较大档位主要增加临时磁盘占用。
+
+真实 libmpv 对本地 Docker Jellyfin 直接播放约 62 MiB 片源的测量：32 MiB 时前向缓存停在 32.0 MiB（约 227 秒），128 MiB 时缓存全部剩余内容（596 秒）。可选测试：
+
+```sh
+fvm flutter test integration_test/playback_buffer_test.dart -d <device> \
+  --dart-define-from-file=tool/jellyfin-test/results/live-config.json
+```
+
 ## ASS / SSA 字幕
 
 ASS/SSA 与位图字幕使用 mpv/libass 原生渲染，尊重原始样式和内嵌字体；普通文本字幕保留应用样式设置。原生字幕截图已接入。实现、自动测试及目标设备验收边界见 [ASS 字幕说明](docs/ass-subtitles.md)。

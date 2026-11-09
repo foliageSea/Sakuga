@@ -1790,6 +1790,30 @@ abstract class AppLocalizations {
   /// **'Playback shortcuts'**
   String get playbackShortcuts;
 
+  /// No description provided for @playbackBuffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback buffer'**
+  String get playbackBuffer;
+
+  /// No description provided for @playbackBufferStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get playbackBufferStandard;
+
+  /// No description provided for @playbackBufferLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Large'**
+  String get playbackBufferLarge;
+
+  /// No description provided for @playbackBufferExtraLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra large'**
+  String get playbackBufferExtraLarge;
+
   /// No description provided for @seekBackwardSeconds.
   ///
   /// In en, this message translates to:

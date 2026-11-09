@@ -908,6 +908,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playbackShortcuts => 'Playback shortcuts';
 
   @override
+  String get playbackBuffer => 'Playback buffer';
+
+  @override
+  String get playbackBufferStandard => 'Standard';
+
+  @override
+  String get playbackBufferLarge => 'Large';
+
+  @override
+  String get playbackBufferExtraLarge => 'Extra large';
+
+  @override
   String get seekBackwardSeconds => 'Backward seconds (←)';
 
   @override
