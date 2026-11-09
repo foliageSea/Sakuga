@@ -508,7 +508,10 @@ class DesktopTitleBar extends StatelessWidget {
               onPanStart: (_) => controller.drag(),
               onDoubleTap: controller.toggleMaximize,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.only(
+                  left: onToggleCompactSidebar != null ? 4 : 16,
+                  right: 16,
+                ),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
