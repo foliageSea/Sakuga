@@ -12,7 +12,7 @@ import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import 'player_slider.dart';
 
-/// Bitmap subtitles have no text for the Flutter caption overlay to draw.
+/// Authored ASS/SSA styles and bitmap subtitles must be drawn by mpv.
 bool usesNativeSubtitleRendering(
   SubtitleTrack selected,
   List<SubtitleTrack> available,
@@ -27,6 +27,8 @@ bool usesNativeSubtitleRendering(
   }
   return track.image == true ||
       const {
+        'ass',
+        'ssa',
         'dvdsub',
         'dvd_subtitle',
         'pgssub',
@@ -191,9 +193,8 @@ class SubtitleCaption extends StatelessWidget {
               : [
                   Shadow(
                     blurRadius: 4 * shadowStrength,
-                    color: const Color(0xFF000000).withValues(
-                      alpha: 0.2 + 0.8 * shadowStrength,
-                    ),
+                    color: const Color(0xFF000000)
+                        .withValues(alpha: 0.2 + 0.8 * shadowStrength),
                   ),
                 ],
         ),

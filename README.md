@@ -38,6 +38,10 @@ M0（工程基建与内核验证）进行中。当前已完成：
 
 已使用本地 Docker Emby 4.9.3.0 普通账号完成真实联调：媒体库/搜索/筛选、电影和两集剧集的原生播放、续播拖动、图片和中英文字幕、继续观看、进度写回及已看状态通过。可复用的测试服、账号和开放授权资源见 [Emby 联调环境](tool/emby-test/README.md)；详情见 [联调结果](tool/emby-test/RESULTS.md)。Jellyfin 账号登录也已通过 Docker Jellyfin 12.4.0 普通账号的真实浏览、原生播放、字幕和进度同步验证，见 [Jellyfin 联调环境](tool/jellyfin-test/README.md) 与 [结果](tool/jellyfin-test/RESULTS.md)。
 
+## ASS / SSA 字幕
+
+ASS/SSA 与位图字幕使用 mpv/libass 原生渲染，尊重原始样式和内嵌字体；普通文本字幕保留应用样式设置。原生字幕截图已接入。实现、自动测试及目标设备验收边界见 [ASS 字幕说明](docs/ass-subtitles.md)。
+
 ## 开发
 
 安装 FVM 后，在项目目录执行：

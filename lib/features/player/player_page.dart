@@ -26,6 +26,7 @@ import 'player_controls_controller.dart';
 import 'player_exit.dart';
 import 'player_errors.dart';
 import 'player_subtitles.dart';
+import 'player_subtitle_rendering.dart';
 import 'player_track_format.dart';
 import 'player_screenshot.dart';
 
@@ -67,6 +68,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   static const _exitSyncTimeout = Duration(seconds: 7);
 
   late final Player _player;
+  late final SubtitleRenderingController _subtitleRendering;
   late final VideoController _controller;
   late final MediaKitControlsController _controlsController;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -116,7 +118,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     WidgetsBinding.instance.addObserver(this);
     _currentItemId = ValueNotifier(widget.itemId);
     _progressRepository = ref.read(playbackProgressRepositoryProvider);
-    _player = Player();
+    _player = Player(configuration: subtitlePlayerConfiguration);
+    _subtitleRendering = SubtitleRenderingController(
+      getProperty: (name) => _nativePlayer.getProperty(name),
+      setProperty: (name, value) => _nativePlayer.setProperty(name, value),
+    )..addListener(_onSubtitleRenderingChanged);
     _controller = VideoController(_player);
     _controlsController = MediaKitControlsController(_player);
     _tracks = _player.state.tracks;
@@ -269,6 +275,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     }
     if (_exiting || !mounted) return;
     final generation = ++_openGeneration;
+    _subtitleRendering.reset();
     if (mounted) {
       setState(() {
         _loading = true;
@@ -282,6 +289,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       final platform = _nativePlayer;
       await platform.setProperty('sub-fonts-dir', assets.fontsDirectory.path);
       await platform.setProperty('sub-font', 'MiSans');
+      // Preserve script styles/positioning and allow MKV font attachments.
+      await platform.setProperty('sub-ass-override', 'no');
+      await platform.setProperty('embeddedfonts', 'yes');
+      await platform.setProperty('secondary-sid', 'no');
+      await platform.setProperty('secondary-sub-visibility', 'no');
+      await platform.setProperty('sub-visibility', 'yes');
       await _applySuperResolution(_superResolutionMode);
       if (!mounted || generation != _openGeneration) return;
 
@@ -350,6 +363,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         await _onMediaLoaded(_player.state.duration, generation);
       }
       if (!mounted || generation != _openGeneration) return;
+      _syncSubtitleRendering();
       await _startTracking();
     } catch (error, stackTrace) {
       debugPrint('PLAYER_OPEN_ERROR ${_errorForLog(error)}\n$stackTrace');
@@ -644,43 +658,46 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     }
   }
 
-  Future<void> _subtitleRenderingTail = Future.value();
-
-  void _syncSubtitleRendering() {
-    final generation = _openGeneration;
-    _subtitleRenderingTail = _subtitleRenderingTail
-        .then((_) async {
-          if (!mounted || generation != _openGeneration) return;
-          var selected = _track.subtitle;
-          // media-kit keeps the auto sentinel rather than reporting mpv's
-          // chosen subtitle track, so resolve it from the native player.
-          if (selected.id == 'auto') {
-            final id = await _nativePlayer.getProperty('sid');
-            if (!mounted || generation != _openGeneration) return;
-            selected = SubtitleTrack(id, null, null);
-          }
-          final native = usesNativeSubtitleRendering(
-            selected,
-            _tracks.subtitle,
-          );
-          await _nativePlayer.setProperty(
-            'sub-visibility',
-            native ? 'yes' : 'no',
-          );
-        })
-        .catchError((Object error, StackTrace stackTrace) {
-          debugPrint(
-            'PLAYER_SUBTITLE_RENDER_ERROR ${_errorForLog(error)}\n$stackTrace',
-          );
-        });
+  void _onSubtitleRenderingChanged() {
+    if (mounted) setState(() {});
   }
 
-  Future<void> _setSubtitle(SubtitleTrack track) async {
+  void _syncSubtitleRendering() {
+    unawaited(
+      _subtitleRendering
+          .synchronize(_track.subtitle, _tracks.subtitle)
+          .catchError((Object error, StackTrace stackTrace) {
+            debugPrint(
+              'PLAYER_SUBTITLE_RENDER_ERROR ${_errorForLog(error)}\n$stackTrace',
+            );
+          }),
+    );
+  }
+
+  Future<void> _setSubtitle(SubtitleTrack track, int generation) async {
+    if (!mounted ||
+        generation != _openGeneration ||
+        _loading ||
+        _switchingEpisode.value ||
+        _exiting) {
+      return;
+    }
+    if (track.id != 'auto' &&
+        track.id != 'no' &&
+        !_tracks.subtitle.any((candidate) => candidate.id == track.id)) {
+      return;
+    }
+    _subtitleRendering.reset();
     try {
       await _player.setSubtitleTrack(track);
+      if (!mounted || generation != _openGeneration) return;
+      _syncSubtitleRendering();
     } catch (error, stackTrace) {
       debugPrint('PLAYER_SUBTITLE_ERROR ${_errorForLog(error)}\n$stackTrace');
-      if (mounted) notifyUser(context, context.l10n.subtitleError);
+      if (mounted && generation == _openGeneration) {
+        _syncSubtitleRendering();
+        notifyUser(context, context.l10n.subtitleError);
+      }
     }
   }
 
@@ -727,6 +744,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }
+    _subtitleRendering.removeListener(_onSubtitleRenderingChanged);
+    _subtitleRendering.dispose();
     _controlsController.dispose();
     unawaited(_player.dispose());
     _currentItemId.dispose();
@@ -752,8 +771,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                   visible: false,
                 ),
                 controls: (state) => PlayerScreenshotSurface(
-                  captureFrame: () => _player.screenshot(format: 'image/png'),
-                  subtitles: PlayerSubtitles(player: _player),
+                  captureFrame: () => _player.screenshot(
+                    format: 'image/png',
+                    includeLibassSubtitles: _subtitleRendering.nativeRendering,
+                  ),
+                  subtitles: _subtitleRendering.flutterVisible
+                      ? PlayerSubtitles(player: _player)
+                      : const SizedBox.expand(),
                   controlsBuilder: (context, copyScreenshot) => PlayerControls(
                     onScreenshot: copyScreenshot,
                     controller: _controlsController,
@@ -870,7 +894,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         _SubtitleMenu(
           tracks: _tracks.subtitle,
           selected: _track.subtitle,
-          onChanged: _setSubtitle,
+          showStyle: _subtitleRendering.flutterVisible,
+          onChanged: (track) => _setSubtitle(track, generation),
         ),
       ],
     );
@@ -974,8 +999,10 @@ class _SubtitleMenu extends StatelessWidget {
     required this.tracks,
     required this.selected,
     required this.onChanged,
+    required this.showStyle,
   });
 
+  final bool showStyle;
   final List<SubtitleTrack> tracks;
   final SubtitleTrack selected;
   final Future<void> Function(SubtitleTrack track) onChanged;
@@ -1020,19 +1047,20 @@ class _SubtitleMenu extends StatelessWidget {
               ),
           ],
         ),
-        FItemGroup(
-          children: [
-            FItem(
-              key: const ValueKey('subtitle-style'),
-              title: Text(context.l10n.subtitleStyle),
-              prefix: const Icon(FLucideIcons.slidersHorizontal, size: 16),
-              onPress: () {
-                controller.hide();
-                unawaited(showSubtitleStyleDialog(context));
-              },
-            ),
-          ],
-        ),
+        if (showStyle)
+          FItemGroup(
+            children: [
+              FItem(
+                key: const ValueKey('subtitle-style'),
+                title: Text(context.l10n.subtitleStyle),
+                prefix: const Icon(FLucideIcons.slidersHorizontal, size: 16),
+                onPress: () {
+                  controller.hide();
+                  unawaited(showSubtitleStyleDialog(context));
+                },
+              ),
+            ],
+          ),
       ],
       builder: (context, controller, _) => FButton.icon(
         key: const ValueKey('subtitle-menu'),

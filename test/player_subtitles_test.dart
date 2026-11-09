@@ -14,8 +14,11 @@ import 'package:sakuga/l10n/generated/app_localizations.dart';
 import 'fakes.dart';
 
 void main() {
-  test('bitmap subtitle tracks use native rendering', () {
+  test('ASS, SSA and bitmap subtitle tracks use native rendering', () {
     for (final codec in [
+      'ass',
+      'ASS',
+      'ssa',
       'dvd_subtitle',
       'DVDSUB',
       'hdmv_pgs_subtitle',
@@ -38,7 +41,7 @@ void main() {
   });
 
   test('text subtitles and disabled tracks keep native rendering off', () {
-    for (final codec in ['ass', 'ssa', 'subrip', 'webvtt', null]) {
+    for (final codec in ['subrip', 'webvtt', null]) {
       expect(
         usesNativeSubtitleRendering(
           SubtitleTrack('1', null, null, codec: codec),
