@@ -189,6 +189,37 @@ class _NoProgress extends Fake implements PlaybackProgressRepository {
 }
 
 void main() {
+  testWidgets('resume movie and episode cards keep equal heights', (
+    tester,
+  ) async {
+    const movie = MediaItem(
+      id: 'resume-movie',
+      name: 'Resumed Movie',
+      type: MediaType.movie,
+      reportedPlayedPercentage: 20,
+    );
+    const noProgressMovie = MediaItem(
+      id: 'resume-no-progress',
+      name: 'Movie without progress',
+      type: MediaType.movie,
+    );
+    await pumpHome(
+      tester,
+      resume: [movie, _resumableEpisode(), noProgressMovie],
+      latest: const [],
+    );
+
+    final cards = find.byType(MediaPosterCard);
+    expect(cards, findsNWidgets(3));
+    final movieRect = tester.getRect(cards.at(0));
+    final episodeRect = tester.getRect(cards.at(1));
+    final noProgressRect = tester.getRect(cards.at(2));
+    expect(movieRect.top, episodeRect.top);
+    expect(movieRect.bottom, episodeRect.bottom);
+    expect(noProgressRect.height, movieRect.height);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('already played resume items can be marked played again', (
     tester,
   ) async {
