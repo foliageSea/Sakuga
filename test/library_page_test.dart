@@ -46,16 +46,15 @@ MediaItem _item(String id, double ratio) => MediaItem(
 );
 
 class _FakeItems extends LibraryItemsController {
-  _FakeItems(super.query);
+  _FakeItems(super.query, {this.items});
+
+  final List<MediaItem>? items;
 
   @override
   Future<LibraryItemsState> build() async {
-    final items = [
-      _item('a', 0.5),
-      _item('b', 1.2),
-      _item('c', 0.7),
-      _item('d', 0.7),
-    ];
+    final items =
+        this.items ??
+        [_item('a', 0.5), _item('b', 1.2), _item('c', 0.7), _item('d', 0.7)];
     return LibraryItemsState(items: items, totalRecordCount: items.length);
   }
 }
@@ -152,6 +151,7 @@ Future<ProviderContainer> _pumpLibrary(
   bool useRealItems = false,
   bool expandFilters = false,
   List<MediaLibrary>? views,
+  List<MediaItem>? items,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -179,7 +179,10 @@ Future<ProviderContainer> _pumpLibrary(
         ),
       ),
       playbackProgressRepositoryProvider.overrideWithValue(_Progress()),
-      if (!useRealItems) libraryItemsProvider.overrideWith2(_FakeItems.new),
+      if (!useRealItems)
+        libraryItemsProvider.overrideWith2(
+          (query) => _FakeItems(query, items: items),
+        ),
     ],
   );
   addTearDown(container.dispose);
@@ -216,6 +219,66 @@ Future<ProviderContainer> _pumpLibrary(
 }
 
 void main() {
+  const listItems = [
+    MediaItem(
+      id: 'watching',
+      name: 'A very long series title that should be truncated rather than crowding the progress, rating, or watched status columns',
+      type: MediaType.series,
+      productionYear: 2026,
+      recursiveItemCount: 12,
+      communityRating: 8.1,
+      reportedPlayedPercentage: 40,
+    ),
+    MediaItem(id: 'unrated', name: 'Unrated series', type: MediaType.series),
+    MediaItem(
+      id: 'watched',
+      name: 'Watched series',
+      type: MediaType.series,
+      communityRating: 7.6,
+      played: true,
+      reportedPlayedPercentage: 100,
+    ),
+  ];
+
+  for (final width in [360.0, 720.0, 1280.0]) {
+    testWidgets('compact library list aligns information at width $width', (
+      tester,
+    ) async {
+      await _pumpLibrary(tester, Size(width, 900), items: listItems);
+      await tester.tap(find.byKey(const ValueKey('library-list-view')));
+      await tester.pumpAndSettle();
+
+      Finder row(String id) => find.byKey(ValueKey('library-list-item-$id'));
+      Finder column(String name, String id) =>
+          find.byKey(ValueKey('library-list-$name-$id'));
+
+      final first = tester.getRect(row('watching'));
+      expect(first.height, closeTo(104, 1));
+      final title = tester.widget<Text>(find.text(listItems.first.name));
+      expect(title.maxLines, 1);
+      expect(title.overflow, TextOverflow.ellipsis);
+      expect(find.byType(MediaProgressBar), findsOneWidget);
+      expect(find.byIcon(FLucideIcons.circleCheck), findsOneWidget);
+
+      for (final name in ['rating', 'status']) {
+        final x = tester.getTopLeft(column(name, 'watching')).dx;
+        for (final id in ['unrated', 'watched']) {
+          expect(tester.getTopLeft(column(name, id)).dx, closeTo(x, 0.01));
+        }
+      }
+      final progress = tester.getRect(column('progress', 'watching'));
+      final titleRect = tester.getRect(find.text(listItems.first.name));
+      expect(progress.width, lessThanOrEqualTo(144));
+      if (first.width >= 640) {
+        expect(progress.left, greaterThan(titleRect.right));
+      } else {
+        expect(progress.left, titleRect.left);
+        expect(progress.top, greaterThan(titleRect.bottom));
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'older selected year remains visible after collapsing year options',
     (tester) async {

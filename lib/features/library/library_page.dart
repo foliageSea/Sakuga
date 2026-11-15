@@ -649,81 +649,122 @@ class _LibraryListItem extends StatelessWidget {
     final theme = context.theme;
     final metadata = _libraryMetadata(context, item);
     final rating = item.communityRating;
+    final progress = item.progressFraction;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Surface(
-        padding: 0,
-        translucent: true,
-        child: FButton(
-          variant: .ghost,
-          builder: responsiveButtonContent,
-          onPress: () => onTap(item, item.poster?.url()),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 56,
-                height: 84,
-                child: PosterHero(
-                  tag: posterHeroTag(item.id),
-                  borderRadius: theme.style.borderRadius.md,
-                  child: MediaImage(
-                    url: item.poster?.url(),
-                    headers: item.poster?.headers ?? const {},
+      padding: const EdgeInsets.only(bottom: 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 640;
+          final gap = wide ? 16.0 : 12.0;
+          final progressBar = progress == null
+              ? null
+              : SizedBox(
+                  key: ValueKey('library-list-progress-${item.id}'),
+                  width: 144,
+                  child: MediaProgressBar(value: progress),
+                );
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.colors.card.withValues(
+                alpha: theme.colors.brightness == Brightness.dark ? 0.32 : 0.4,
+              ),
+              borderRadius: theme.style.borderRadius.lg,
+            ),
+            child: FButton(
+              variant: .ghost,
+              style: .delta(
+                contentStyle: .delta(
+                  padding: .value(
+                    EdgeInsets.symmetric(
+                      horizontal: wide ? 16 : 12,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.displayTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.typography.body.sm.copyWith(
-                        fontWeight: FontWeight.w500,
+              builder: responsiveButtonContent,
+              onPress: () => onTap(item, item.poster?.url()),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 48,
+                    height: 72,
+                    child: PosterHero(
+                      tag: posterHeroTag(item.id),
+                      borderRadius: theme.style.borderRadius.md,
+                      child: MediaImage(
+                        url: item.poster?.url(),
+                        headers: item.poster?.headers ?? const {},
                       ),
                     ),
-                    if (metadata != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        metadata,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.typography.body.xs.copyWith(
-                          color: theme.colors.mutedForeground,
-                        ),
-                      ),
-                    ],
-                    if (item.progressFraction != null) ...[
-                      const SizedBox(height: 8),
-                      MediaProgressBar(value: item.progressFraction!),
-                    ],
-                  ],
-                ),
-              ),
-              if (rating != null && rating.isFinite && rating > 0) ...[
-                const SizedBox(width: 12),
-                Text(
-                  rating.toStringAsFixed(1),
-                  style: theme.typography.body.sm.copyWith(
-                    color: const Color(0xFFE2BB6A),
-                    fontWeight: FontWeight.w600,
                   ),
-                ),
-              ],
-              if (item.played) ...[
-                const SizedBox(width: 12),
-                Icon(
-                  FLucideIcons.circleCheck,
-                  size: 18,
-                  color: theme.colors.mutedForeground,
-                ),
-              ],
-            ],
-          ),
-        ),
+                  SizedBox(width: gap),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.displayTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.typography.body.sm.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (metadata != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            metadata,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.typography.body.xs.copyWith(
+                              color: theme.colors.mutedForeground,
+                            ),
+                          ),
+                        ],
+                        if (!wide && progressBar != null) ...[
+                          const SizedBox(height: 8),
+                          progressBar,
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (wide) ...[
+                    SizedBox(width: gap),
+                    SizedBox(width: 144, child: progressBar),
+                  ],
+                  SizedBox(width: gap),
+                  SizedBox(
+                    key: ValueKey('library-list-rating-${item.id}'),
+                    width: MediaQuery.textScalerOf(context).scale(32),
+                    child: rating != null && rating.isFinite && rating > 0
+                        ? Text(
+                            rating.toStringAsFixed(1),
+                            textAlign: TextAlign.end,
+                            style: theme.typography.body.sm.copyWith(
+                              color: const Color(0xFFE2BB6A),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    key: ValueKey('library-list-status-${item.id}'),
+                    width: 18,
+                    child: item.played
+                        ? Icon(
+                            FLucideIcons.circleCheck,
+                            size: 18,
+                            color: theme.colors.mutedForeground,
+                          )
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
