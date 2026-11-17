@@ -157,19 +157,75 @@ Dialogue: 0,0:00:00.00,0:00:08.00,Default,,0,0,0,,{\an7\move(20,85,160,85)\c&H00
         greaterThan(authored.greenX + 30),
         reason: 'ASS move animation must advance',
       );
-      await player.setSubtitleTrack(SubtitleTrack.uri(srt.uri.toString()));
+      // Re-enable the existing numeric track, as the player menu does, rather
+      // than loading a new URI (which would bypass the reported roundtrip).
+      final assId = await native.getProperty('sid');
+      final assTrack = SubtitleTrack(assId, null, null);
+      for (var attempt = 0; attempt < 2; attempt++) {
+        await player.setSubtitleTrack(SubtitleTrack.no());
+        await rendering.synchronize(
+          SubtitleTrack.no(),
+          player.state.tracks.subtitle,
+        );
+        expect(rendering.nativeRendering, isFalse);
+        expect(rendering.flutterVisible, isFalse);
+        expect(await native.getProperty('sub-visibility'), 'no');
+        expect((await inspect(true)).red, 0);
+
+        rendering.reset();
+        await player.setSubtitleTrack(assTrack);
+        await rendering.synchronize(
+          player.state.track.subtitle,
+          player.state.tracks.subtitle,
+        );
+        expect(await native.getProperty('sid'), assId);
+        expect(await native.getProperty('sub-ass'), 'yes');
+        expect(await native.getProperty('sub-ass-override'), 'no');
+        expect(await native.getProperty('sub-visibility'), 'yes');
+        expect(rendering.nativeRendering, isTrue);
+        expect(rendering.flutterVisible, isFalse);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        final restored = await inspect(true);
+        expect(restored.red, greaterThan(30));
+        expect(restored.green, greaterThan(30));
+      }
+
+      await player.setSubtitleTrack(
+        SubtitleTrack.uri(srt.uri.toString(), language: 'en'),
+      );
       await rendering.synchronize(
         player.state.track.subtitle,
         player.state.tracks.subtitle,
       );
       expect(rendering.nativeRendering, isFalse);
       expect(rendering.flutterVisible, isTrue);
+      final srtId = await native.getProperty('sid');
+      // Give automatic selection a different language-preferred default.
+      await native.setProperty('slang', 'en');
+      await player.setSubtitleTrack(assTrack);
+      await rendering.synchronize(assTrack, player.state.tracks.subtitle);
+      expect(rendering.nativeRendering, isTrue);
       await player.setSubtitleTrack(SubtitleTrack.no());
       await rendering.synchronize(
         SubtitleTrack.no(),
         player.state.tracks.subtitle,
       );
       expect(rendering.flutterVisible, isFalse);
+      // Automatic is a new mpv selection, not restoration of the last ASS.
+      await player.setSubtitleTrack(SubtitleTrack.auto());
+      await rendering.synchronize(
+        player.state.track.subtitle,
+        player.state.tracks.subtitle,
+      );
+
+      expect(await native.getProperty('sid'), srtId);
+      expect(rendering.nativeRendering, isFalse);
+      expect(rendering.flutterVisible, isTrue);
+      await player.setSubtitleTrack(assTrack);
+      await rendering.synchronize(assTrack, player.state.tracks.subtitle);
+      expect(rendering.nativeRendering, isTrue);
+      expect(rendering.flutterVisible, isFalse);
+      expect((await inspect(true)).red, greaterThan(30));
       expect(errors, isEmpty);
     } finally {
       rendering.dispose();

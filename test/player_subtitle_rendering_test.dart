@@ -36,6 +36,89 @@ void main() {
     });
   }
 
+  for (final codec in ['ass', 'ssa']) {
+    for (final metadataAvailable in [true, false]) {
+      test(
+        '$codec survives off/on with track metadata=$metadataAvailable',
+        () async {
+          var sid = '2';
+          final writes = <String>[];
+          final controller = SubtitleRenderingController(
+            getProperty: (name) async =>
+                {
+                  'sid': sid,
+                  'track-list/count': '1',
+                  'track-list/0/type': 'sub',
+                  'track-list/0/id': '2',
+                  'track-list/0/codec': codec,
+                }[name] ??
+                '',
+            setProperty: (name, value) async => writes.add('$name=$value'),
+          );
+          addTearDown(controller.dispose);
+          final available = metadataAvailable
+              ? [SubtitleTrack('2', null, null, codec: codec)]
+              : <SubtitleTrack>[];
+          await controller.synchronize(SubtitleTrack.auto(), available);
+          expect(controller.nativeRendering, isTrue);
+
+          for (var attempt = 0; attempt < 2; attempt++) {
+            sid = 'no';
+            controller.reset();
+            await controller.synchronize(SubtitleTrack.no(), available);
+            expect(controller.nativeRendering, isFalse);
+            expect(controller.flutterVisible, isFalse);
+
+            sid = '2';
+            controller.reset();
+            await controller.synchronize(
+              SubtitleTrack('2', null, null),
+              available,
+            );
+            expect(controller.nativeRendering, isTrue);
+            expect(controller.flutterVisible, isFalse);
+          }
+          expect(writes, [
+            'sub-visibility=yes',
+            'sub-visibility=no',
+            'sub-visibility=yes',
+            'sub-visibility=no',
+            'sub-visibility=yes',
+          ]);
+        },
+      );
+    }
+  }
+
+  test(
+    'automatic after off follows actual track, not the previous ASS',
+    () async {
+      var sid = '2';
+      final controller = SubtitleRenderingController(
+        getProperty: (name) async => sid,
+        setProperty: (name, value) async {},
+      );
+      addTearDown(controller.dispose);
+      final available = [
+        SubtitleTrack('1', null, null, codec: 'subrip'),
+        SubtitleTrack('2', null, null, codec: 'ass'),
+      ];
+      await controller.synchronize(SubtitleTrack.auto(), available);
+      expect(controller.nativeRendering, isTrue);
+      sid = 'no';
+      await controller.synchronize(SubtitleTrack.no(), available);
+      expect(controller.flutterVisible, isFalse);
+      sid = '1';
+      await controller.synchronize(SubtitleTrack.auto(), available);
+      expect(controller.nativeRendering, isFalse);
+      expect(controller.flutterVisible, isTrue);
+      sid = '2';
+      await controller.synchronize(available.last, available);
+      expect(controller.nativeRendering, isTrue);
+      expect(controller.flutterVisible, isFalse);
+    },
+  );
+
   test('external URI sentinel resolves the actual native ASS codec', () async {
     final controller = SubtitleRenderingController(
       getProperty: (name) async =>
