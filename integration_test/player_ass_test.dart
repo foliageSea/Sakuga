@@ -9,6 +9,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:sakuga/features/player/player_assets.dart';
 import 'package:sakuga/features/player/player_subtitle_rendering.dart';
+import 'package:sakuga/features/player/player_subtitle_selection_controller.dart';
 
 /// Optional real-libmpv test; no server, network or licensed media required.
 void main() {
@@ -226,6 +227,61 @@ Dialogue: 0,0:00:00.00,0:00:08.00,Default,,0,0,0,,{\an7\move(20,85,160,85)\c&H00
       expect(rendering.nativeRendering, isTrue);
       expect(rendering.flutterVisible, isFalse);
       expect((await inspect(true)).red, greaterThan(30));
+      // Exercise the app policy against real mpv tracks and external
+      // loading, including arrivals while subtitles are manually disabled.
+      final selection = SubtitleSelectionController(
+        setTrack: (track) async {
+          await player.setSubtitleTrack(track);
+          await rendering.synchronize(
+            player.state.track.subtitle,
+            player.state.tracks.subtitle,
+          );
+        },
+      );
+      try {
+        await selection.activate(player.state.tracks.subtitle);
+        Future<SubtitleTrack> addChinese(
+          String path,
+          String title,
+          String language,
+        ) async {
+          final arrived = player.stream.tracks
+              .firstWhere(
+                (tracks) =>
+                    tracks.subtitle.any((track) => track.title == title),
+              )
+              .timeout(const Duration(seconds: 10));
+          await native.command(['sub-add', path, 'auto', title, language]);
+          final tracks = (await arrived).subtitle;
+          await selection.updateTracks(tracks);
+          return tracks.firstWhere((track) => track.title == title);
+        }
+
+        // Use separate resources to represent distinct external subtitle tracks.
+        final chineseSrt = File('${directory.path}/simplified.srt');
+        await chineseSrt.writeAsString(await srt.readAsString());
+        final chineseAss = File('${directory.path}/simplified.ass');
+        await chineseAss.writeAsString(await ass.readAsString());
+        final simplified = await addChinese(chineseSrt.path, '简体', 'chi');
+        expect(await native.getProperty('sid'), simplified.id);
+        expect(rendering.flutterVisible, isTrue);
+        await selection.select(SubtitleTrack.no());
+        final styled = await addChinese(chineseAss.path, '简日双语 ASS', 'chi');
+        expect(await native.getProperty('sid'), 'no');
+        expect(rendering.flutterVisible, isFalse);
+        await selection.select(SubtitleTrack.auto());
+        expect(await native.getProperty('sid'), styled.id);
+        expect(selection.automatic, isTrue);
+        expect(rendering.nativeRendering, isTrue);
+        expect(rendering.flutterVisible, isFalse);
+        expect((await inspect(true)).red, greaterThan(30));
+        await selection.select(simplified);
+        await selection.updateTracks(player.state.tracks.subtitle);
+        expect(await native.getProperty('sid'), simplified.id);
+        expect(selection.automatic, isFalse);
+      } finally {
+        selection.dispose();
+      }
       expect(errors, isEmpty);
     } finally {
       rendering.dispose();

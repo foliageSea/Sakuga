@@ -27,6 +27,7 @@ import 'player_exit.dart';
 import 'player_errors.dart';
 import 'player_subtitles.dart';
 import 'player_subtitle_rendering.dart';
+import 'player_subtitle_selection_controller.dart';
 import 'player_track_format.dart';
 import 'player_quality.dart';
 import 'player_buffer.dart';
@@ -72,6 +73,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   late final Player _player;
   late final SubtitleRenderingController _subtitleRendering;
+  late final SubtitleSelectionController _subtitleSelection;
   late final PlaybackErrorGate _errorGate;
   late final VideoController _controller;
   late final MediaKitControlsController _controlsController;
@@ -99,6 +101,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   List<SubtitleSource> _pendingSubtitles = const [];
   String _externalSubtitleLabel = '';
   bool _subtitlesAttached = false;
+  int _subtitleMediaReadyGeneration = -1;
   bool _receivedPlayerPosition = false;
   bool _completed = false;
   bool _playing = false;
@@ -132,6 +135,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       getProperty: (name) => _nativePlayer.getProperty(name),
       setProperty: (name, value) => _nativePlayer.setProperty(name, value),
     )..addListener(_onSubtitleRenderingChanged);
+    _subtitleSelection = SubtitleSelectionController(
+      setTrack: (track) async {
+        _subtitleRendering.reset();
+        await _player.setSubtitleTrack(track);
+        if (!mounted || _exiting) return;
+        _syncSubtitleRendering();
+      },
+    );
     _errorGate = PlaybackErrorGate(
       isStopped: () async {
         final native = _nativePlayer;
@@ -230,6 +241,16 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       _player.stream.tracks.listen((tracks) {
         if (mounted) {
           setState(() => _tracks = tracks);
+          unawaited(
+            _subtitleSelection.updateTracks(tracks.subtitle).catchError((
+              Object error,
+              StackTrace stackTrace,
+            ) {
+              debugPrint(
+                'PLAYER_SUBTITLE_SELECT_ERROR ${_errorForLog(error)}\n$stackTrace',
+              );
+            }),
+          );
           _syncSubtitleRendering();
         }
       }),
@@ -255,7 +276,25 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       ? target - const Duration(seconds: 2)
       : Duration(microseconds: target.inMicroseconds ~/ 2);
 
+  Future<void> _activateSubtitleSelection() async {
+    try {
+      await _subtitleSelection.activate(_player.state.tracks.subtitle);
+    } catch (error, stackTrace) {
+      // Subtitle selection must not abort video startup or an unawaited
+      // duration callback. Later metadata updates can retry the selection.
+      debugPrint(
+        'PLAYER_SUBTITLE_SELECT_ERROR ${_errorForLog(error)}\n$stackTrace',
+      );
+    }
+  }
+
   Future<void> _onMediaLoaded(Duration duration, int generation) async {
+    if (!mounted ||
+        generation != _openGeneration ||
+        _subtitleMediaReadyGeneration != generation) {
+      return;
+    }
+    await _activateSubtitleSelection();
     if (!mounted || generation != _openGeneration) return;
     if (!_subtitlesAttached && _pendingSubtitles.isNotEmpty) {
       _subtitlesAttached = true;
@@ -297,6 +336,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     }
     if (_exiting || !mounted) return;
     final generation = ++_openGeneration;
+    final subtitleSelectionReady = _subtitleSelection.reset();
+    _subtitleMediaReadyGeneration = -1;
     _subtitleRendering.reset();
     _errorGate.reset();
     if (mounted) {
@@ -309,6 +350,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     PlaybackSource? source;
     var tracked = false;
     try {
+      await subtitleSelectionReady;
+      if (!mounted || generation != _openGeneration) return;
       final assets = await PlayerAssets.prepare();
       if (!mounted || generation != _openGeneration) return;
       _assets = assets;
@@ -330,6 +373,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
       if (_devMediaUrl.isNotEmpty) {
         await _player.open(Media(_devMediaUrl), play: true);
+        if (!mounted || generation != _openGeneration) return;
+        _subtitleMediaReadyGeneration = generation;
+        await _activateSubtitleSelection();
         return;
       }
 
@@ -392,6 +438,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         ),
         play: true,
       );
+      if (!mounted || generation != _openGeneration) return;
+      _subtitleMediaReadyGeneration = generation;
+      await _activateSubtitleSelection();
       if (!mounted || generation != _openGeneration) return;
       if (_player.state.duration > Duration.zero) {
         _fileLoadedAt ??= DateTime.now();
@@ -764,7 +813,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   void _syncSubtitleRendering() {
     unawaited(
       _subtitleRendering
-          .synchronize(_track.subtitle, _tracks.subtitle)
+          .synchronize(
+            _player.state.track.subtitle,
+            _player.state.tracks.subtitle,
+          )
           .catchError((Object error, StackTrace stackTrace) {
             debugPrint(
               'PLAYER_SUBTITLE_RENDER_ERROR ${_errorForLog(error)}\n$stackTrace',
@@ -786,9 +838,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         !_tracks.subtitle.any((candidate) => candidate.id == track.id)) {
       return;
     }
-    _subtitleRendering.reset();
     try {
-      await _player.setSubtitleTrack(track);
+      await _subtitleSelection.select(track);
       if (!mounted || generation != _openGeneration) return;
       _syncSubtitleRendering();
     } catch (error, stackTrace) {
@@ -844,6 +895,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       unawaited(subscription.cancel());
     }
     _errorGate.reset();
+    _subtitleSelection.dispose();
     _subtitleRendering.removeListener(_onSubtitleRenderingChanged);
     _subtitleRendering.dispose();
     _controlsController.dispose();
@@ -1005,7 +1057,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         const SizedBox(width: 8),
         _SubtitleMenu(
           tracks: _tracks.subtitle,
-          selected: _track.subtitle,
+          selected: _subtitleSelection.automatic
+              ? SubtitleTrack.auto()
+              : _track.subtitle,
           showStyle: _subtitleRendering.flutterVisible,
           onChanged: (track) => _setSubtitle(track, generation),
         ),
