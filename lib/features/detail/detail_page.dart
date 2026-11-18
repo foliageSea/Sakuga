@@ -271,12 +271,27 @@ class _DetailBody extends ConsumerWidget {
               ),
             ),
             SliverToBoxAdapter(child: _About(item: value)),
+            if (client.server.type == MediaServerType.ugreen &&
+                value.type == MediaType.movie)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 24),
+                  child: _PlaybackTile(
+                    item: value,
+                    thumbnail:
+                        value.backdrop ??
+                        preview?.backdrop ??
+                        value.poster ??
+                        preview?.poster,
+                    translucent: WindowPosterBackgroundScope.isActive(context),
+                  ),
+                ),
+              ),
             if (value.isSeries)
               _Seasons(client: client, userId: userId, series: value),
             if (value.type == MediaType.season)
               if (parentSeriesId != null)
                 _Episodes(
-                  client: client,
                   userId: userId,
                   seriesId: parentSeriesId,
                   seasonId: value.id,
@@ -870,7 +885,7 @@ class _Seasons extends ConsumerWidget {
     return seasons.when(
       data: (values) {
         if (values.isEmpty) {
-          return _Episodes(client: client, userId: userId, seriesId: series.id);
+          return _Episodes(userId: userId, seriesId: series.id);
         }
         return SliverMainAxisGroup(
           slivers: [
@@ -971,12 +986,10 @@ class _SeasonCard extends StatelessWidget {
 
 class _Episodes extends ConsumerWidget {
   const _Episodes({
-    required this.client,
     required this.userId,
     required this.seriesId,
     this.seasonId,
   });
-  final MediaServerClient client;
   final String userId;
   final String seriesId;
   final String? seasonId;
@@ -1023,9 +1036,9 @@ class _Episodes extends ConsumerWidget {
                     itemCount: values.length,
                     itemBuilder: (context, index) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _EpisodeTile(
-                        client: client,
+                      child: _PlaybackTile(
                         item: values[index],
+                        thumbnail: values[index].poster,
                         translucent: ambient,
                       ),
                     ),
@@ -1046,23 +1059,24 @@ class _Episodes extends ConsumerWidget {
   }
 }
 
-class _EpisodeTile extends StatelessWidget {
-  const _EpisodeTile({
-    required this.client,
+class _PlaybackTile extends StatelessWidget {
+  const _PlaybackTile({
     required this.item,
+    required this.thumbnail,
     this.translucent = false,
   });
-  final MediaServerClient client;
   final MediaItem item;
+  final MediaImageResource? thumbnail;
   final bool translucent;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final code = item.episodeCode;
+    final code = item.isEpisode ? item.episodeCode : null;
     final progress = item.progressFraction;
-    final overview = item.overview?.trim() ?? '';
-    final title = item.indexNumber == null
+    final overview = item.isEpisode ? item.overview?.trim() ?? '' : '';
+    final keyPrefix = item.isEpisode ? 'detail-episode' : 'detail-movie';
+    final title = !item.isEpisode || item.indexNumber == null
         ? item.name
         : context.l10n.episodeTitle(item.indexNumber!, item.name);
     final duration = item.runtime;
@@ -1076,7 +1090,7 @@ class _EpisodeTile extends StatelessWidget {
       children: [
         Text(
           title,
-          key: ValueKey('detail-episode-title-${item.id}'),
+          key: ValueKey('$keyPrefix-title-${item.id}'),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: theme.typography.body.md.copyWith(fontWeight: FontWeight.w500),
@@ -1091,7 +1105,7 @@ class _EpisodeTile extends StatelessWidget {
               if (metadata.isNotEmpty)
                 Text(
                   metadata,
-                  key: ValueKey('detail-episode-metadata-${item.id}'),
+                  key: ValueKey('$keyPrefix-metadata-${item.id}'),
                   style: theme.typography.body.xs.copyWith(
                     color: theme.colors.mutedForeground,
                   ),
@@ -1109,7 +1123,7 @@ class _EpisodeTile extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             overview,
-            key: ValueKey('detail-episode-overview-${item.id}'),
+            key: ValueKey('$keyPrefix-overview-${item.id}'),
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
             style: theme.typography.body.sm.copyWith(
@@ -1119,7 +1133,7 @@ class _EpisodeTile extends StatelessWidget {
         ],
       ],
     );
-    final thumbnail = Column(
+    final thumbnailFrame = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1131,8 +1145,8 @@ class _EpisodeTile extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 MediaImage(
-                  url: item.poster?.url(),
-                  headers: item.poster?.headers ?? const {},
+                  url: thumbnail?.url(),
+                  headers: thumbnail?.headers ?? const {},
                 ),
                 Center(
                   child: Container(
@@ -1163,7 +1177,7 @@ class _EpisodeTile extends StatelessWidget {
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
-          key: ValueKey('detail-episode-${item.id}'),
+          key: ValueKey('$keyPrefix-${item.id}'),
           behavior: HitTestBehavior.opaque,
           onTap: () => context.push(playerLocation(item.id)),
           child: Surface(
@@ -1175,7 +1189,7 @@ class _EpisodeTile extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      thumbnail,
+                      thumbnailFrame,
                       const SizedBox(height: 12),
                       information,
                     ],
@@ -1186,7 +1200,7 @@ class _EpisodeTile extends StatelessWidget {
                   children: [
                     SizedBox(
                       width: constraints.maxWidth < 600 ? 112 : 240,
-                      child: thumbnail,
+                      child: thumbnailFrame,
                     ),
                     const SizedBox(width: 16),
                     Expanded(child: information),

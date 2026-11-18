@@ -233,6 +233,54 @@ Future<void> expectBackButtonPinned(
 }
 
 void main() {
+  const movieCard = ValueKey('detail-movie-movie-1');
+  for (final width in [320.0, 1280.0]) {
+    testWidgets(
+      'UGREEN movie plays from the card below credits at width $width',
+      (tester) async {
+        await pumpDetailPage(
+          tester,
+          server: _server.copyWith(type: MediaServerType.ugreen),
+          item: _movie,
+          size: Size(width, 800),
+          withPlayerRoute: true,
+        );
+        final card = find.byKey(movieCard);
+        await tester.scrollUntilVisible(card, 300);
+        await tester.pumpAndSettle();
+        final lastCredit = find.text('Person 11');
+        expect(
+          tester.getTopLeft(card).dy,
+          greaterThan(tester.getBottomLeft(lastCredit).dy),
+        );
+        expect(card.hitTestable(), findsOneWidget);
+        final play = find.descendant(
+          of: card,
+          matching: find.byIcon(FLucideIcons.play),
+        );
+        expect(play.hitTestable(), findsOneWidget);
+        await tester.tap(play);
+        await tester.pumpAndSettle();
+        expect(find.text('player:movie-1'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+  for (final type in MediaServerType.values.where(
+    (t) => t != MediaServerType.ugreen,
+  )) {
+    testWidgets('${type.name} keeps the original movie detail layout', (
+      tester,
+    ) async {
+      await pumpDetailPage(
+        tester,
+        server: _server.copyWith(type: type),
+        item: _movie,
+      );
+      expect(find.byKey(movieCard), findsNothing);
+      expect(find.byIcon(FLucideIcons.play), findsNothing);
+    });
+  }
   testWidgets(
     'UGREEN season card loads episodes without fetching season again',
     (tester) async {
@@ -265,6 +313,7 @@ void main() {
       pending.complete([_episode()]);
       await tester.pumpAndSettle();
       expect(duplicateSeasonLookups, 0);
+      expect(find.byKey(movieCard), findsNothing);
       expect(find.text('1. Pilot'), findsOneWidget);
       expect(find.byType(LoadingNotice), findsNothing);
     },
