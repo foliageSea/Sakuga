@@ -72,8 +72,9 @@ final randomItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   ref,
 ) async {
   final library = await ref.watch(libraryViewsProvider.future);
-  if (library.client.server.type == MediaServerType.ugreen) return const [];
   final items = await library.client.randomItems(library.userId);
+  // UGREEN already ranks by backdrop and filters out items without artwork.
+  if (library.client.server.type == MediaServerType.ugreen) return items;
   final withPosters = items.where((item) => item.poster != null).toList();
   return withPosters.isNotEmpty ? withPosters : items;
 });

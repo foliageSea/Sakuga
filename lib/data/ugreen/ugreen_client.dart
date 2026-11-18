@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
 
@@ -432,8 +433,38 @@ class UgreenClient implements MediaServerClient {
   }
 
   @override
-  Future<List<MediaItem>> randomItems(String userId, {int limit = 8}) async =>
-      const [];
+  Future<List<MediaItem>> randomItems(String userId, {int limit = 8}) async {
+    _check(userId);
+    if (limit <= 0) return const [];
+    // UGOS can ignore Random sorting. Sample a bounded pool locally instead
+    // of paging through the entire library on a home-page refresh.
+    const candidateLimit = 60;
+    final data = await _request(
+      '$_userPath/Items',
+      query: {
+        'Recursive': true,
+        'IncludeItemTypes': 'Movie,Series',
+        'Limit': candidateLimit,
+        'Fields': _itemFields,
+      },
+    );
+    final candidates = _parseItems(_rows(data).take(candidateLimit).toList());
+    final seen = <String>{};
+    final withBackdrop = <MediaItem>[];
+    final withPosterOnly = <MediaItem>[];
+    for (final item in candidates) {
+      if (item.type != MediaType.movie && item.type != MediaType.series) {
+        continue;
+      }
+      if (item.backdrop == null && item.poster == null) continue;
+      if (!seen.add(item.id)) continue;
+      (item.backdrop != null ? withBackdrop : withPosterOnly).add(item);
+    }
+    final random = Random();
+    withBackdrop.shuffle(random);
+    withPosterOnly.shuffle(random);
+    return withBackdrop.followedBy(withPosterOnly).take(limit).toList();
+  }
 
   @override
   Future<PlaybackSource> playbackSource(

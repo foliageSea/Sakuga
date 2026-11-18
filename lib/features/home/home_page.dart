@@ -77,8 +77,7 @@ class HomePage extends ConsumerWidget {
                 data: (data) => Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (data.client.server.type != MediaServerType.ugreen)
-                      _PosterCarouselSection(client: data.client),
+                    _PosterCarouselSection(client: data.client),
                     _MediaSection(
                       client: data.client,
                       title: l.continueWatching,

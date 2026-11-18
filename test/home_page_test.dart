@@ -61,6 +61,7 @@ MediaItem _series() => const MediaItem(
 Future<void> pumpHome(
   WidgetTester tester, {
   List<MediaItem>? carousel,
+  bool useClientCarousel = false,
   List<MediaItem>? resume,
   List<MediaItem>? latest,
   FakeMediaServerClient? client,
@@ -103,9 +104,10 @@ Future<void> pumpHome(
           views: const [],
         ),
       ),
-      randomItemsProvider.overrideWith(
-        (ref) async => carousel ?? const <MediaItem>[],
-      ),
+      if (!useClientCarousel)
+        randomItemsProvider.overrideWith(
+          (ref) async => carousel ?? const <MediaItem>[],
+        ),
       resumeItemsProvider.overrideWith(
         (ref) async => loadResume != null
             ? await loadResume()
@@ -188,7 +190,42 @@ class _NoProgress extends Fake implements PlaybackProgressRepository {
   }) async => null;
 }
 
+class _UgreenCarouselClient extends FakeMediaServerClient {
+  _UgreenCarouselClient()
+    : super(
+        server: const ServerProfile(
+          id: 'ugreen-test',
+          name: 'UGREEN',
+          baseUrl: 'https://nas.test:9443',
+          type: MediaServerType.ugreen,
+          userId: 'user-1',
+          accessToken: 'test-token',
+        ),
+      );
+
+  @override
+  Future<List<MediaItem>> randomItems(
+    String userId, {
+    int limit = 8,
+  }) async => const [
+    MediaItem(id: 'ugreen-pick', name: 'UGREEN Pick', type: MediaType.series),
+  ];
+}
+
 void main() {
+  testWidgets('UGREEN renders its carousel picks and opens the series', (
+    tester,
+  ) async {
+    await pumpHome(
+      tester,
+      client: _UgreenCarouselClient(),
+      useClientCarousel: true,
+    );
+    expect(find.byKey(const ValueKey('home-poster-carousel')), findsOneWidget);
+    await _tapCard(tester, 'UGREEN Pick');
+    expect(find.text('detail:ugreen-pick'), findsOneWidget);
+  });
+
   testWidgets('resume movie and episode cards keep equal heights', (
     tester,
   ) async {

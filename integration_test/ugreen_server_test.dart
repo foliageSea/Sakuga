@@ -59,6 +59,18 @@ void main() {
       stage = 'browse';
       final userId = auth.userId;
       final views = await client.views(userId);
+      stage = 'home carousel';
+      final carousel = await client.randomItems(userId);
+      expect(carousel.length, inInclusiveRange(1, 8));
+      expect(
+        carousel.map((item) => item.id).toSet(),
+        hasLength(carousel.length),
+      );
+      for (final item in carousel) {
+        expect(item.type, anyOf(MediaType.movie, MediaType.series));
+        expect(item.backdrop ?? item.poster, isNotNull);
+      }
+      stage = 'browse';
       Future<MediaItem> findSample(MediaType type) async {
         for (final view in views) {
           final page = await client.items(

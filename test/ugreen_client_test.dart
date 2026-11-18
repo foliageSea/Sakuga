@@ -248,7 +248,6 @@ void main() {
       const Duration(seconds: 2),
     );
     expect((await client.latest('24', limit: 1)).single.id, '42');
-    expect(await client.randomItems('24'), isEmpty);
     expect(await client.genres('24', '9'), isEmpty);
     expect(await client.years('24', '9'), isEmpty);
     final [details, search, resume, latest] = adapter.requests;
@@ -342,6 +341,58 @@ void main() {
       expect(filtered.uri.queryParameters, containsPair('IsMissing', 'false'));
     },
   );
+
+  test('carousel samples a bounded movie and series pool by artwork', () async {
+    final adapter = _Adapter(
+      (_) => {
+        'Items': [
+          {'Id': 'no-art', 'Type': 'Movie'},
+          {
+            'Id': 'poster',
+            'Type': 'Movie',
+            'ImageTags': {'Primary': 'poster'},
+          },
+          {
+            'Id': 'wide',
+            'Type': 'Series',
+            'BackdropImageTags': ['wide'],
+          },
+          {
+            'Id': 'wide',
+            'Type': 'Series',
+            'BackdropImageTags': ['wide'],
+          },
+          {
+            'Id': 'episode',
+            'Type': 'Episode',
+            'BackdropImageTags': ['thumbnail'],
+          },
+          ...List.generate(55, (i) => {'Id': 'no-art-$i', 'Type': 'Series'}),
+          {
+            'Id': 'over-limit',
+            'Type': 'Movie',
+            'BackdropImageTags': ['wide'],
+          },
+        ],
+      },
+    );
+    final client = UgreenClient(server: _server, dio: adapter.dio);
+    expect(await client.randomItems('24', limit: 0), isEmpty);
+    expect(adapter.requests, isEmpty);
+    final picks = await client.randomItems('24');
+    expect(picks.map((item) => item.id), ['wide', 'poster']);
+    expect((await client.randomItems('24', limit: 1)).single.id, 'wide');
+    for (final query in adapter.requests) {
+      expect(query.uri.path, '/emby/Users/24/Items');
+      expect(query.uri.queryParameters, containsPair('Limit', '60'));
+      expect(query.uri.queryParameters, containsPair('Recursive', 'true'));
+      expect(
+        query.uri.queryParameters,
+        containsPair('IncludeItemTypes', 'Movie,Series'),
+      );
+      expect(query.uri.queryParameters, isNot(contains('SortBy')));
+    }
+  });
 
   test('playback rejects foreign, Path and transcoding sources', () async {
     final adapter = _Adapter(
