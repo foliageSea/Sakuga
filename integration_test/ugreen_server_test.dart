@@ -19,6 +19,7 @@ void main() {
   const username = String.fromEnvironment('UGREEN_TEST_USERNAME');
   const password = String.fromEnvironment('UGREEN_TEST_PASSWORD');
   const fingerprint = String.fromEnvironment('UGREEN_TEST_FINGERPRINT');
+  const seriesSearch = String.fromEnvironment('UGREEN_TEST_SERIES');
   const deviceId = 'sakuga-ugreen-live-test';
 
   testWidgets('UGREEN native playback opens and seeks in a movie and episode', (
@@ -79,10 +80,13 @@ void main() {
         userId,
         (await findSample(MediaType.movie)).id,
       );
-      final series = await client.item(
-        userId,
-        (await findSample(MediaType.series)).id,
-      );
+      final seriesSample = seriesSearch.isEmpty
+          ? await findSample(MediaType.series)
+          : (await client.search(
+              userId,
+              seriesSearch,
+            )).firstWhere((item) => item.isSeries);
+      final series = await client.item(userId, seriesSample.id);
       final seasons = await client.seasons(userId, series.id);
       expect(seasons.isNotEmpty, isTrue);
       final episodes = await client.episodes(
@@ -91,12 +95,23 @@ void main() {
         seasonId: seasons.first.id,
       );
       expect(episodes.isNotEmpty, isTrue);
-      for (final item in [movie, series, episodes.first]) {
-        stage = '${item.type.name} artwork';
-        final poster = item.poster!;
+      stage = 'season details';
+      final season = await client.item(userId, seasons.first.id);
+      final artwork = {
+        'movie poster': movie.poster,
+        'series poster': series.poster,
+        'series backdrop': series.backdrop,
+        'season poster': season.poster,
+        'season backdrop': season.backdrop,
+        'episode thumbnail': episodes.first.poster,
+      };
+      for (final entry in artwork.entries) {
+        stage = entry.key;
+        final resource = entry.value!;
+        final wide = entry.key.endsWith('backdrop');
         final image = await ArtworkFileService().get(
-          poster.url(),
-          headers: poster.headers,
+          resource.url(width: wide ? 1920 : 600),
+          headers: resource.headers,
         );
         expect(image.statusCode, 200);
         final bytes = await image.content.expand((chunk) => chunk).toList();

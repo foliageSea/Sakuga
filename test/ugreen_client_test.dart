@@ -272,25 +272,33 @@ void main() {
     'synthesizes season details and loads episodes with numeric Season',
     () async {
       final adapter = _Adapter(
-        (_) => {
-          'Items': [
-            {
-              'Id': 53,
-              'ParentIndexNumber': 2,
-              'IndexNumber': 2,
-              'PrimaryImageItemId': 44,
-              'PrimaryImageTag': 'shared',
-            },
-            {'Id': 31, 'ParentIndexNumber': 0, 'IndexNumber': 1},
-            {
-              'Id': 52,
-              'ParentIndexNumber': 2,
-              'IndexNumber': 1,
-              'PrimaryImageItemId': 52,
-              'PrimaryImageTag': 'own',
-            },
-          ],
-        },
+        (request) => request.uri.path.endsWith('/Items/44')
+            ? {
+                'Id': 44,
+                'Name': 'Show',
+                'Type': 'Series',
+                'ImageTags': {'Primary': 'series-poster'},
+                'BackdropImageTags': ['wide art'],
+              }
+            : {
+                'Items': [
+                  {
+                    'Id': 53,
+                    'ParentIndexNumber': 2,
+                    'IndexNumber': 2,
+                    'PrimaryImageItemId': 44,
+                    'PrimaryImageTag': 'shared',
+                  },
+                  {'Id': 31, 'ParentIndexNumber': 0, 'IndexNumber': 1},
+                  {
+                    'Id': 52,
+                    'ParentIndexNumber': 2,
+                    'IndexNumber': 1,
+                    'PrimaryImageItemId': 52,
+                    'PrimaryImageTag': 'own',
+                  },
+                ],
+              },
       );
       final client = UgreenClient(server: _server, dio: adapter.dio);
       final seasons = await client.seasons('24', '44');
@@ -299,6 +307,14 @@ void main() {
       final detail = await client.item('24', seasonId);
       expect(detail.childCount, 2);
       expect(detail.seriesId, '44');
+      final poster = Uri.parse(detail.poster!.url());
+      expect(poster.path, '/emby/Items/44/Images/Primary');
+      expect(poster.queryParameters['tag'], 'series-poster');
+      final backdrop = detail.backdrop!;
+      final wide = Uri.parse(backdrop.url(width: 1920));
+      expect(wide.path, '/emby/Items/44/Images/Backdrop');
+      expect(wide.queryParameters, {'maxWidth': '1920', 'tag': 'wide art'});
+      expect(backdrop.headers[ugreenArtworkProfileHeader], 'nas-profile');
       final episodes = await client.episodes('24', '44', seasonId: seasonId);
       expect(episodes.map((item) => item.id), ['52', '53']);
       expect(episodes.first.seasonId, seasonId);
@@ -314,10 +330,11 @@ void main() {
         client.episodes('24', '99', seasonId: seasonId),
         throwsA(_invalidData),
       );
-      expect(adapter.requests, hasLength(1));
+      expect(adapter.requests, hasLength(2));
       final freshClient = UgreenClient(server: _server, dio: adapter.dio);
       await freshClient.episodes('24', '44', seasonId: seasonId);
-      final [group, filtered] = adapter.requests;
+      final [group, parent, filtered] = adapter.requests;
+      expect(parent.uri.path, '/emby/Users/24/Items/44');
       expect(group.uri.path, '/emby/Shows/44/Episodes');
       expect(group.uri.queryParameters, isNot(contains('Season')));
       expect(filtered.uri.path, '/emby/Shows/44/Episodes');

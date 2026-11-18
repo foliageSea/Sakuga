@@ -36,6 +36,8 @@ class UgreenClient implements MediaServerClient {
   late final _dio = _injectedDio ?? createUgreenDio(_baseUrl, _fingerprint);
   late final _mapper = MediaBrowserMapper(
     baseUrl: _apiBaseUrl,
+    // UGOS exposes only the unindexed route for the primary backdrop.
+    backdropKind: 'Backdrop',
     headers: ugreenArtworkHeaders(
       baseUrl: _baseUrl,
       fingerprint: _fingerprint,
@@ -256,8 +258,19 @@ class UgreenClient implements MediaServerClient {
     if (season != null) {
       final values = await episodes(userId, season.seriesId, seasonId: itemId);
       if (values.isEmpty) throw const AppException(FailureKind.invalidData);
-      return _season(season.seriesId, season.number, values);
+      MediaItem? parent;
+      try {
+        // A direct link has no season card to provide the parent artwork.
+        parent = await _serverItem(season.seriesId);
+      } on AppException {
+        // The episode list is still usable if the parent metadata is unavailable.
+      }
+      return _season(season.seriesId, season.number, values, parent: parent);
     }
+    return _serverItem(itemId);
+  }
+
+  Future<MediaItem> _serverItem(String itemId) async {
     final data = await _request('$_userPath/Items/${_pathId(itemId)}');
     if (ugreenId(data['Id']) != itemId) {
       throw const AppException(FailureKind.invalidData);
@@ -311,14 +324,16 @@ class UgreenClient implements MediaServerClient {
   static MediaItem _season(
     String seriesId,
     int number,
-    List<MediaItem> episodes,
-  ) => MediaItem(
+    List<MediaItem> episodes, {
+    MediaItem? parent,
+  }) => MediaItem(
     id: _seasonId(seriesId, number),
     name: 'Season $number',
     type: MediaType.season,
-    poster: episodes.first.seriesPoster,
+    poster: parent?.poster ?? episodes.first.seriesPoster,
+    backdrop: parent?.backdrop,
     seriesId: seriesId,
-    seriesName: episodes.first.seriesName,
+    seriesName: episodes.first.seriesName ?? parent?.name,
     indexNumber: number,
     childCount: episodes.length,
   );

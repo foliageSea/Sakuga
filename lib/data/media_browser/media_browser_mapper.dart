@@ -4,9 +4,14 @@ Duration mediaBrowserDuration(int ticks) => Duration(microseconds: ticks ~/ 10);
 int mediaBrowserTicks(Duration duration) => duration.inMicroseconds * 10;
 
 class MediaBrowserMapper {
-  const MediaBrowserMapper({required this.baseUrl, required this.headers});
+  const MediaBrowserMapper({
+    required this.baseUrl,
+    required this.headers,
+    this.backdropKind = 'Backdrop/0',
+  });
   final String baseUrl;
   final Map<String, String> headers;
+  final String backdropKind;
 
   MediaUser user(Map<String, dynamic> json) => MediaUser(
     id: json['Id'] as String? ?? '',
@@ -56,7 +61,7 @@ class MediaBrowserMapper {
       seriesPoster: _image(json['SeriesId'], json['SeriesPrimaryImageTag']),
       backdrop: backdrops.isEmpty
           ? null
-          : _image(id, backdrops.first, kind: 'Backdrop/0'),
+          : _image(id, backdrops.first, kind: backdropKind),
       logo:
           _image(id, tags['Logo'], kind: 'Logo') ??
           _image(
