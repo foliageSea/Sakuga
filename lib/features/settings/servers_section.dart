@@ -712,7 +712,8 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
                 ),
               ),
             ),
-            if (widget.server?.type == MediaServerType.ugreen)
+            if (widget.server?.type == MediaServerType.ugreen) ...[
+              const SizedBox(height: 12),
               FButton(
                 key: const ValueKey('ugreen-relogin'),
                 variant: .ghost,
@@ -725,6 +726,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
                       },
                 child: Text(l.ugreenRelogin),
               ),
+            ],
           ] else
             FSwitch(
               key: const ValueKey('server-secure'),
