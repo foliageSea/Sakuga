@@ -19,20 +19,13 @@ import '../../data/ugreen/ugreen_auth.dart';
 import '../../data/ugreen/ugreen_transport.dart';
 import '../../shared/localization.dart';
 import '../../shared/responsive_button.dart';
+import '../../shared/server_brand.dart';
 import '../../shared/widgets.dart';
 
 final ugreenFingerprintProbeProvider =
     Provider<Future<String> Function(String)>(
       (ref) => fetchUgreenCertificateFingerprint,
     );
-
-String _serverTypeLabel(BuildContext context, MediaServerType type) =>
-    switch (type) {
-      MediaServerType.jellyfin => 'Jellyfin',
-      MediaServerType.emby => 'Emby',
-      MediaServerType.fnmovie => context.l10n.serverTypeFnMovie,
-      MediaServerType.ugreen => context.l10n.serverTypeUgreen,
-    };
 
 class ServersSection extends ConsumerStatefulWidget {
   const ServersSection({super.key});
@@ -624,13 +617,13 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
             mainAxisAlignment: MainAxisAlignment.start,
             onPress: _busy ? null : _selectServerType,
             semanticsLabel:
-                '${l.serverType}: ${_serverTypeLabel(context, _type)}',
-            prefix: _ServerTypeIcon(type: _type, size: 20),
+                '${l.serverType}: ${serverTypeLabel(context, _type)}',
+            prefix: ServerTypeIcon(type: _type, size: 20),
             suffix: const Icon(FLucideIcons.chevronRight),
             builder: responsiveButtonContent,
             child: Align(
               alignment: AlignmentDirectional.centerStart,
-              child: Text(_serverTypeLabel(context, _type)),
+              child: Text(serverTypeLabel(context, _type)),
             ),
           ),
           if (_type == MediaServerType.jellyfin) ...[
@@ -841,14 +834,14 @@ class _ServerTypePicker extends StatelessWidget {
               selected: type == selected,
               mainAxisAlignment: MainAxisAlignment.start,
               onPress: () => Navigator.of(context).pop(type),
-              prefix: _ServerTypeIcon(type: type, size: 24),
+              prefix: ServerTypeIcon(type: type, size: 24),
               suffix: type == selected
                   ? Icon(FLucideIcons.check, color: theme.colors.primary)
                   : null,
               builder: responsiveButtonContent,
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: Text(_serverTypeLabel(context, type)),
+                child: Text(serverTypeLabel(context, type)),
               ),
             ),
           ],
@@ -866,25 +859,6 @@ class _ServerTypePicker extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ServerTypeIcon extends StatelessWidget {
-  const _ServerTypeIcon({required this.type, required this.size});
-
-  final MediaServerType type;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = type == MediaServerType.fnmovie ? 'fnos' : type.name;
-    return Image.asset(
-      'assets/icons/servers/$name.png',
-      width: size,
-      height: size,
-      fit: BoxFit.contain,
-      excludeFromSemantics: true,
     );
   }
 }
@@ -1007,18 +981,12 @@ class _ServerTile extends StatelessWidget {
       borderRadius: context.theme.style.borderRadius.md,
     ),
     child: Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      padding: const EdgeInsets.fromLTRB(18, 8, 4, 8),
       child: Row(
         children: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Icon(
-              FLucideIcons.server,
-              size: 20,
-              color: active
-                  ? context.theme.colors.primary
-                  : context.theme.colors.mutedForeground,
-            ),
+            padding: const EdgeInsets.only(right: 18),
+            child: ServerTypeIcon(type: server.type, size: 20),
           ),
           Expanded(
             child: Column(
@@ -1031,7 +999,7 @@ class _ServerTile extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  '${_serverTypeLabel(context, server.type)}'
+                  '${serverTypeLabel(context, server.type)}'
                   '${server.usesAccount ? ' · ${server.username}' : ''}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

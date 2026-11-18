@@ -157,6 +157,20 @@ Future<void> _edit(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('settings list shows the saved server brand icon', (
+    tester,
+  ) async {
+    final repo = MemoryServerRepository()..items = [_saved];
+    await _pump(tester, repo, _Auth());
+    final image = find.descendant(
+      of: _key(_saved.id),
+      matching: find.byType(Image),
+    );
+    expect(image, findsOneWidget);
+    final asset = tester.widget<Image>(image).image as AssetImage;
+    expect(asset.assetName, 'assets/icons/servers/emby.png');
+  });
+
   testWidgets('server type opens a branded modal without losing edits', (
     tester,
   ) async {

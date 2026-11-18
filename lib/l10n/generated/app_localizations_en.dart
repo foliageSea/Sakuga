@@ -55,6 +55,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchServer => 'Switch';
 
   @override
+  String get librarySwitchServer => 'Switch server';
+
+  @override
   String get serverName => 'Name';
 
   @override

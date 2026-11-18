@@ -17,8 +17,9 @@ import '../../shared/poster_background.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import '../detail/detail_page.dart';
-import 'library_providers.dart';
 import 'library_filters.dart';
+import 'library_providers.dart';
+import 'library_server_picker.dart';
 import 'library_toolbar.dart';
 
 class LibraryPage extends ConsumerStatefulWidget {
@@ -128,12 +129,18 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   Widget build(BuildContext context) {
     ref.listen(activeServerProvider, (previous, next) {
       if (previous?.id == next?.id) return;
+      _searchDebounce?.cancel();
       setState(() {
+        _searchTerm = '';
         _selectedViewId = null;
         _selectedGenre = null;
         _isPlayed = null;
         _selectedYear = null;
+        _sort = MediaSort.name;
+        _descending = false;
       });
+      _searchController.clear();
+      if (_scrollController.hasClients) _scrollController.jumpTo(0);
     });
     final l = context.l10n;
     final server = ref.watch(activeServerProvider);
@@ -153,10 +160,23 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         ],
       );
     }
+    final mobileShell =
+        isMobileLayout(context) &&
+        WindowPosterBackgroundScope.hasShell(context);
+    final serverButton = LibraryServerHeaderScope.hasAction(context)
+        ? null
+        : const LibraryServerAction();
     if (!ref.watch(mediaServerClientProvider(server)).isConfigured) {
       return PageContent(
         children: [
           PageHeading(l.library, hideTitleOnMobile: true),
+          if (serverButton != null) ...[
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: serverButton,
+            ),
+            const SizedBox(height: 12),
+          ],
           EmptyNotice(
             server.usesAccount ? l.serverLoginRequired : l.noApiKey,
             child: FButton(
@@ -171,16 +191,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     }
 
     final data = ref.watch(libraryViewsProvider);
-    final views = data.hasError ? null : data.value?.views;
+    final views = data.hasError || data.isReloading ? null : data.value?.views;
     final hasViews = views != null && views.isNotEmpty;
     final activeViewId = hasViews
         ? (views.any((view) => view.id == _selectedViewId)
               ? _selectedViewId!
               : views.first.id)
         : null;
-    final mobileShell =
-        isMobileLayout(context) &&
-        WindowPosterBackgroundScope.hasShell(context);
     final query = activeViewId == null
         ? null
         : _query(data.requireValue, activeViewId);
@@ -235,22 +252,51 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     Expanded(
                       child: Text(
                         l.library,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: context.theme.typography.body.xl.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    FButton.icon(
-                      key: const ValueKey('library-refresh'),
-                      variant: .ghost,
-                      size: .sm,
-                      semanticsLabel: l.refresh,
-                      onPress: () => ref.invalidate(libraryViewsProvider),
-                      child: const Icon(FLucideIcons.refreshCw),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (serverButton != null) ...[
+                            Flexible(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 280,
+                                ),
+                                child: serverButton,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          FButton.icon(
+                            key: const ValueKey('library-refresh'),
+                            variant: .ghost,
+                            size: .sm,
+                            semanticsLabel: l.refresh,
+                            onPress: () => ref.invalidate(libraryViewsProvider),
+                            child: const Icon(FLucideIcons.refreshCw),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
+            if (mobileShell && serverButton != null) ...[
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: serverButton,
+              ),
+              const SizedBox(height: 12),
+            ],
             if (viewChips != null) ...[
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -343,8 +389,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     if (_searchTerm.isNotEmpty) return false;
     if (notification.metrics.axis != Axis.vertical) return false;
     if (notification.metrics.extentAfter > 480) return false;
-    final library = ref.read(libraryViewsProvider).value;
-    if (library == null || library.views.isEmpty) return false;
+    final data = ref.read(libraryViewsProvider);
+    final library = data.value;
+    if (data.isReloading || library == null || library.views.isEmpty) {
+      return false;
+    }
     final viewId = library.views.any((view) => view.id == _selectedViewId)
         ? _selectedViewId!
         : library.views.first.id;
@@ -470,26 +519,29 @@ class _SearchGrid extends ConsumerWidget {
   final bool listView;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => ref
-      .watch(searchResultsProvider(term))
-      .when(
-        data: (items) => _LibraryGrid(
-          client: client,
-          items: items,
-          listView: listView,
-          onTap: (item, posterUrl) => context.go(
-            '/library/${item.id}',
-            extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final results = searchResultsProvider((
+      serverId: client.server.id,
+      term: term,
+    ));
+    return ref
+        .watch(results)
+        .when(
+          data: (items) => _LibraryGrid(
+            client: client,
+            items: items,
+            listView: listView,
+            onTap: (item, posterUrl) => context.go(
+              '/library/${item.id}',
+              extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
+            ),
           ),
-        ),
-        loading: () => const SliverToBoxAdapter(child: LoadingNotice()),
-        error: (error, _) => SliverToBoxAdapter(
-          child: ErrorNotice(
-            error,
-            onRetry: () => ref.invalidate(searchResultsProvider(term)),
+          loading: () => const SliverToBoxAdapter(child: LoadingNotice()),
+          error: (error, _) => SliverToBoxAdapter(
+            child: ErrorNotice(error, onRetry: () => ref.invalidate(results)),
           ),
-        ),
-      );
+        );
+  }
 }
 
 class _LibraryEmptyState extends StatelessWidget {

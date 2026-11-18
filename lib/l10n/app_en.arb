@@ -15,6 +15,7 @@
   "editServer": "Edit server",
   "currentServer": "Current",
   "switchServer": "Switch",
+  "librarySwitchServer": "Switch server",
   "serverName": "Name",
   "serverUrl": "Server address",
   "secureConnection": "Secure connection",

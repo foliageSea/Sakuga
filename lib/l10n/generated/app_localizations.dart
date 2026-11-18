@@ -188,6 +188,12 @@ abstract class AppLocalizations {
   /// **'Switch'**
   String get switchServer;
 
+  /// No description provided for @librarySwitchServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch server'**
+  String get librarySwitchServer;
+
   /// No description provided for @serverName.
   ///
   /// In en, this message translates to:

@@ -255,7 +255,13 @@ final libraryItemsProvider = AsyncNotifierProvider.autoDispose
     );
 
 final searchResultsProvider = FutureProvider.autoDispose
-    .family<List<MediaItem>, String>((ref, term) async {
+    .family<List<MediaItem>, ({String serverId, String term})>((
+      ref,
+      query,
+    ) async {
       final library = await ref.watch(libraryViewsProvider.future);
-      return library.client.search(library.userId, term);
+      // An old search widget may still be subscribed while the active server
+      // changes. Never send its query to the new server.
+      if (library.client.server.id != query.serverId) return const [];
+      return library.client.search(library.userId, query.term);
     });

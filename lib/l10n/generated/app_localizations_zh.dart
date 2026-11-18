@@ -55,6 +55,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get switchServer => '切换';
 
   @override
+  String get librarySwitchServer => '切换服务器';
+
+  @override
   String get serverName => '名称';
 
   @override

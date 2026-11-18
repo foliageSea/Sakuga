@@ -11,6 +11,7 @@ import '../data/media_server/media_server_factory.dart';
 import '../features/detail/detail_page.dart';
 import '../features/home/home_providers.dart';
 import '../features/library/library_providers.dart';
+import '../features/library/library_server_picker.dart';
 import '../shared/language_options.dart';
 import '../shared/localization.dart';
 import '../shared/poster_background.dart';
@@ -96,6 +97,9 @@ class AppShell extends ConsumerWidget {
                       if (window.available && !window.fullScreen)
                         DesktopTitleBar(
                           controller: window,
+                          libraryServerAction: const LibraryServerAction(
+                            compact: true,
+                          ),
                           compactSidebar: settings.compactSidebar,
                           onToggleCompactSidebar: () async {
                             try {
@@ -275,6 +279,20 @@ class AppShell extends ConsumerWidget {
                                           ),
                                           titleAlignment:
                                               AlignmentDirectional.centerStart,
+                                          suffixes: [
+                                            if (!window.available ||
+                                                window.fullScreen)
+                                              ConstrainedBox(
+                                                constraints:
+                                                    const BoxConstraints(
+                                                      maxWidth: 160,
+                                                    ),
+                                                child:
+                                                    const LibraryServerAction(
+                                                      compact: true,
+                                                    ),
+                                              ),
+                                          ],
                                           prefixes: [
                                             FHeaderAction.back(
                                               key: const ValueKey(
@@ -349,6 +367,17 @@ class AppShell extends ConsumerWidget {
                                                 ],
                                               ),
                                               suffixes: [
+                                                if (!window.available ||
+                                                    window.fullScreen)
+                                                  ConstrainedBox(
+                                                    constraints: BoxConstraints(
+                                                      maxWidth: 160,
+                                                    ),
+                                                    child:
+                                                        const LibraryServerAction(
+                                                          compact: true,
+                                                        ),
+                                                  ),
                                                 if (canRefreshLibrary ||
                                                     canRefreshHome)
                                                   FButton.icon(
@@ -407,7 +436,15 @@ class AppShell extends ConsumerWidget {
                                           ],
                                         )
                                       : null,
-                                  child: shell,
+                                  child: LibraryServerHeaderScope(
+                                    hasServerAction:
+                                        isLibraryRootRoute &&
+                                        ((window.available &&
+                                                !window.fullScreen) ||
+                                            mobile ||
+                                            backLocation != null),
+                                    child: shell,
+                                  ),
                                 ),
                               ),
                             ),
@@ -465,6 +502,7 @@ class DesktopTitleBar extends StatelessWidget {
     this.language = 'system',
     this.onLanguageChanged,
     this.onToggleTheme,
+    this.libraryServerAction,
     super.key,
   });
   final DesktopWindowController controller;
@@ -473,6 +511,7 @@ class DesktopTitleBar extends StatelessWidget {
   final String language;
   final Future<void> Function(String language)? onLanguageChanged;
   final Future<void> Function()? onToggleTheme;
+  final Widget? libraryServerAction;
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -528,6 +567,11 @@ class DesktopTitleBar extends StatelessWidget {
               ),
             ),
           ),
+          if (libraryServerAction case final action?)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: action,
+            ),
           if (onLanguageChanged != null)
             _LanguageMenu(
               key: const ValueKey('language-menu'),
