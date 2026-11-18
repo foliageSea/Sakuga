@@ -128,6 +128,23 @@ class UgreenClient implements MediaServerClient {
     int? season,
   }) {
     final data = _normalizeIds(row);
+    // UGOS can advertise the Primary tag and its owner as top-level fields.
+    final tags = Map<Object?, Object?>.of(
+      row['ImageTags'] is Map ? row['ImageTags'] as Map : const {},
+    );
+    final primary =
+        ugreenId(row['PrimaryImageTag']) ?? ugreenId(tags['Primary']);
+    final owner = ugreenId(row['PrimaryImageItemId']);
+    if (primary != null) {
+      if (owner != null && owner != data['Id']) {
+        tags.remove('Primary');
+        data['ParentPrimaryImageItemId'] = owner;
+        data['ParentPrimaryImageTag'] = primary;
+      } else {
+        tags['Primary'] = primary;
+      }
+      data['ImageTags'] = tags;
+    }
     if (seriesId != null) data['Type'] = 'Episode';
     if (data['Type'] == 'Episode') {
       final series = seriesId ?? data['SeriesId'] as String?;

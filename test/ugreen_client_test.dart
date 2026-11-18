@@ -274,9 +274,21 @@ void main() {
       final adapter = _Adapter(
         (_) => {
           'Items': [
-            {'Id': 53, 'ParentIndexNumber': 2, 'IndexNumber': 2},
+            {
+              'Id': 53,
+              'ParentIndexNumber': 2,
+              'IndexNumber': 2,
+              'PrimaryImageItemId': 44,
+              'PrimaryImageTag': 'shared',
+            },
             {'Id': 31, 'ParentIndexNumber': 0, 'IndexNumber': 1},
-            {'Id': 52, 'ParentIndexNumber': 2, 'IndexNumber': 1},
+            {
+              'Id': 52,
+              'ParentIndexNumber': 2,
+              'IndexNumber': 1,
+              'PrimaryImageItemId': 52,
+              'PrimaryImageTag': 'own',
+            },
           ],
         },
       );
@@ -290,6 +302,14 @@ void main() {
       final episodes = await client.episodes('24', '44', seasonId: seasonId);
       expect(episodes.map((item) => item.id), ['52', '53']);
       expect(episodes.first.seasonId, seasonId);
+      expect(
+        Uri.parse(episodes.first.poster!.url()).path,
+        '/emby/Items/52/Images/Primary',
+      );
+      expect(
+        Uri.parse(episodes.last.poster!.url()).path,
+        '/emby/Items/44/Images/Primary',
+      );
       await expectLater(
         client.episodes('24', '99', seasonId: seasonId),
         throwsA(_invalidData),

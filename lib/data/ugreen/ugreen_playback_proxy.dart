@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:io';
 import 'dart:math';
 
@@ -6,7 +8,83 @@ import 'ugreen_transport.dart';
 
 /// Adapts pinned HTTPS media to a capability URL on the IPv4 loopback only.
 class UgreenPlaybackProxy {
-  UgreenPlaybackProxy._(this._server, this._client, this._base, this._upstream)
+  UgreenPlaybackProxy._(this.url, this._worker, this._stop, this._exited);
+
+  final String url;
+  final Isolate _worker;
+  final SendPort _stop;
+  final Future<void> _exited;
+  Future<void>? _closing;
+
+  static Future<UgreenPlaybackProxy> start({
+    required String baseUrl,
+    required String fingerprint,
+    required Uri upstream,
+  }) async {
+    requireUgreenOrigin(Uri.parse(normalizeUgreenBaseUrl(baseUrl)), upstream);
+    final ready = ReceivePort();
+    final exit = ReceivePort();
+    final exited = exit.first.then<void>((_) => exit.close());
+    Isolate? worker;
+    try {
+      // libmpv performs synchronous native calls on the UI isolate. Keep the
+      // HTTP server independent so those calls cannot starve its own stream.
+      worker = await Isolate.spawn(
+        _serveInWorker,
+        (ready.sendPort, baseUrl, fingerprint, upstream.toString()),
+        onError: ready.sendPort,
+        onExit: exit.sendPort,
+      );
+      final result = await ready.first.timeout(const Duration(seconds: 10));
+      if (result is! (String, SendPort)) {
+        throw const SocketException('UGREEN proxy unavailable');
+      }
+      return UgreenPlaybackProxy._(result.$1, worker, result.$2, exited);
+    } catch (_) {
+      if (worker == null) {
+        exit.close();
+      } else {
+        worker.kill(priority: Isolate.immediate);
+      }
+      rethrow;
+    } finally {
+      ready.close();
+    }
+  }
+
+  Future<void> close() => _closing ??= _close();
+
+  Future<void> _close() async {
+    _stop.send(null);
+    try {
+      await _exited.timeout(const Duration(seconds: 3));
+    } on TimeoutException {
+      _worker.kill(priority: Isolate.immediate);
+      await _exited;
+    }
+  }
+}
+
+Future<void> _serveInWorker((SendPort, String, String, String) args) async {
+  final (ready, baseUrl, fingerprint, upstream) = args;
+  try {
+    final proxy = await _PlaybackServer.start(
+      baseUrl: baseUrl,
+      fingerprint: fingerprint,
+      upstream: Uri.parse(upstream),
+    );
+    final stop = ReceivePort();
+    ready.send((proxy.url, stop.sendPort));
+    await stop.first;
+    stop.close();
+    await proxy.close();
+  } catch (_) {
+    ready.send(null);
+  }
+}
+
+class _PlaybackServer {
+  _PlaybackServer._(this._server, this._client, this._base, this._upstream)
     : _path = '/${_randomPath()}' {
     _server.listen(_serve);
   }
@@ -16,9 +94,8 @@ class UgreenPlaybackProxy {
   final Uri _base;
   final Uri _upstream;
   final String _path;
-  Future<void>? _closing;
 
-  static Future<UgreenPlaybackProxy> start({
+  static Future<_PlaybackServer> start({
     required String baseUrl,
     required String fingerprint,
     required Uri upstream,
@@ -30,7 +107,7 @@ class UgreenPlaybackProxy {
       ..connectionTimeout = const Duration(seconds: 15);
     try {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      return UgreenPlaybackProxy._(server, client, base, upstream);
+      return _PlaybackServer._(server, client, base, upstream);
     } catch (_) {
       client.close(force: true);
       rethrow;
@@ -39,9 +116,7 @@ class UgreenPlaybackProxy {
 
   String get url => 'http://127.0.0.1:${_server.port}$_path';
 
-  Future<void> close() => _closing ??= _close();
-
-  Future<void> _close() async {
+  Future<void> close() async {
     _client.close(force: true);
     await _server.close(force: true);
   }

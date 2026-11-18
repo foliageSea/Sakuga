@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -27,6 +29,9 @@ void main() {
       isTrue,
       reason: 'Provide live configuration via dart-define-from-file.',
     );
+    var stage = 'sign-in';
+    // Preserve the first failing stage even if native cleanup also stalls.
+    String? failedStage;
     try {
       final baseUrl = normalizeUgreenBaseUrl(rawUrl);
       final auth = await UgreenAuthService().authenticate(
@@ -50,6 +55,7 @@ void main() {
           certificateFingerprint: fingerprint,
         ),
       );
+      stage = 'browse';
       final userId = auth.userId;
       final views = await client.views(userId);
       Future<MediaItem> findSample(MediaType type) async {
@@ -85,14 +91,21 @@ void main() {
         seasonId: seasons.first.id,
       );
       expect(episodes.isNotEmpty, isTrue);
-      final poster = movie.poster!;
-      final image = await ArtworkFileService().get(
-        poster.url(),
-        headers: poster.headers,
-      );
-      expect(image.statusCode, 200);
-      expect((await image.content.first).isNotEmpty, isTrue);
+      for (final item in [movie, series, episodes.first]) {
+        stage = '${item.type.name} artwork';
+        final poster = item.poster!;
+        final image = await ArtworkFileService().get(
+          poster.url(),
+          headers: poster.headers,
+        );
+        expect(image.statusCode, 200);
+        final bytes = await image.content.expand((chunk) => chunk).toList();
+        final codec = await decodeImageFromList(Uint8List.fromList(bytes));
+        expect(codec.width, greaterThan(0));
+        codec.dispose();
+      }
 
+      stage = 'initialize libmpv';
       MediaKit.ensureInitialized();
       final player = Player();
       final controller = VideoController(player);
@@ -109,18 +122,24 @@ void main() {
         );
         await player.setVolume(0);
         for (final item in [movie, episodes.first]) {
+          stage = '${item.type.name} PlaybackInfo';
           final source = await client.playbackSource(userId, item.id);
           try {
             expect(Uri.parse(source.url).host, '127.0.0.1');
-            await player.open(Media(source.url, httpHeaders: source.headers));
+            stage = '${item.type.name} libmpv open';
+            debugPrint(stage);
+            await player
+                .open(Media(source.url, httpHeaders: source.headers))
+                .timeout(const Duration(seconds: 20));
             final duration = player.state.duration > Duration.zero
                 ? player.state.duration
                 : await player.stream.duration
                       .firstWhere((d) => d > Duration.zero)
                       .timeout(const Duration(seconds: 30));
+            stage = '${item.type.name} libmpv seek';
+            debugPrint(stage);
             final target = duration ~/ 2;
-            await player.pause();
-            await player.seek(target);
+            await player.seek(target).timeout(const Duration(seconds: 15));
             bool near(Duration position) =>
                 (position - target).abs() < const Duration(seconds: 3);
             if (!near(player.state.position)) {
@@ -128,20 +147,25 @@ void main() {
                   .firstWhere(near)
                   .timeout(const Duration(seconds: 20));
             }
+          } catch (_) {
+            failedStage = stage;
+            rethrow;
           } finally {
             try {
-              await player.stop();
+              await player.stop().timeout(const Duration(seconds: 5));
             } finally {
               await client.stopTranscoding(source.session);
             }
           }
         }
       } finally {
-        await player.dispose();
+        await player.dispose().timeout(const Duration(seconds: 5));
       }
     } catch (error) {
       // Test output must not disclose server responses, URLs or credentials.
-      fail('UGREEN live check failed (${error.runtimeType}).');
+      fail(
+        'UGREEN live check failed at ${failedStage ?? stage} (${error.runtimeType}).',
+      );
     }
   }, skip: !enabled);
 }
