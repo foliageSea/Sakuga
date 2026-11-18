@@ -278,6 +278,26 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
     });
   }
 
+  Future<void> _selectServerType() async {
+    if (_busy) return;
+    FocusScope.of(context).unfocus();
+    final selected = await showFDialog<MediaServerType>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      builder: (context, style, animation) => FDialog(
+        key: const ValueKey('server-type-dialog'),
+        animation: animation,
+        semanticsLabel: context.l10n.serverType,
+        constraints: const BoxConstraints(minWidth: 280, maxWidth: 420),
+        builder: (context, style) => _ServerTypePicker(selected: _type),
+      ),
+    );
+    if (!mounted || selected == null || selected == _type) return;
+    _type = selected;
+    _changeAuthentication(true);
+  }
+
   void _changeAuthentication(bool account) {
     _account = account;
     _identityReset = true;
@@ -596,26 +616,22 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
             ),
           ),
           const SizedBox(height: 16),
-          FSelect<MediaServerType>.rich(
+          Text(l.serverType, style: context.theme.typography.body.sm),
+          const SizedBox(height: 4),
+          FButton(
             key: const ValueKey('server-type'),
-            label: Text(l.serverType),
-            enabled: !_saving,
-            format: (value) => _serverTypeLabel(context, value),
-            control: .lifted(
-              value: _type,
-              onChange: (value) {
-                if (value == null || value == _type) return;
-                _type = value;
-                _changeAuthentication(true);
-              },
+            variant: .outline,
+            mainAxisAlignment: MainAxisAlignment.start,
+            onPress: _busy ? null : _selectServerType,
+            semanticsLabel:
+                '${l.serverType}: ${_serverTypeLabel(context, _type)}',
+            prefix: _ServerTypeIcon(type: _type, size: 20),
+            suffix: const Icon(FLucideIcons.chevronRight),
+            builder: responsiveButtonContent,
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(_serverTypeLabel(context, _type)),
             ),
-            children: [
-              for (final type in MediaServerType.values)
-                FSelectItem(
-                  title: Text(_serverTypeLabel(context, type)),
-                  value: type,
-                ),
-            ],
           ),
           if (_type == MediaServerType.jellyfin) ...[
             const SizedBox(height: 12),
@@ -790,6 +806,85 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ServerTypePicker extends StatelessWidget {
+  const _ServerTypePicker({required this.selected});
+
+  final MediaServerType selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = context.theme;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l.serverType,
+            style: theme.typography.body.lg.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          for (final type in MediaServerType.values) ...[
+            if (type != MediaServerType.values.first) const SizedBox(height: 8),
+            FButton(
+              key: ValueKey('pick-server-type-${type.name}'),
+              variant: type == selected ? .secondary : .outline,
+              size: .lg,
+              selected: type == selected,
+              mainAxisAlignment: MainAxisAlignment.start,
+              onPress: () => Navigator.of(context).pop(type),
+              prefix: _ServerTypeIcon(type: type, size: 24),
+              suffix: type == selected
+                  ? Icon(FLucideIcons.check, color: theme.colors.primary)
+                  : null,
+              builder: responsiveButtonContent,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(_serverTypeLabel(context, type)),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: FButton(
+              key: const ValueKey('cancel-server-type'),
+              variant: .ghost,
+              mainAxisSize: MainAxisSize.min,
+              builder: responsiveButtonContent,
+              onPress: () => Navigator.of(context).pop(),
+              child: Text(l.cancel),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServerTypeIcon extends StatelessWidget {
+  const _ServerTypeIcon({required this.type, required this.size});
+
+  final MediaServerType type;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = type == MediaServerType.fnmovie ? 'fnos' : type.name;
+    return Image.asset(
+      'assets/icons/servers/$name.png',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      excludeFromSemantics: true,
     );
   }
 }

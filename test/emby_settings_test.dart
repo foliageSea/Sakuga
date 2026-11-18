@@ -157,6 +157,66 @@ Future<void> _edit(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('server type opens a branded modal without losing edits', (
+    tester,
+  ) async {
+    final repo = MemoryServerRepository()..items = [_saved];
+    await _pump(tester, repo, _Auth());
+    await _edit(tester);
+    await _enter(tester, 'server-name', 'Renamed');
+    await _enter(tester, 'server-password', 'draft password');
+
+    final picker = _key('server-type-dialog');
+    await _tap(tester, 'server-type');
+    expect(picker, findsOneWidget);
+    final rows = find.descendant(of: picker, matching: find.byType(FButton));
+    expect(rows, findsNWidgets(5));
+    for (final type in MediaServerType.values) {
+      final row = _key('pick-server-type-${type.name}');
+      expect(row, findsOneWidget);
+      expect(
+        tester.widget<FButton>(row).selected,
+        type == MediaServerType.emby,
+      );
+      final asset =
+          tester
+                  .widget<Image>(
+                    find.descendant(of: row, matching: find.byType(Image)),
+                  )
+                  .image
+              as AssetImage;
+      final name = type == MediaServerType.fnmovie ? 'fnos' : type.name;
+      expect(asset.assetName, 'assets/icons/servers/$name.png');
+    }
+
+    TextEditingController field(String key) => tester
+        .widget<EditableText>(
+          find.descendant(of: _key(key), matching: find.byType(EditableText)),
+        )
+        .controller;
+
+    await _tap(tester, 'cancel-server-type');
+    expect(picker, findsNothing);
+    expect(field('server-name').text, 'Renamed');
+    expect(field('server-password').text, 'draft password');
+
+    await _tap(tester, 'server-type');
+    await _tap(tester, 'pick-server-type-emby');
+    expect(picker, findsNothing);
+    expect(field('server-password').text, 'draft password');
+
+    await _tap(tester, 'server-type');
+    await _tap(tester, 'pick-server-type-ugreen');
+    expect(picker, findsNothing);
+    expect(_key('ugreen-fingerprint'), findsOneWidget);
+    expect(field('server-name').text, 'Renamed');
+    expect(field('server-url').text, 'media.example');
+    expect(field('server-username').text, isEmpty);
+    expect(field('server-password').text, isEmpty);
+    expect(repo.items.single.type, MediaServerType.emby);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Emby Save authenticates before persisting an account', (
     tester,
   ) async {

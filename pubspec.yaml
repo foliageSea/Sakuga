@@ -58,6 +58,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/sakuga.png
+    - assets/icons/servers/jellyfin.png
+    - assets/icons/servers/emby.png
+    - assets/icons/servers/fnos.png
+    - assets/icons/servers/ugreen.png
     - assets/shaders/
   fonts:
     - family: MiSans
