@@ -80,6 +80,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'HTTPS only. Verify self-signed certificates on a trusted network before entering the fingerprint. Leave blank for a system-trusted certificate.';
 
   @override
+  String get ugreenFingerprintTitle => 'Certificate SHA-256 fingerprint';
+
+  @override
+  String get ugreenFingerprintCopy => 'Copy fingerprint';
+
+  @override
+  String get ugreenFingerprintCopyError => 'Could not copy the fingerprint.';
+
+  @override
+  String get ugreenFingerprintFetch => 'Get fingerprint';
+
+  @override
+  String get ugreenFingerprintFetching => 'Reading certificate…';
+
+  @override
+  String get ugreenFingerprintUnverified =>
+      'Unverified fingerprint. Compare it with the certificate from your trusted local network before using it.';
+
+  @override
+  String get ugreenFingerprintUse => 'Use fingerprint';
+
+  @override
+  String get ugreenFingerprintFetchError =>
+      'Could not read the certificate. Check the address, HTTPS port, and network connection.';
+
+  @override
   String get ugreenFingerprintInvalid =>
       'Enter a 64-digit hexadecimal SHA-256 fingerprint, with or without colons.';
 

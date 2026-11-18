@@ -53,6 +53,38 @@ String normalizeUgreenBaseUrl(String value) {
   return 'https://$host:$port';
 }
 
+/// Reads the presented leaf's SHA-256 fingerprint without sending app data.
+///
+/// The result is not an identity check: verify it independently before pinning.
+Future<String> fetchUgreenCertificateFingerprint(String baseUrl) async {
+  final endpoint = Uri.parse(normalizeUgreenBaseUrl(baseUrl));
+  const timeout = Duration(seconds: 5);
+  final tcp = await RawSocket.connect(
+    endpoint.host,
+    endpoint.port,
+    timeout: timeout,
+  );
+  RawSecureSocket? tls;
+  try {
+    tls = await RawSecureSocket.secure(
+      tcp,
+      host: endpoint.host,
+      context: SecurityContext(withTrustedRoots: false),
+      onBadCertificate: (_) => true,
+    ).timeout(timeout);
+    final certificate = tls.peerCertificate;
+    if (certificate == null) {
+      throw const HandshakeException(
+        'Ugreen server did not present a certificate',
+      );
+    }
+    return sha256.convert(certificate.der).toString();
+  } finally {
+    // Keep the underlying TCP socket so a stalled TLS handshake can be aborted.
+    await (tls ?? tcp).close();
+  }
+}
+
 void requireUgreenOrigin(Uri base, Uri target) {
   if (target.scheme != 'https' ||
       !target.hasAuthority ||

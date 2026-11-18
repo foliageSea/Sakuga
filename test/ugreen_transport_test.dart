@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -51,28 +52,77 @@ void main() {
     }
   });
 
+  final pin = sha256
+      .convert(
+        base64.decode(
+          _certificate.replaceAll(RegExp(r'-----[^-]+-----|\s'), ''),
+        ),
+      )
+      .toString();
+
+  group('TLS fingerprint discovery', () {
+    test('reads the self-signed leaf and sends no application bytes', () async {
+      final server = await SecureServerSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+        _serverContext(),
+      );
+      addTearDown(server.close);
+      final observed = server.first.then((socket) {
+        addTearDown(socket.destroy);
+        return socket.expand((chunk) => chunk).toList();
+      });
+
+      expect(
+        await fetchUgreenCertificateFingerprint(
+          '  HTTPS://LOCALHOST:${server.port}/  ',
+        ),
+        pin,
+      );
+      expect(await observed.timeout(const Duration(seconds: 2)), isEmpty);
+    });
+
+    test('rejects non-HTTPS and URLs with credentials or a path', () async {
+      for (final url in [
+        'http://127.0.0.1',
+        'https://user:secret@127.0.0.1',
+        'https://127.0.0.1/api',
+      ]) {
+        await expectLater(
+          fetchUgreenCertificateFingerprint(url),
+          throwsFormatException,
+        );
+      }
+    });
+
+    test('times out and closes TCP if the TLS peer never responds', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      final disconnected = server.first.then((socket) {
+        addTearDown(socket.destroy);
+        return socket.drain<void>();
+      });
+
+      await expectLater(
+        fetchUgreenCertificateFingerprint('127.0.0.1:${server.port}'),
+        throwsA(isA<TimeoutException>()),
+      );
+      await disconnected.timeout(const Duration(seconds: 2));
+    });
+  });
+
   group('loopback HTTPS', () {
     late HttpServer upstream;
     late String base;
     late int hits;
     late List<Uri> seen;
     late List<Map<String, String>> seenHeaders;
-    final pin = sha256
-        .convert(
-          base64.decode(
-            _certificate.replaceAll(RegExp(r'-----[^-]+-----|\s'), ''),
-          ),
-        )
-        .toString();
 
     setUp(() async {
-      final context = SecurityContext()
-        ..useCertificateChainBytes(utf8.encode(_certificate))
-        ..usePrivateKeyBytes(utf8.encode(_privateKey));
       upstream = await HttpServer.bindSecure(
         InternetAddress.loopbackIPv4,
         0,
-        context,
+        _serverContext(),
       );
       base = 'https://127.0.0.1:${upstream.port}';
       hits = 0;
@@ -307,6 +357,10 @@ void main() {
     );
   });
 }
+
+SecurityContext _serverContext() => SecurityContext()
+  ..useCertificateChainBytes(utf8.encode(_certificate))
+  ..usePrivateKeyBytes(utf8.encode(_privateKey));
 
 // Self-signed localhost fixture. This key must never be used outside tests.
 const _privateKey = '''-----BEGIN PRIVATE KEY-----

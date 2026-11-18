@@ -236,6 +236,54 @@ abstract class AppLocalizations {
   /// **'HTTPS only. Verify self-signed certificates on a trusted network before entering the fingerprint. Leave blank for a system-trusted certificate.'**
   String get ugreenFingerprintHelp;
 
+  /// No description provided for @ugreenFingerprintTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Certificate SHA-256 fingerprint'**
+  String get ugreenFingerprintTitle;
+
+  /// No description provided for @ugreenFingerprintCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy fingerprint'**
+  String get ugreenFingerprintCopy;
+
+  /// No description provided for @ugreenFingerprintCopyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy the fingerprint.'**
+  String get ugreenFingerprintCopyError;
+
+  /// No description provided for @ugreenFingerprintFetch.
+  ///
+  /// In en, this message translates to:
+  /// **'Get fingerprint'**
+  String get ugreenFingerprintFetch;
+
+  /// No description provided for @ugreenFingerprintFetching.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading certificate…'**
+  String get ugreenFingerprintFetching;
+
+  /// No description provided for @ugreenFingerprintUnverified.
+  ///
+  /// In en, this message translates to:
+  /// **'Unverified fingerprint. Compare it with the certificate from your trusted local network before using it.'**
+  String get ugreenFingerprintUnverified;
+
+  /// No description provided for @ugreenFingerprintUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use fingerprint'**
+  String get ugreenFingerprintUse;
+
+  /// No description provided for @ugreenFingerprintFetchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the certificate. Check the address, HTTPS port, and network connection.'**
+  String get ugreenFingerprintFetchError;
+
   /// No description provided for @ugreenFingerprintInvalid.
   ///
   /// In en, this message translates to:

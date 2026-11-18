@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -54,11 +57,17 @@ void main() {
       final auth = _Auth();
       final repo = MemoryServerRepository();
       final factory = _Factory();
+      final endpoints = <String>[];
+      var probe = Completer<String>();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             serverRepositoryProvider.overrideWithValue(repo),
             ugreenAuthProvider.overrideWithValue(auth),
+            ugreenFingerprintProbeProvider.overrideWithValue((url) {
+              endpoints.add(url);
+              return probe.future;
+            }),
             ugreenDeviceIdProvider.overrideWith((ref) async => 'test-device'),
             mediaServerFactoryProvider.overrideWithValue(factory),
           ],
@@ -109,6 +118,73 @@ void main() {
       await enter('ugreen-fingerprint', 'invalid');
       await tap('server-test');
       expect(auth.logins, isEmpty);
+      await tap('ugreen-fetch-fingerprint');
+      expect(find.text('Reading certificate…'), findsOneWidget);
+      expect(endpoints, ['https://nas.local:9443']);
+      await enter('server-url', 'nas2.local');
+      probe.complete(canonical);
+      await tester.pumpAndSettle();
+      expect(key('ugreen-use-fingerprint'), findsNothing);
+
+      await enter('server-url', 'nas.local');
+      probe = Completer<String>();
+      await tap('ugreen-fetch-fingerprint');
+      probe.completeError(StateError('TLS failed'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Could not read the certificate'),
+        findsOneWidget,
+      );
+      expect(key('ugreen-use-fingerprint'), findsNothing);
+
+      probe = Completer<String>();
+      await tap('ugreen-fetch-fingerprint');
+      probe.complete(canonical);
+      await tester.pumpAndSettle();
+      final pinField = find.descendant(
+        of: key('ugreen-fingerprint'),
+        matching: find.byType(EditableText),
+      );
+      expect(tester.widget<EditableText>(pinField).controller.text, 'invalid');
+      final dialog = find.ancestor(
+        of: find.text('Certificate SHA-256 fingerprint'),
+        matching: find.byType(FDialog),
+      );
+      expect(
+        find.descendant(of: dialog, matching: find.text(canonical)),
+        findsOneWidget,
+      );
+      final messenger = tester.binding.defaultBinaryMessenger;
+      String? copied;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+      await tap('ugreen-copy-fingerprint');
+      expect(copied, canonical);
+      expect(find.text('Copied to clipboard'), findsOneWidget);
+      expect(tester.widget<EditableText>(pinField).controller.text, 'invalid');
+      await tap('ugreen-close-fingerprint');
+      expect(dialog, findsNothing);
+      expect(tester.widget<EditableText>(pinField).controller.text, 'invalid');
+
+      probe = Completer<String>();
+      await tap('ugreen-fetch-fingerprint');
+      probe.complete(canonical);
+      await tester.pumpAndSettle();
+      expect(dialog, findsOneWidget);
+      expect(auth.logins, isEmpty);
+      expect(repo.items, isEmpty);
+      await tap('ugreen-use-fingerprint');
+      expect(tester.widget<EditableText>(pinField).controller.text, canonical);
+      expect(key('ugreen-use-fingerprint'), findsNothing);
+      expect(auth.logins, isEmpty);
+      expect(repo.items, isEmpty);
       await enter('ugreen-fingerprint', fingerprint);
       await tap('server-test');
       expect(repo.items, isEmpty);

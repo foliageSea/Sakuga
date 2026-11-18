@@ -80,6 +80,30 @@ class AppLocalizationsZh extends AppLocalizations {
       '仅使用 HTTPS。自签名证书请从可信局域网核对指纹后填入；使用系统信任的证书可留空。';
 
   @override
+  String get ugreenFingerprintTitle => '证书 SHA-256 指纹';
+
+  @override
+  String get ugreenFingerprintCopy => '复制指纹';
+
+  @override
+  String get ugreenFingerprintCopyError => '无法复制指纹。';
+
+  @override
+  String get ugreenFingerprintFetch => '获取指纹';
+
+  @override
+  String get ugreenFingerprintFetching => '正在读取证书…';
+
+  @override
+  String get ugreenFingerprintUnverified => '此指纹未经验证。请先与可信局域网中获取的证书指纹核对，再填入。';
+
+  @override
+  String get ugreenFingerprintUse => '填入指纹';
+
+  @override
+  String get ugreenFingerprintFetchError => '无法读取证书。请检查服务器地址、HTTPS 端口和网络连接。';
+
+  @override
   String get ugreenFingerprintInvalid => '请输入 64 位十六进制 SHA-256 指纹，可用冒号分隔。';
 
   @override

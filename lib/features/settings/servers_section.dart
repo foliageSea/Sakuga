@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
@@ -19,6 +20,11 @@ import '../../data/ugreen/ugreen_transport.dart';
 import '../../shared/localization.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
+
+final ugreenFingerprintProbeProvider =
+    Provider<Future<String> Function(String)>(
+      (ref) => fetchUgreenCertificateFingerprint,
+    );
 
 String _serverTypeLabel(BuildContext context, MediaServerType type) =>
     switch (type) {
@@ -227,6 +233,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
   late bool _account;
   bool _identityReset = false;
   bool _busy = false;
+  bool _fetchingFingerprint = false;
   bool _saving = false;
   bool _sessionRejected = false;
   int _revision = 0;
@@ -302,6 +309,47 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
       mounted &&
       revision == _revision &&
       (ModalRoute.of(context)?.isCurrent ?? true);
+
+  Future<void> _fetchFingerprint() async {
+    if (_busy || !_isUgreen) return;
+    final l = context.l10n;
+    final String baseUrl;
+    try {
+      baseUrl = normalizeUgreenBaseUrl(_url.text);
+    } on FormatException {
+      setState(() => _error = l.serverUrlInvalid);
+      return;
+    }
+    final revision = _revision;
+    setState(() {
+      _busy = _fetchingFingerprint = true;
+      _error = null;
+    });
+    try {
+      final observed = await ref.read(ugreenFingerprintProbeProvider)(baseUrl);
+      if (!_acceptsResponse(revision)) return;
+      setState(() => _fetchingFingerprint = false);
+      final confirmed = await showFDialog<bool>(
+        context: context,
+        useRootNavigator: true,
+        useSafeArea: true,
+        builder: (context, style, animation) => FDialog(
+          animation: animation,
+          builder: (context, style) =>
+              _FingerprintPreview(fingerprint: observed),
+        ),
+      );
+      if (confirmed == true && _acceptsResponse(revision)) {
+        _fingerprint.text = observed;
+      }
+    } catch (_) {
+      if (_acceptsResponse(revision)) {
+        setState(() => _error = l.ugreenFingerprintFetchError);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = _fetchingFingerprint = false);
+    }
+  }
 
   Future<void> _submit({required bool save}) async {
     if (_busy) return;
@@ -649,6 +697,21 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
               l.ugreenFingerprintHelp,
               style: context.theme.typography.body.sm,
             ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FButton(
+                key: const ValueKey('ugreen-fetch-fingerprint'),
+                mainAxisSize: MainAxisSize.min,
+                variant: .outline,
+                onPress: _busy ? null : _fetchFingerprint,
+                child: Text(
+                  _fetchingFingerprint
+                      ? l.ugreenFingerprintFetching
+                      : l.ugreenFingerprintFetch,
+                ),
+              ),
+            ),
             if (widget.server?.type == MediaServerType.ugreen)
               FButton(
                 key: const ValueKey('ugreen-relogin'),
@@ -720,6 +783,99 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
                 mainAxisSize: MainAxisSize.min,
                 onPress: _busy ? null : () => _submit(save: true),
                 child: Text(l.save),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FingerprintPreview extends StatefulWidget {
+  const _FingerprintPreview({required this.fingerprint});
+
+  final String fingerprint;
+
+  @override
+  State<_FingerprintPreview> createState() => _FingerprintPreviewState();
+}
+
+class _FingerprintPreviewState extends State<_FingerprintPreview> {
+  bool? _copied;
+
+  Future<void> _copy() async {
+    var copied = false;
+    try {
+      await Clipboard.setData(ClipboardData(text: widget.fingerprint));
+      copied = true;
+    } catch (_) {
+      // Keep the preview open even if the platform clipboard is unavailable.
+    }
+    if (mounted) setState(() => _copied = copied);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = context.theme;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l.ugreenFingerprintTitle,
+            style: theme.typography.body.lg.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(l.ugreenFingerprintUnverified),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: Text(widget.fingerprint)),
+              const SizedBox(width: 8),
+              FTooltip(
+                tipBuilder: (context, controller) =>
+                    Text(l.ugreenFingerprintCopy),
+                child: FButton.icon(
+                  key: const ValueKey('ugreen-copy-fingerprint'),
+                  variant: .outline,
+                  semanticsLabel: l.ugreenFingerprintCopy,
+                  onPress: _copy,
+                  child: const Icon(FLucideIcons.copy),
+                ),
+              ),
+            ],
+          ),
+          if (_copied case final copied?) ...[
+            const SizedBox(height: 8),
+            Semantics(
+              liveRegion: true,
+              child: Text(copied ? l.copied : l.ugreenFingerprintCopyError),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FButton(
+                key: const ValueKey('ugreen-close-fingerprint'),
+                mainAxisSize: MainAxisSize.min,
+                variant: .ghost,
+                onPress: () => Navigator.of(context).pop(false),
+                child: Text(l.close),
+              ),
+              FButton(
+                key: const ValueKey('ugreen-use-fingerprint'),
+                mainAxisSize: MainAxisSize.min,
+                onPress: () => Navigator.of(context).pop(true),
+                child: Text(l.ugreenFingerprintUse),
               ),
             ],
           ),
