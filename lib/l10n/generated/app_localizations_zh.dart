@@ -67,6 +67,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get serverType => '服务器类型';
 
   @override
+  String get serverTypeFnMovie => '飞牛影视';
+
+  @override
   String get serverAuthMethod => '认证方式';
 
   @override

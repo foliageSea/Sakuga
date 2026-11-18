@@ -10,6 +10,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../data/media_server/media_server_client.dart';
 import '../../data/media_server/media_models.dart';
 import '../../data/media_server/playback_models.dart';
+import '../../data/media_server/server_profile.dart';
 import '../../shared/localization.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
@@ -387,23 +388,23 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       if (!mounted || generation != _openGeneration) return;
       final item = await library.client.item(library.userId, itemId);
       if (!mounted || generation != _openGeneration) return;
-      final serverTicks = _durationToTicks(
-        item.playbackPosition ?? Duration.zero,
-      );
+      final serverPosition = item.playbackPosition;
       final localTicks = await _loadLocalProgress(
         serverId: library.client.server.id,
         userId: library.userId,
         itemId: itemId,
       );
-      final ticks = resumeAt == null
-          ? localTicks ?? serverTicks
-          : _durationToTicks(resumeAt);
+      final startPosition =
+          resumeAt ??
+          (localTicks == null
+              ? serverPosition
+              : Duration(microseconds: localTicks ~/ 10));
       if (!mounted || generation != _openGeneration) return;
       openedClient = library.client;
       source = await library.client.playbackSource(
         library.userId,
         itemId,
-        startPosition: Duration(microseconds: ticks ~/ 10),
+        startPosition: startPosition,
         maxStreamingBitrate: _quality?.bitrate,
         maxVideoHeight: _quality?.height,
       );
@@ -556,6 +557,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       return Future.value();
     }
 
+    final isFnMovie = client.server.type == MediaServerType.fnmovie;
+    final skipProgress = isFnMovie && failed && !_receivedPlayerPosition;
     final rawTicks = _positionTicks;
     final runtime = _runtimeTicks ?? _durationToTicks(_player.state.duration);
     final finished =
@@ -567,6 +570,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final volume = _controlsController.volume;
     final revision = ++_progressRevision;
     final localSave = _serializeLocal(() async {
+      if (skipProgress) return;
       try {
         await _progressRepository.save(
           serverId: serverId,
@@ -629,11 +633,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             'PLAYER_SESSION_SYNC_ERROR ${_errorForLog(error)}\n$stackTrace',
           );
         }
+        if (skipProgress) return;
         await client.updatePlaybackPosition(
           userId,
           itemId,
-          position: Duration(microseconds: persistedTicks ~/ 10),
+          position: Duration(
+            microseconds: (isFnMovie ? sessionTicks : persistedTicks) ~/ 10,
+          ),
           played: finished ? true : null,
+          session: session,
         );
         await _clearLocalIfCurrent(
           revision: revision,
@@ -1032,7 +1040,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           mode: _superResolutionMode,
           onChanged: _setSuperResolution,
         ),
-        if (_devMediaUrl.isEmpty) ...[
+        if (_devMediaUrl.isEmpty &&
+            (ref.watch(activeServerProvider)?.type.supportsPlaybackQuality ??
+                true)) ...[
           const SizedBox(width: 8),
           ValueListenableBuilder<bool>(
             valueListenable: _switchingEpisode,

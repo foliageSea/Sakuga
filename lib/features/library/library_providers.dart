@@ -102,16 +102,20 @@ class LibraryItemsState {
   const LibraryItemsState({
     required this.items,
     required this.totalRecordCount,
+    this.nextStartIndex,
+    this.moreAvailable,
     this.loadingMore = false,
     this.loadMoreError,
   });
 
   final List<MediaItem> items;
-  final int totalRecordCount;
+  final int? totalRecordCount;
+  final int? nextStartIndex;
+  final bool? moreAvailable;
   final bool loadingMore;
   final Object? loadMoreError;
 
-  bool get hasMore => items.length < totalRecordCount;
+  bool get hasMore => moreAvailable ?? items.length < (totalRecordCount ?? 0);
 
   LibraryItemsState copyWith({
     List<MediaItem>? items,
@@ -122,6 +126,8 @@ class LibraryItemsState {
   }) => LibraryItemsState(
     items: items ?? this.items,
     totalRecordCount: totalRecordCount ?? this.totalRecordCount,
+    nextStartIndex: nextStartIndex,
+    moreAvailable: moreAvailable,
     loadingMore: loadingMore ?? this.loadingMore,
     loadMoreError: clearLoadMoreError
         ? null
@@ -149,6 +155,8 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
     return LibraryItemsState(
       items: page.items,
       totalRecordCount: page.totalRecordCount,
+      nextStartIndex: page.nextStartIndex,
+      moreAvailable: page.hasMore,
     );
   }
 
@@ -167,7 +175,10 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
     state = AsyncData(loading);
     try {
       final data = await ref.read(libraryViewsProvider.future);
-      final page = await _fetch(data, startIndex: current.items.length);
+      final page = await _fetch(
+        data,
+        startIndex: current.nextStartIndex ?? current.items.length,
+      );
       if (!ref.mounted || !identical(state.value, loading)) return;
       final existingIds = {for (final item in current.items) item.id};
       state = AsyncData(
@@ -178,6 +189,8 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
               if (existingIds.add(item.id)) item,
           ],
           totalRecordCount: page.totalRecordCount,
+          nextStartIndex: page.nextStartIndex,
+          moreAvailable: page.hasMore,
         ),
       );
     } catch (error, stackTrace) {
@@ -216,6 +229,8 @@ class LibraryItemsController extends AsyncNotifier<LibraryItemsState>
     return MediaItemsPage(
       items: items,
       totalRecordCount: page.totalRecordCount,
+      nextStartIndex: page.nextStartIndex,
+      hasMore: page.hasMore,
     );
   }
 

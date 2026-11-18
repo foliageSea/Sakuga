@@ -1,4 +1,11 @@
-enum MediaServerType { jellyfin, emby }
+enum MediaServerType { jellyfin, emby, fnmovie }
+
+extension MediaServerCapabilities on MediaServerType {
+  bool get supportsPlaybackQuality => this != MediaServerType.fnmovie;
+  bool get supportsManualPlayed => this != MediaServerType.fnmovie;
+  bool get supportsLibraryOptions => this != MediaServerType.fnmovie;
+  bool get supportsRecentlyAdded => this != MediaServerType.fnmovie;
+}
 
 class ServerProfile {
   const ServerProfile({
@@ -27,7 +34,7 @@ class ServerProfile {
   final String remoteServerId;
 
   bool get usesAccount =>
-      type == MediaServerType.emby ||
+      type != MediaServerType.jellyfin ||
       accessToken.isNotEmpty ||
       userId.isNotEmpty ||
       username.isNotEmpty;

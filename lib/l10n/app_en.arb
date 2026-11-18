@@ -19,6 +19,7 @@
   "serverUrl": "Server address",
   "secureConnection": "Secure connection",
   "serverType": "Server type",
+  "serverTypeFnMovie": "fnOS Media",
   "serverAuthMethod": "Authentication method",
   "serverAccountPassword": "Account/password",
   "serverUsername": "Username",

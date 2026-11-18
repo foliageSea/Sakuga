@@ -183,7 +183,17 @@ class MediaItem {
 }
 
 class MediaItemsPage {
-  const MediaItemsPage({required this.items, required this.totalRecordCount});
+  const MediaItemsPage({
+    required this.items,
+    required this.totalRecordCount,
+    this.hasMore,
+    this.nextStartIndex,
+  });
   final List<MediaItem> items;
-  final int totalRecordCount;
+  final int? totalRecordCount;
+
+  /// Some servers return page-based cursors with a different number of raw
+  /// rows than visible results. Null preserves the standard offset behavior.
+  final bool? hasMore;
+  final int? nextStartIndex;
 }

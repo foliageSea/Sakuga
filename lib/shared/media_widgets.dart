@@ -29,6 +29,7 @@ class MediaImage extends StatelessWidget {
     return CachedNetworkImage(
       imageUrl: url,
       httpHeaders: headers,
+      cacheKey: artworkCacheKey(url, headers),
       cacheManager: ArtworkCacheManager.instance,
       fit: fit,
       useOldImageOnUrlChange: true,

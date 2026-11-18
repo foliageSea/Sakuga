@@ -614,6 +614,7 @@ class _TitleBlock extends StatelessWidget {
               key: const ValueKey('detail-logo'),
               imageUrl: logo.url(width: 840),
               httpHeaders: logo.headers,
+              cacheKey: artworkCacheKey(logo.url(width: 840), logo.headers),
               cacheManager: ArtworkCacheManager.instance,
               fit: BoxFit.contain,
               alignment: Alignment.bottomLeft,

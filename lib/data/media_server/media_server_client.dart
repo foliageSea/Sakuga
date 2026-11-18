@@ -41,12 +41,12 @@ abstract interface class MediaServerClient {
   Future<PlaybackSource> playbackSource(
     String userId,
     String itemId, {
-    Duration startPosition = Duration.zero,
+    Duration? startPosition,
     int? maxStreamingBitrate,
     int? maxVideoHeight,
   });
 
-  /// Best-effort cleanup of a server-side transcoding job; no-op otherwise.
+  /// Best-effort cleanup of a transcoding job or adapter-owned stream proxy.
   Future<void> stopTranscoding(PlaybackSession session);
   Future<void> reportPlaybackStarted(
     PlaybackSession session, {
@@ -72,5 +72,6 @@ abstract interface class MediaServerClient {
     String itemId, {
     required Duration position,
     bool? played,
+    PlaybackSession? session,
   });
 }

@@ -386,6 +386,7 @@ class _PosterArtworkLayer extends StatelessWidget {
     child: CachedNetworkImage(
       imageUrl: background.url,
       httpHeaders: background.headers,
+      cacheKey: artworkCacheKey(background.url, background.headers),
       cacheManager: ArtworkCacheManager.instance,
       fit: BoxFit.cover,
       useOldImageOnUrlChange: true,

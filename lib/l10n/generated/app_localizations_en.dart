@@ -67,6 +67,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get serverType => 'Server type';
 
   @override
+  String get serverTypeFnMovie => 'fnOS Media';
+
+  @override
   String get serverAuthMethod => 'Authentication method';
 
   @override

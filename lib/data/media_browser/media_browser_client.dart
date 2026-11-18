@@ -90,10 +90,11 @@ abstract class MediaBrowserClient implements MediaServerClient {
   Future<PlaybackSource> playbackSource(
     String userId,
     String itemId, {
-    Duration startPosition = Duration.zero,
+    Duration? startPosition,
     int? maxStreamingBitrate,
     int? maxVideoHeight,
   }) async {
+    startPosition ??= Duration.zero;
     final startTimeTicks = mediaBrowserTicks(startPosition);
     final bitrate = maxStreamingBitrate ?? defaultMaxStreamingBitrate;
     final response = await _dio.post<Map<String, dynamic>>(
@@ -344,6 +345,7 @@ abstract class MediaBrowserClient implements MediaServerClient {
     String itemId, {
     required Duration position,
     bool? played,
+    PlaybackSession? session,
   }) async {
     final payload = {
       'PlaybackPositionTicks': mediaBrowserTicks(position),

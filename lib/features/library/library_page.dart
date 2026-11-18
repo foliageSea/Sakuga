@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../data/media_server/media_server_client.dart';
 import '../../data/media_server/media_server_factory.dart';
 import '../../data/media_server/media_models.dart';
+import '../../data/media_server/server_profile.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/poster_background.dart';
@@ -110,15 +111,18 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     _selectedYear = null;
   });
 
-  LibraryQuery _query(LibraryData library, String viewId) => LibraryQuery(
-    userId: library.userId,
-    viewId: viewId,
-    genre: _selectedGenre,
-    isPlayed: _isPlayed,
-    year: _selectedYear,
-    sort: _sort,
-    descending: _descending,
-  );
+  LibraryQuery _query(LibraryData library, String viewId) =>
+      !library.client.server.type.supportsLibraryOptions
+      ? LibraryQuery(userId: library.userId, viewId: viewId)
+      : LibraryQuery(
+          userId: library.userId,
+          viewId: viewId,
+          genre: _selectedGenre,
+          isPlayed: _isPlayed,
+          year: _selectedYear,
+          sort: _sort,
+          descending: _descending,
+        );
 
   @override
   Widget build(BuildContext context) {
@@ -198,6 +202,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           )
         : null;
     final toolbar = LibraryToolbar(
+      showLibraryOptions: server.type.supportsLibraryOptions,
       filtersVisible: _showFilters,
       hasFilters:
           _selectedGenre != null || _isPlayed != null || _selectedYear != null,
@@ -287,7 +292,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             ],
             if (viewChips == null)
               Align(alignment: Alignment.centerRight, child: toolbar),
-            if (_showFilters) ...[
+            if (_showFilters || !server.type.supportsLibraryOptions) ...[
               const SizedBox(height: 12),
               FTextField(
                 key: const ValueKey('library-search'),
@@ -302,7 +307,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               ),
               const SizedBox(height: 8),
             ],
-            if (_showFilters && _searchTerm.isEmpty && query != null)
+            if (server.type.supportsLibraryOptions &&
+                _showFilters &&
+                _searchTerm.isEmpty &&
+                query != null)
               LibraryFilterPanel(
                 key: ValueKey((
                   data.requireValue.client.server.id,

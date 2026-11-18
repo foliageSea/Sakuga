@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../data/media_server/media_server_client.dart';
 import '../../data/media_server/media_server_factory.dart';
 import '../../data/media_server/media_models.dart';
+import '../../data/media_server/server_profile.dart';
 import '../../data/media_server/server_repository.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
@@ -81,30 +82,34 @@ class HomePage extends ConsumerWidget {
                       client: data.client,
                       title: l.continueWatching,
                       compact: true,
-                      posterAction: (item) => PlayedStatusButton(
-                        key: ValueKey((
-                          data.client.server,
-                          data.userId,
-                          item.id,
-                        )),
-                        client: data.client,
-                        userId: data.userId,
-                        item: item,
-                        iconOnly: true,
-                      ),
+                      posterAction:
+                          !data.client.server.type.supportsManualPlayed
+                          ? null
+                          : (item) => PlayedStatusButton(
+                              key: ValueKey((
+                                data.client.server,
+                                data.userId,
+                                item.id,
+                              )),
+                              client: data.client,
+                              userId: data.userId,
+                              item: item,
+                              iconOnly: true,
+                            ),
                       items: ref.watch(resumeItemsProvider),
                       onRetry: () => ref.invalidate(resumeItemsProvider),
                       onTap: (item, posterUrl) =>
                           _resume(context, item, posterUrl),
                     ),
-                    _MediaSection(
-                      client: data.client,
-                      title: l.recentlyAdded,
-                      items: ref.watch(latestItemsProvider),
-                      onRetry: () => ref.invalidate(latestItemsProvider),
-                      onTap: (item, posterUrl) =>
-                          _openDetail(context, item, posterUrl),
-                    ),
+                    if (data.client.server.type.supportsRecentlyAdded)
+                      _MediaSection(
+                        client: data.client,
+                        title: l.recentlyAdded,
+                        items: ref.watch(latestItemsProvider),
+                        onRetry: () => ref.invalidate(latestItemsProvider),
+                        onTap: (item, posterUrl) =>
+                            _openDetail(context, item, posterUrl),
+                      ),
                   ],
                 ),
                 loading: () => const LoadingNotice(),

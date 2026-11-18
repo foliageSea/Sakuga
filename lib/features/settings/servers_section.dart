@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_exception.dart';
 import '../../data/emby/emby_auth.dart';
+import '../../data/fnmovie/fnmovie_auth.dart';
 import '../../data/jellyfin/jellyfin_auth.dart';
 import '../../data/media_server/media_server_factory.dart';
 import '../../data/media_server/server_probe.dart';
@@ -14,6 +15,13 @@ import '../../data/media_server/server_repository.dart';
 import '../../shared/localization.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
+
+String _serverTypeLabel(BuildContext context, MediaServerType type) =>
+    switch (type) {
+      MediaServerType.jellyfin => 'Jellyfin',
+      MediaServerType.emby => 'Emby',
+      MediaServerType.fnmovie => context.l10n.serverTypeFnMovie,
+    };
 
 class ServersSection extends ConsumerStatefulWidget {
   const ServersSection({super.key});
@@ -331,6 +339,22 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
       if (needsLogin) {
         if (_authenticated != null) {
           profile = _authenticated!;
+        } else if (_type == MediaServerType.fnmovie) {
+          final result = await ref
+              .read(fnMovieAuthProvider)
+              .authenticate(
+                baseUrl: baseUrl,
+                username: username,
+                password: password,
+              );
+          if (!_acceptsResponse(revision)) return;
+          profile = profile.copyWith(
+            baseUrl: result.baseUrl,
+            accessToken: result.accessToken,
+            // fnOS Media login returns a token, not a distinct account GUID.
+            userId: profile.id,
+          );
+          _authenticated = profile;
         } else {
           final emby = _type == MediaServerType.emby;
           final deviceId = await ref.read(
@@ -450,8 +474,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
             key: const ValueKey('server-type'),
             label: Text(l.serverType),
             enabled: !_saving,
-            format: (value) =>
-                value == MediaServerType.emby ? 'Emby' : 'Jellyfin',
+            format: (value) => _serverTypeLabel(context, value),
             control: .lifted(
               value: _type,
               onChange: (value) {
@@ -460,12 +483,12 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
                 _changeAuthentication(true);
               },
             ),
-            children: const [
-              FSelectItem(
-                title: Text('Jellyfin'),
-                value: MediaServerType.jellyfin,
-              ),
-              FSelectItem(title: Text('Emby'), value: MediaServerType.emby),
+            children: [
+              for (final type in MediaServerType.values)
+                FSelectItem(
+                  title: Text(_serverTypeLabel(context, type)),
+                  value: type,
+                ),
             ],
           ),
           if (_type == MediaServerType.jellyfin) ...[
@@ -501,7 +524,9 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
             enabled: !_saving,
             control: .managed(controller: _url),
             label: Text(l.serverUrl),
-            hint: '192.168.1.2:8096',
+            hint: _type == MediaServerType.fnmovie
+                ? '192.168.1.2'
+                : '192.168.1.2:8096',
             keyboardType: TextInputType.url,
           ),
           const SizedBox(height: 12),
@@ -644,7 +669,7 @@ class _ServerTile extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  '${server.type == MediaServerType.emby ? 'Emby' : 'Jellyfin'}'
+                  '${_serverTypeLabel(context, server.type)}'
                   '${server.usesAccount ? ' · ${server.username}' : ''}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

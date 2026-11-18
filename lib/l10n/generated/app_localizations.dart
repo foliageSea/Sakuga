@@ -212,6 +212,12 @@ abstract class AppLocalizations {
   /// **'Server type'**
   String get serverType;
 
+  /// No description provided for @serverTypeFnMovie.
+  ///
+  /// In en, this message translates to:
+  /// **'fnOS Media'**
+  String get serverTypeFnMovie;
+
   /// No description provided for @serverAuthMethod.
   ///
   /// In en, this message translates to:

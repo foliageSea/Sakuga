@@ -118,7 +118,7 @@ class EmbyClient extends MediaBrowserClient {
   Future<PlaybackSource> playbackSource(
     String userId,
     String itemId, {
-    Duration startPosition = Duration.zero,
+    Duration? startPosition,
     int? maxStreamingBitrate,
     int? maxVideoHeight,
   }) async {

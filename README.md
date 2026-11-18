@@ -1,6 +1,6 @@
 # Sakuga
 
-Jellyfin / Emby 第三方客户端，目标平台 macOS（Apple Silicon / arm64）与 Android（arm64-v8a）。
+Jellyfin / Emby / 飞牛影视第三方客户端，目标平台 macOS（Apple Silicon / arm64）与 Android（arm64-v8a）。
 基于 `forui_app` 模板（Flutter 3.47.6 + Forui 0.27.5 + Riverpod 3.4.3），播放内核为 media_kit / libmpv，支持 Anime4K 超分辨率。
 
 ## 状态
@@ -37,6 +37,14 @@ M0（工程基建与内核验证）进行中。当前已完成：
 密码不会落盘；Jellyfin / Emby 访问令牌、Jellyfin API 密钥和服务器信息统一使用 `shared_preferences` 持久化，重启后从配置恢复。此前单独存储的 Emby 令牌需重新登录后写入配置。修改服务器地址或账号需要重新登录；删除服务器会清理对应的本地令牌。401 提示重新登录，403 显示权限错误。
 
 已使用本地 Docker Emby 4.9.3.0 普通账号完成真实联调：媒体库/搜索/筛选、电影和两集剧集的原生播放、续播拖动、图片和中英文字幕、继续观看、进度写回及已看状态通过。可复用的测试服、账号和开放授权资源见 [Emby 联调环境](tool/emby-test/README.md)；详情见 [联调结果](tool/emby-test/RESULTS.md)。Jellyfin 账号登录也已通过 Docker Jellyfin 12.4.0 普通账号的真实浏览、原生播放、字幕和进度同步验证，见 [Jellyfin 联调环境](tool/jellyfin-test/README.md) 与 [结果](tool/jellyfin-test/RESULTS.md)。
+
+## 飞牛影视使用
+
+在「设置 → 服务器」选择「飞牛影视」，填入用于打开飞牛影视的地址（含端口或反代子路径，如有）、用户名和密码。可先点「测试连接」验证片库访问，再点「保存」。密码不保存；会话过期后，在原服务器配置里重新输入密码并保存。建议在受信任的局域网使用 HTTP，其它网络使用 HTTPS。
+
+首版支持分库分页、全局搜索、海报和影视详情、季/集、原画直播放和服务端续播进度。飞牛服务器暂不开放库内高级筛选和排序、最近添加、转码档位、手动标记已看及外部字幕。参考 [fnmovie](docs/third-party-notices.md) 的接口在本地模拟服务上覆盖了鉴权、图片、Range 拖动和进度回读；不同飞牛影视版本、反代及 FN Connect 尚未做真机兼容验证。
+
+运行飞牛专项测试：`fvm flutter test test/fnmovie_client_test.dart test/fnmovie_settings_test.dart`。要额外验证 libmpv 拖动，可通过 `--dart-define=FNMOVIE_NATIVE_FIXTURE=<MP4 绝对路径>` 指向 [Emby 联调环境](tool/emby-test/README.md) 中的 Big Buck Bunny 影片。
 
 ## 播放质量
 
@@ -181,7 +189,7 @@ fvm dart run icons_launcher:create
 lib/
   app/          应用根、路由、响应式外壳、主题
   core/         设置、日志、网络、窗口、平台能力
-  data/         Jellyfin / Emby API、认证与本地存储
+  data/         Jellyfin / Emby / 飞牛影视 API、认证与本地存储
   features/     首页、媒体库、搜索、下载、设置、播放器
   shared/       跨功能 UI 与本地化
   l10n/         中英文 ARB
