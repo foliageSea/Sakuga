@@ -77,7 +77,8 @@ class HomePage extends ConsumerWidget {
                 data: (data) => Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _PosterCarouselSection(client: data.client),
+                    if (data.client.server.type != MediaServerType.ugreen)
+                      _PosterCarouselSection(client: data.client),
                     _MediaSection(
                       client: data.client,
                       title: l.continueWatching,
@@ -105,6 +106,8 @@ class HomePage extends ConsumerWidget {
                       _MediaSection(
                         client: data.client,
                         title: l.recentlyAdded,
+                        showEmpty:
+                            data.client.server.type == MediaServerType.ugreen,
                         items: ref.watch(latestItemsProvider),
                         onRetry: () => ref.invalidate(latestItemsProvider),
                         onTap: (item, posterUrl) =>
@@ -693,6 +696,7 @@ class _MediaSection extends StatelessWidget {
     required this.onRetry,
     required this.onTap,
     this.compact = false,
+    this.showEmpty = false,
     this.posterAction,
   });
 
@@ -702,13 +706,21 @@ class _MediaSection extends StatelessWidget {
   final VoidCallback onRetry;
   final void Function(MediaItem item, String? posterUrl) onTap;
   final bool compact;
+  final bool showEmpty;
   final Widget Function(MediaItem item)? posterAction;
 
   @override
   Widget build(BuildContext context) {
     return items.when(
       data: (values) {
-        if (values.isEmpty) return const SizedBox.shrink();
+        if (values.isEmpty) {
+          return showEmpty
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 28),
+                  child: EmptyNotice(context.l10n.noItems),
+                )
+              : const SizedBox.shrink();
+        }
         return Padding(
           padding: const EdgeInsets.only(top: 28),
           child: Column(

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +14,8 @@ import '../../data/media_server/media_server_factory.dart';
 import '../../data/media_server/server_probe.dart';
 import '../../data/media_server/server_profile.dart';
 import '../../data/media_server/server_repository.dart';
+import '../../data/ugreen/ugreen_auth.dart';
+import '../../data/ugreen/ugreen_transport.dart';
 import '../../shared/localization.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
@@ -21,6 +25,7 @@ String _serverTypeLabel(BuildContext context, MediaServerType type) =>
       MediaServerType.jellyfin => 'Jellyfin',
       MediaServerType.emby => 'Emby',
       MediaServerType.fnmovie => context.l10n.serverTypeFnMovie,
+      MediaServerType.ugreen => context.l10n.serverTypeUgreen,
     };
 
 class ServersSection extends ConsumerStatefulWidget {
@@ -215,7 +220,9 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
   late final TextEditingController _apiKey;
   late final TextEditingController _username;
   final _password = TextEditingController();
+  late final TextEditingController _fingerprint;
   late MediaServerType _type;
+  bool get _isUgreen => _type == MediaServerType.ugreen;
   late bool _secure;
   late bool _account;
   bool _identityReset = false;
@@ -237,10 +244,20 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
     );
     _apiKey = TextEditingController(text: server?.apiKey ?? '');
     _username = TextEditingController(text: server?.username ?? '');
+    _fingerprint = TextEditingController(
+      text: server?.certificateFingerprint ?? '',
+    );
     _type = server?.type ?? MediaServerType.jellyfin;
     _account = server?.usesAccount ?? true;
     _secure = isSecureBaseUrl(server?.baseUrl ?? '');
-    for (final controller in [_name, _url, _apiKey, _username, _password]) {
+    for (final controller in [
+      _name,
+      _url,
+      _apiKey,
+      _username,
+      _password,
+      _fingerprint,
+    ]) {
       controller.addListener(_inputsChanged);
     }
   }
@@ -260,13 +277,21 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
     _apiKey.clear();
     _username.clear();
     _password.clear();
+    if (!_isUgreen) _fingerprint.clear();
     _sessionRejected = false;
     _inputsChanged();
   }
 
   @override
   void dispose() {
-    for (final controller in [_name, _url, _apiKey, _username, _password]) {
+    for (final controller in [
+      _name,
+      _url,
+      _apiKey,
+      _username,
+      _password,
+      _fingerprint,
+    ]) {
       controller.removeListener(_inputsChanged);
       controller.dispose();
     }
@@ -286,8 +311,19 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
       return;
     }
     String baseUrl;
+    var fingerprint = '';
+    if (_isUgreen) {
+      try {
+        fingerprint = normalizeUgreenFingerprint(_fingerprint.text);
+      } on FormatException {
+        setState(() => _error = l.ugreenFingerprintInvalid);
+        return;
+      }
+    }
     try {
-      baseUrl = composeBaseUrl(_url.text, secure: _secure);
+      baseUrl = _isUgreen
+          ? normalizeUgreenBaseUrl(_url.text)
+          : composeBaseUrl(_url.text, secure: _secure);
     } on FormatException {
       setState(() => _error = l.serverUrlInvalid);
       return;
@@ -303,6 +339,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
         old.type != _type ||
         old.usesAccount != account ||
         old.baseUrl != baseUrl ||
+        (_isUgreen && old.certificateFingerprint != fingerprint) ||
         (account && old.username != username);
     final needsLogin =
         account &&
@@ -335,10 +372,43 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
         username: account ? username : '',
         deviceId: account && !identityChanged ? old.deviceId : '',
         remoteServerId: account && !identityChanged ? old.remoteServerId : '',
+        certificateFingerprint: fingerprint,
       );
       if (needsLogin) {
         if (_authenticated != null) {
           profile = _authenticated!;
+        } else if (_isUgreen) {
+          final deviceId = await ref.read(ugreenDeviceIdProvider.future);
+          if (!_acceptsResponse(revision)) return;
+          final result = await ref
+              .read(ugreenAuthProvider)
+              .authenticate(
+                baseUrl: baseUrl,
+                username: username,
+                password: password,
+                deviceId: deviceId,
+                fingerprint: fingerprint,
+              );
+          if (!_acceptsResponse(revision)) return;
+          profile = profile.copyWith(
+            id:
+                !identityChanged &&
+                    (old.userId != result.userId ||
+                        old.remoteServerId != result.remoteServerId)
+                ? DateTime.now().microsecondsSinceEpoch.toString()
+                : profile.id,
+            accessToken: result.accessToken,
+            userId: result.userId,
+            username: result.username,
+            deviceId: deviceId,
+            remoteServerId: result.remoteServerId,
+          );
+          await ref
+              .read(mediaServerFactoryProvider)
+              .createClient(profile)
+              .users();
+          if (!_acceptsResponse(revision)) return;
+          _authenticated = profile;
         } else if (_type == MediaServerType.fnmovie) {
           final result = await ref
               .read(fnMovieAuthProvider)
@@ -432,7 +502,9 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
       if (_acceptsResponse(revision)) {
         final rejected =
             account &&
-            (error is AppException && error.kind == FailureKind.auth ||
+            (error is AppException &&
+                    error.kind == FailureKind.auth &&
+                    error.cause != 403 ||
                 error is DioException && error.response?.statusCode == 401);
         setState(() {
           if (rejected) {
@@ -441,6 +513,12 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
           }
           _error = rejected
               ? l.serverLoginRequired
+              : _isUgreen &&
+                    (error is TlsException ||
+                        (error is DioException &&
+                            error.error is TlsException) ||
+                        (error is AppException && error.cause is TlsException))
+              ? l.ugreenCertificateError
               : failureMessage(context, error);
         });
       }
@@ -524,9 +602,11 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
             enabled: !_saving,
             control: .managed(controller: _url),
             label: Text(l.serverUrl),
-            hint: _type == MediaServerType.fnmovie
-                ? '192.168.1.2'
-                : '192.168.1.2:8096',
+            hint: switch (_type) {
+              MediaServerType.ugreen => '192.168.1.2:9443',
+              MediaServerType.fnmovie => '192.168.1.2',
+              _ => '192.168.1.2:8096',
+            },
             keyboardType: TextInputType.url,
           ),
           const SizedBox(height: 12),
@@ -545,7 +625,10 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
               label: Text(l.serverPassword),
             ),
             const SizedBox(height: 8),
-            Text(l.serverPasswordHelp, style: context.theme.typography.body.sm),
+            Text(
+              _isUgreen ? l.ugreenAccountHelp : l.serverPasswordHelp,
+              style: context.theme.typography.body.sm,
+            ),
           ] else
             FTextField.password(
               key: const ValueKey('server-api-key'),
@@ -554,17 +637,43 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
               label: Text(l.apiKey),
             ),
           const SizedBox(height: 8),
-          FSwitch(
-            key: const ValueKey('server-secure'),
-            value: _secure,
-            label: Text(l.secureConnection),
-            onChange: _saving
-                ? null
-                : (value) {
-                    _secure = value;
-                    _inputsChanged();
-                  },
-          ),
+          if (_isUgreen) ...[
+            FTextField(
+              key: const ValueKey('ugreen-fingerprint'),
+              enabled: !_saving,
+              control: .managed(controller: _fingerprint),
+              label: Text(l.ugreenFingerprint),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l.ugreenFingerprintHelp,
+              style: context.theme.typography.body.sm,
+            ),
+            if (widget.server?.type == MediaServerType.ugreen)
+              FButton(
+                key: const ValueKey('ugreen-relogin'),
+                variant: .ghost,
+                onPress: _busy
+                    ? null
+                    : () {
+                        _sessionRejected = true;
+                        _inputsChanged();
+                        _submit(save: false);
+                      },
+                child: Text(l.ugreenRelogin),
+              ),
+          ] else
+            FSwitch(
+              key: const ValueKey('server-secure'),
+              value: _secure,
+              label: Text(l.secureConnection),
+              onChange: _saving
+                  ? null
+                  : (value) {
+                      _secure = value;
+                      _inputsChanged();
+                    },
+            ),
           if (_result != null) ...[
             const SizedBox(height: 12),
             Text(

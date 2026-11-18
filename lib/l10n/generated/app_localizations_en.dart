@@ -70,6 +70,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get serverTypeFnMovie => 'fnOS Media';
 
   @override
+  String get serverTypeUgreen => 'UGREEN Theater';
+
+  @override
+  String get ugreenFingerprint => 'Certificate SHA-256 fingerprint (optional)';
+
+  @override
+  String get ugreenFingerprintHelp =>
+      'HTTPS only. Verify self-signed certificates on a trusted network before entering the fingerprint. Leave blank for a system-trusted certificate.';
+
+  @override
+  String get ugreenFingerprintInvalid =>
+      'Enter a 64-digit hexadecimal SHA-256 fingerprint, with or without colons.';
+
+  @override
+  String get ugreenCertificateError =>
+      'Could not verify the UGREEN Theater certificate. Check the server address and fingerprint.';
+
+  @override
+  String get ugreenAccountHelp =>
+      'Use the Theater media library account. The password is not saved; leave it blank if the account has no password.';
+
+  @override
+  String get ugreenRelogin => 'Sign in again';
+
+  @override
   String get serverAuthMethod => 'Authentication method';
 
   @override

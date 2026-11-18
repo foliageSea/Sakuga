@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_exception.dart';
 import '../../data/media_server/media_models.dart';
+import '../../data/media_server/media_server_factory.dart';
+import '../../data/media_server/server_profile.dart';
 import '../library/library_providers.dart';
 import '../player/playback_progress_repository.dart';
 
@@ -29,17 +32,27 @@ final seriesSeasonsProvider = FutureProvider.autoDispose
 
 final seriesEpisodesProvider = FutureProvider.autoDispose
     .family<List<MediaItem>, EpisodesQuery>((ref, query) async {
-      final library = await ref.watch(libraryViewsProvider.future);
-      final episodes = await library.client.episodes(
-        query.userId,
-        query.seriesId,
-        seasonId: query.seasonId,
-      );
-      return ref
-          .watch(playbackProgressRepositoryProvider)
+      final progress = ref.watch(playbackProgressRepositoryProvider);
+      final server = ref.watch(activeServerProvider);
+      final client =
+          server?.type == MediaServerType.ugreen &&
+              server?.userId == query.userId
+          ? ref.watch(mediaServerClientProvider(server!))
+          : (await ref.watch(libraryViewsProvider.future)).client;
+      final episodes = await client
+          .episodes(query.userId, query.seriesId, seasonId: query.seasonId)
+          .timeout(
+            const Duration(seconds: 22),
+            onTimeout: () {
+              throw const AppException(FailureKind.timeout);
+            },
+          );
+      // Local resume data must not keep otherwise available episodes hidden.
+      return progress
           .overlayItems(
             episodes,
-            serverId: library.client.server.id,
+            serverId: client.server.id,
             userId: query.userId,
-          );
-    });
+          )
+          .timeout(const Duration(seconds: 2), onTimeout: () => episodes);
+    }, retry: (_, _) => null);

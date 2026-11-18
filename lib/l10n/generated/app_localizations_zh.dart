@@ -70,6 +70,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String get serverTypeFnMovie => '飞牛影视';
 
   @override
+  String get serverTypeUgreen => '绿联影视';
+
+  @override
+  String get ugreenFingerprint => '证书 SHA-256 指纹（可选）';
+
+  @override
+  String get ugreenFingerprintHelp =>
+      '仅使用 HTTPS。自签名证书请从可信局域网核对指纹后填入；使用系统信任的证书可留空。';
+
+  @override
+  String get ugreenFingerprintInvalid => '请输入 64 位十六进制 SHA-256 指纹，可用冒号分隔。';
+
+  @override
+  String get ugreenCertificateError => '无法验证绿联影视证书。请核对服务器地址与证书指纹。';
+
+  @override
+  String get ugreenAccountHelp => '使用影视中心媒体库专用账号。密码不会保存；如该账号未设密码可留空。';
+
+  @override
+  String get ugreenRelogin => '重新登录';
+
+  @override
   String get serverAuthMethod => '认证方式';
 
   @override

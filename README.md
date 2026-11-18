@@ -1,6 +1,6 @@
 # Sakuga
 
-Jellyfin / Emby / 飞牛影视第三方客户端，目标平台 macOS（Apple Silicon / arm64）与 Android（arm64-v8a）。
+Jellyfin / Emby / 飞牛影视 / 绿联影视第三方客户端，目标平台 macOS（Apple Silicon / arm64）与 Android（arm64-v8a）。
 基于 `forui_app` 模板（Flutter 3.47.6 + Forui 0.27.5 + Riverpod 3.4.3），播放内核为 media_kit / libmpv，支持 Anime4K 超分辨率。
 
 ## 状态
@@ -45,6 +45,22 @@ M0（工程基建与内核验证）进行中。当前已完成：
 首版支持分库分页、全局搜索、海报和影视详情、季/集、原画直播放和服务端续播进度。飞牛服务器暂不开放库内高级筛选和排序、最近添加、转码档位、手动标记已看及外部字幕。参考 [fnmovie](docs/third-party-notices.md) 的接口在本地模拟服务上覆盖了鉴权、图片、Range 拖动和进度回读；不同飞牛影视版本、反代及 FN Connect 尚未做真机兼容验证。
 
 运行飞牛专项测试：`fvm flutter test test/fnmovie_client_test.dart test/fnmovie_settings_test.dart`。要额外验证 libmpv 拖动，可通过 `--dart-define=FNMOVIE_NATIVE_FIXTURE=<MP4 绝对路径>` 指向 [Emby 联调环境](tool/emby-test/README.md) 中的 Big Buck Bunny 影片。
+
+## 绿联影视使用
+
+1. 按[绿联官方指南](https://support.ugnas.com/detail/article/zh-CN/908)，在 UGOS Pro 的「影视中心 → 设置 → 媒体服务器」启用媒体库服务，并配置专用媒体库账号，不要使用 NAS 管理员账号。
+2. 在 Sakuga 的「设置 → 服务器」选择「绿联影视」，填入 NAS 主机名或 IP，默认 HTTPS 端口为 `9443`；使用自定义端口时请明确填写。无需填写 `/emby` 或其他路径。
+3. 使用系统信任的证书可留空「证书 SHA-256 指纹」。使用自签名证书时，从 NAS 或可信局域网核对证书指纹后再填入；不要信任仅从未知公网连接看到的证书。更换证书后需重新核对指纹。建议使用有密码的专用账号和局域网/私网连接，不要把空密码服务暴露到公网。
+4. 输入专用账号，点击「测试连接」验证能访问片库，再点「保存」。密码不落盘；会话失效时，编辑原配置并重新登录。
+
+绿联适配直接复用 NAS 原有片库，支持分库分页、搜索、海报、详情、季/集、原画和内封字幕。续播进度存于本机，不回写绿联；不支持转码画质、外部字幕、收藏或手动标记已看。不同固件可能存在差异，绿联影视中心并不是完整的 Emby 服务器。
+
+可选真机联调：准备一个未纳入版本控制、仅用于测试的 JSON 文件，配置 `UGREEN_LIVE_TEST: true`、`UGREEN_TEST_URL`、`UGREEN_TEST_USERNAME`、`UGREEN_TEST_PASSWORD`、`UGREEN_TEST_FINGERPRINT`（后两项可为空）。片库需有一部带海报的电影和至少一集已入库的剧集。不要分发包含这些构建参数的测试包。
+
+```sh
+fvm flutter test integration_test/ugreen_server_test.dart -d <device> \
+  --dart-define-from-file=/path/to/local-ugreen-test.json
+```
 
 ## 播放质量
 

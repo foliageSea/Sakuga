@@ -5,6 +5,7 @@ import '../emby/emby_probe.dart';
 import '../fnmovie/fnmovie_client.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/jellyfin_probe.dart';
+import '../ugreen/ugreen_client.dart';
 import 'media_server_client.dart';
 import 'server_probe.dart';
 import 'server_profile.dart';
@@ -15,12 +16,13 @@ class MediaServerFactory {
     MediaServerType.jellyfin => JellyfinClient(server: server),
     MediaServerType.emby => EmbyClient(server: server),
     MediaServerType.fnmovie => FnMovieClient(server: server),
+    MediaServerType.ugreen => UgreenClient(server: server),
   };
   ServerProbe createProbe(MediaServerType type) => switch (type) {
     MediaServerType.jellyfin => JellyfinProbe(),
     MediaServerType.emby => EmbyProbe(),
-    MediaServerType.fnmovie => throw UnsupportedError(
-      'fnOS Media requires account login',
+    MediaServerType.fnmovie || MediaServerType.ugreen => throw UnsupportedError(
+      'Media library requires account login',
     ),
   };
 }

@@ -558,7 +558,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     }
 
     final isFnMovie = client.server.type == MediaServerType.fnmovie;
-    final skipProgress = isFnMovie && failed && !_receivedPlayerPosition;
+    final syncsProgress = client.server.type.syncsPlaybackProgress;
+    final skipProgress =
+        (isFnMovie || !syncsProgress) && failed && !_receivedPlayerPosition;
     final rawTicks = _positionTicks;
     final runtime = _runtimeTicks ?? _durationToTicks(_player.state.duration);
     final finished =
@@ -585,6 +587,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       }
     });
 
+    if (!syncsProgress) {
+      if (!stopped) return localSave;
+      return _serializeSync(() async {
+        await localSave;
+        try {
+          await client.stopTranscoding(session);
+        } catch (error, stackTrace) {
+          debugPrint(
+            'PLAYER_STREAM_CLEANUP_ERROR ${_errorForLog(error)}\n$stackTrace',
+          );
+        }
+      });
+    }
     if (!started && !report && !stopped) return localSave;
     _lastReportedTicks = rawTicks;
     return _serializeSync(() async {

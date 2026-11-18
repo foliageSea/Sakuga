@@ -9,6 +9,7 @@ import '../../core/images/artwork_cache.dart';
 import '../../data/media_server/media_server_client.dart';
 import '../../data/media_server/media_server_factory.dart';
 import '../../data/media_server/media_models.dart';
+import '../../data/media_server/server_profile.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/poster_background.dart';
@@ -72,6 +73,10 @@ typedef DetailBackgroundSpec = ({
   String? initialPosterUrl,
 });
 
+bool _canReuseSeason(MediaServerClient client, MediaItem? preview) =>
+    client.server.type == MediaServerType.ugreen &&
+    preview?.type == MediaType.season;
+
 /// Resolves the poster URL and auth headers for [spec], reusing the tapped
 /// card's cached poster URL immediately before full metadata arrives.
 PosterBackground? watchDetailPosterBackground(
@@ -83,9 +88,11 @@ PosterBackground? watchDetailPosterBackground(
   final library = ref.watch(libraryViewsProvider);
   return library.when(
     data: (data) {
-      final item = ref.watch(
-        libraryItemProvider((userId: data.userId, itemId: spec.itemId)),
-      );
+      final item = _canReuseSeason(data.client, preview)
+          ? AsyncData(preview!)
+          : ref.watch(
+              libraryItemProvider((userId: data.userId, itemId: spec.itemId)),
+            );
       final url = item.when(
         data: (value) {
           final poster = value.poster ?? preview?.poster;
@@ -150,6 +157,18 @@ class DetailPage extends ConsumerWidget {
       ),
       loading: () {
         final server = ref.watch(activeServerProvider);
+        if (server?.type == MediaServerType.ugreen &&
+            server!.userId.isNotEmpty &&
+            preview?.type == MediaType.season) {
+          return _DetailBody(
+            client: ref.watch(mediaServerClientProvider(server)),
+            userId: server.userId,
+            itemId: itemId,
+            initialItem: preview,
+            initialPosterUrl: initialPosterUrl,
+            seriesId: seriesId,
+          );
+        }
         if (server != null && preview != null) {
           return _DetailScaffold(
             title: preview.name,
@@ -222,8 +241,16 @@ class _DetailBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final query = (userId: userId, itemId: itemId);
-    final item = ref.watch(libraryItemProvider(query));
     final preview = initialItem;
+    // Green Theater seasons are generated from the episode list. Reuse the
+    // season card metadata so entering a season fetches episodes only once.
+    final item =
+        _canReuseSeason(client, preview) &&
+            preview != null &&
+            preview.id == itemId &&
+            (preview.seriesId ?? seriesId) != null
+        ? AsyncData(preview)
+        : ref.watch(libraryItemProvider(query));
     return item.when(
       data: (value) {
         final parentSeriesId = value.seriesId ?? preview?.seriesId ?? seriesId;
@@ -377,8 +404,11 @@ class DetailHeaderTitle extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final library = ref.watch(libraryViewsProvider).value;
+    final preview = spec.initialItem;
     final item = library == null
         ? null
+        : _canReuseSeason(library.client, preview) && preview?.id == spec.itemId
+        ? preview
         : ref
               .watch(
                 libraryItemProvider((

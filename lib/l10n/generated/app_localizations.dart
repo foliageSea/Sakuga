@@ -218,6 +218,48 @@ abstract class AppLocalizations {
   /// **'fnOS Media'**
   String get serverTypeFnMovie;
 
+  /// No description provided for @serverTypeUgreen.
+  ///
+  /// In en, this message translates to:
+  /// **'UGREEN Theater'**
+  String get serverTypeUgreen;
+
+  /// No description provided for @ugreenFingerprint.
+  ///
+  /// In en, this message translates to:
+  /// **'Certificate SHA-256 fingerprint (optional)'**
+  String get ugreenFingerprint;
+
+  /// No description provided for @ugreenFingerprintHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTPS only. Verify self-signed certificates on a trusted network before entering the fingerprint. Leave blank for a system-trusted certificate.'**
+  String get ugreenFingerprintHelp;
+
+  /// No description provided for @ugreenFingerprintInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a 64-digit hexadecimal SHA-256 fingerprint, with or without colons.'**
+  String get ugreenFingerprintInvalid;
+
+  /// No description provided for @ugreenCertificateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not verify the UGREEN Theater certificate. Check the server address and fingerprint.'**
+  String get ugreenCertificateError;
+
+  /// No description provided for @ugreenAccountHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the Theater media library account. The password is not saved; leave it blank if the account has no password.'**
+  String get ugreenAccountHelp;
+
+  /// No description provided for @ugreenRelogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in again'**
+  String get ugreenRelogin;
+
   /// No description provided for @serverAuthMethod.
   ///
   /// In en, this message translates to:

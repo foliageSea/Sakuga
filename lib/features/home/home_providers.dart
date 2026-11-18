@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/media_server/media_models.dart';
+import '../../data/media_server/server_profile.dart';
 import '../../data/media_server/server_repository.dart';
 import '../../shared/poster_background.dart';
 import '../library/library_providers.dart';
+import '../player/playback_progress_repository.dart';
 
 void refreshHome(WidgetRef ref) {
   ref.invalidate(libraryViewsProvider);
@@ -16,7 +18,47 @@ final resumeItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   ref,
 ) async {
   final library = await ref.watch(libraryViewsProvider.future);
-  return library.client.resume(library.userId);
+  final client = library.client;
+  if (client.server.type.syncsPlaybackProgress) {
+    return client.resume(library.userId);
+  }
+  const limit = 12;
+  final repository = ref.read(playbackProgressRepositoryProvider);
+  final local = await repository.tryLoadAll(
+    serverId: client.server.id,
+    userId: library.userId,
+  );
+  List<MediaItem> remote;
+  try {
+    remote = await client.resume(library.userId, limit: limit);
+  } catch (_) {
+    if (!local.values.any((ticks) => ticks > 0)) rethrow;
+    remote = const [];
+  }
+  final remoteById = {for (final item in remote) item.id: item};
+  final items = <MediaItem>[];
+  final pending = local.entries.where((entry) => entry.value > 0).take(limit);
+  final localItems = await Future.wait(
+    pending.map((entry) async {
+      try {
+        final item =
+            remoteById[entry.key] ??
+            await client.item(library.userId, entry.key);
+        return item.withPlaybackPosition(
+          Duration(microseconds: entry.value ~/ 10),
+        );
+      } catch (_) {
+        return null;
+      }
+    }),
+  );
+  items.addAll(localItems.whereType<MediaItem>());
+  final shown = items.map((item) => item.id).toSet();
+  for (final item in remote) {
+    if (local[item.id] == 0 || !shown.add(item.id)) continue;
+    items.add(item);
+  }
+  return items.take(limit).toList();
 });
 
 final latestItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
@@ -30,6 +72,7 @@ final randomItemsProvider = FutureProvider.autoDispose<List<MediaItem>>((
   ref,
 ) async {
   final library = await ref.watch(libraryViewsProvider.future);
+  if (library.client.server.type == MediaServerType.ugreen) return const [];
   final items = await library.client.randomItems(library.userId);
   final withPosters = items.where((item) => item.poster != null).toList();
   return withPosters.isNotEmpty ? withPosters : items;

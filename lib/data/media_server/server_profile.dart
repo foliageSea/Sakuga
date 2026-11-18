@@ -1,10 +1,13 @@
-enum MediaServerType { jellyfin, emby, fnmovie }
+enum MediaServerType { jellyfin, emby, fnmovie, ugreen }
 
 extension MediaServerCapabilities on MediaServerType {
-  bool get supportsPlaybackQuality => this != MediaServerType.fnmovie;
-  bool get supportsManualPlayed => this != MediaServerType.fnmovie;
-  bool get supportsLibraryOptions => this != MediaServerType.fnmovie;
-  bool get supportsRecentlyAdded => this != MediaServerType.fnmovie;
+  bool get supportsPlaybackQuality =>
+      this == MediaServerType.jellyfin || this == MediaServerType.emby;
+  bool get supportsManualPlayed => supportsPlaybackQuality;
+  bool get supportsLibraryOptions => supportsPlaybackQuality;
+  bool get supportsRecentlyAdded =>
+      supportsPlaybackQuality || this == MediaServerType.ugreen;
+  bool get syncsPlaybackProgress => this != MediaServerType.ugreen;
 }
 
 class ServerProfile {
@@ -19,6 +22,7 @@ class ServerProfile {
     this.username = '',
     this.deviceId = '',
     this.remoteServerId = '',
+    this.certificateFingerprint = '',
   });
 
   final String id;
@@ -32,6 +36,7 @@ class ServerProfile {
   final String username;
   final String deviceId;
   final String remoteServerId;
+  final String certificateFingerprint;
 
   bool get usesAccount =>
       type != MediaServerType.jellyfin ||
@@ -50,6 +55,7 @@ class ServerProfile {
     String? username,
     String? deviceId,
     String? remoteServerId,
+    String? certificateFingerprint,
   }) => ServerProfile(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -61,6 +67,8 @@ class ServerProfile {
     username: username ?? this.username,
     deviceId: deviceId ?? this.deviceId,
     remoteServerId: remoteServerId ?? this.remoteServerId,
+    certificateFingerprint:
+        certificateFingerprint ?? this.certificateFingerprint,
   );
 
   Map<String, Object> toJson() => {
@@ -69,6 +77,8 @@ class ServerProfile {
     'baseUrl': baseUrl,
     'apiKey': usesAccount ? '' : apiKey,
     'type': type.name,
+    if (type == MediaServerType.ugreen && certificateFingerprint.isNotEmpty)
+      'certificateFingerprint': certificateFingerprint,
     if (usesAccount) ...{
       'accessToken': accessToken,
       'userId': userId,
@@ -91,5 +101,6 @@ class ServerProfile {
     username: json['username'] as String? ?? '',
     deviceId: json['deviceId'] as String? ?? '',
     remoteServerId: json['remoteServerId'] as String? ?? '',
+    certificateFingerprint: json['certificateFingerprint'] as String? ?? '',
   );
 }

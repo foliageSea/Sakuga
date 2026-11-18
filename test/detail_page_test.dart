@@ -101,6 +101,7 @@ Future<GoRouter> pumpDetailPage(
   Size size = const Size(1280, 800),
   bool settle = true,
   bool withPlayerRoute = false,
+  ServerProfile server = _server,
   List<MediaItem>? seasons,
   List<MediaItem>? episodes,
   FutureOr<MediaItem> Function(String id)? itemById,
@@ -148,7 +149,7 @@ Future<GoRouter> pumpDetailPage(
         ),
       libraryViewsProvider.overrideWith(
         (ref) async => LibraryData(
-          client: FakeMediaServerClient(server: _server),
+          client: FakeMediaServerClient(server: server),
           userId: 'user-1',
           views: const [],
         ),
@@ -232,6 +233,43 @@ Future<void> expectBackButtonPinned(
 }
 
 void main() {
+  testWidgets(
+    'UGREEN season card loads episodes without fetching season again',
+    (tester) async {
+      final pending = Completer<List<MediaItem>>();
+      final requests = <EpisodesQuery>[];
+      var duplicateSeasonLookups = 0;
+      final router = await pumpDetailPage(
+        tester,
+        server: _server.copyWith(type: MediaServerType.ugreen),
+        item: _series,
+        itemById: (id) {
+          if (id == _season().id) duplicateSeasonLookups++;
+          if (id == _season().id) return _season();
+          return _series();
+        },
+        loadEpisodes: (query) {
+          requests.add(query);
+          return pending.future;
+        },
+      );
+      router.push(
+        '/library/${_season().id}',
+        extra: DetailRouteExtra(item: _season()),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(requests, [
+        (userId: 'user-1', seriesId: 'series-1', seasonId: 'season-1'),
+      ]);
+      pending.complete([_episode()]);
+      await tester.pumpAndSettle();
+      expect(duplicateSeasonLookups, 0);
+      expect(find.text('1. Pilot'), findsOneWidget);
+      expect(find.byType(LoadingNotice), findsNothing);
+    },
+  );
+
   for (final width in [390.0, 1280.0]) {
     testWidgets('season can return directly to library at width $width', (
       tester,
