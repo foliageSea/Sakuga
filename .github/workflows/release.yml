@@ -66,7 +66,7 @@ jobs:
           flutter-version-file: .fvmrc
       - name: Install Android NDK
         run: |
-          sdkmanager "ndk;$NDK_VERSION"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION"
           printf 'ANDROID_NDK_HOME=%s/ndk/%s\n' "$ANDROID_HOME" "$NDK_VERSION" >> "$GITHUB_ENV"
       - name: Build Android arm64 release APK
         shell: bash
