@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      name: ${{ steps.version.outputs.name }}
+      number: ${{ steps.version.outputs.number }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Validate release tag
+        id: version
+        shell: bash
+        run: |
+          version=$(tool/release.sh --version)
+          name=${version%+*}
+          number=${version##*+}
+          if [[ "$GITHUB_REF_NAME" != "v$name" ]]; then
+            printf 'Expected tag v%s for pubspec version %s, got %s\n' "$name" "$version" "$GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+          printf 'name=%s\nnumber=%s\n' "$name" "$number" >> "$GITHUB_OUTPUT"
+
+  android:
+    needs: version
+    runs-on: ubuntu-24.04
+    env:
+      BUILD_NAME: ${{ needs.version.outputs.name }}
+      BUILD_NUMBER: ${{ needs.version.outputs.number }}
+      # Match flutter.ndkVersion in the SDK pinned by .fvmrc.
+      NDK_VERSION: '28.2.13676358'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version-file: .fvmrc
+      - name: Install Android NDK
+        run: |
+          sdkmanager "ndk;$NDK_VERSION"
+          printf 'ANDROID_NDK_HOME=%s/ndk/%s\n' "$ANDROID_HOME" "$NDK_VERSION" >> "$GITHUB_ENV"
+      - name: Build Android arm64 release APK
+        shell: bash
+        run: |
+          # Exclude other ABIs without letting Flutter offset Android's versionCode.
+          flutter build apk --release --target-platform android-arm64 --split-per-abi \
+            --android-project-arg=force-version-code-ignoring-abi=true \
+            --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            "dist/Sakuga-${BUILD_NAME}-${BUILD_NUMBER}-android-arm64-v8a.apk"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: android-release
+          path: dist/*.apk
+          if-no-files-found: error
+          overwrite: true
+
+  macos:
+    needs: version
+    runs-on: macos-15
+    env:
+      BUILD_NAME: ${{ needs.version.outputs.name }}
+      BUILD_NUMBER: ${{ needs.version.outputs.number }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version-file: .fvmrc
+      - name: Build macOS arm64 release DMG
+        shell: bash
+        run: |
+          flutter config --enable-macos-arm64-only
+          tool/build_dmg.sh --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+          mkdir -p dist
+          cp "build/macos/dmg/Sakuga-${BUILD_NAME}+${BUILD_NUMBER}-macos-arm64.dmg" \
+            "dist/Sakuga-${BUILD_NAME}-${BUILD_NUMBER}-macos-arm64.dmg"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: macos-release
+          path: dist/*.dmg
+          if-no-files-found: error
+          overwrite: true
+
+  publish:
+    needs: [android, macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: android-release
+          path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: macos-release
+          path: dist
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            dist/*.apk dist/*.dmg
