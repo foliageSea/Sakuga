@@ -216,6 +216,7 @@ tool/release.sh 0.1.1
 脚本会把 `pubspec.yaml` 的 `0.1.0+1` 更新为 `0.1.1+2`，提交版本变更，并将当前分支和 `v0.1.1` 标签一并推送到 `origin`。如果推送失败，可用同一版本号重试，不会再次增加构建号。不传版本号时，只按 `pubspec.yaml` 中已提交的版本创建并推送标签，不修改文件。
 
 `Release` 工作流会并行构建 Android arm64 APK 和 macOS Apple Silicon DMG。两个构建都成功后才会创建 GitHub Release、生成发布说明并上传安装包。失败时可在 Actions 页面重跑失败的任务，无需重新打标签。
+若标签已推送但没有触发构建，可在 `Release` 工作流的 **Run workflow** 中填写已有标签（如 `v0.1.1`）手动运行。
 
 例如 `0.1.0+1` 会发布到 `v0.1.0`，产物为 `Sakuga-0.1.0-1-android-arm64-v8a.apk` 和 `Sakuga-0.1.0-1-macos-arm64.dmg`。Android 沿用项目现有的发布签名；macOS 仍是 ad-hoc 签名，未做 Apple 公证，下载后可能受到 Gatekeeper 限制。
 
