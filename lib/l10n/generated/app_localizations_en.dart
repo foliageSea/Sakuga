@@ -326,6 +326,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noServers => 'No servers';
 
   @override
+  String get serverConfigMenu => 'Server configuration actions';
+
+  @override
+  String get serverImport => 'Import server configuration';
+
+  @override
+  String get serverExport => 'Export server configuration';
+
+  @override
+  String get serverImportAction => 'Import';
+
+  @override
+  String get serverExportAction => 'Export';
+
+  @override
+  String get serverExportCredentials => 'Include login credentials';
+
+  @override
+  String get serverExportCredentialsWarning =>
+      'The JSON file will contain unencrypted API keys or login tokens. Store it securely.';
+
+  @override
+  String get serverExportSaved => 'Server configuration saved.';
+
+  @override
+  String get serverExportError => 'Could not export the server configuration.';
+
+  @override
+  String get serverImportInvalid =>
+      'Invalid, oversized, or unsupported server configuration file.';
+
+  @override
+  String get serverImportError => 'Could not import the server configuration.';
+
+  @override
+  String serverImportNew(int count) {
+    return 'To add: $count';
+  }
+
+  @override
+  String serverImportSkipped(int count) {
+    return 'Duplicates to skip: $count';
+  }
+
+  @override
+  String serverImportDone(int added, int skipped) {
+    return 'Added: $added · Skipped: $skipped';
+  }
+
+  @override
   String get deleteServer => 'Delete server?';
 
   @override

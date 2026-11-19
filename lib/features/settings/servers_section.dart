@@ -12,6 +12,7 @@ import '../../data/emby/emby_auth.dart';
 import '../../data/fnmovie/fnmovie_auth.dart';
 import '../../data/jellyfin/jellyfin_auth.dart';
 import '../../data/media_server/media_server_factory.dart';
+import '../../data/media_server/server_config.dart';
 import '../../data/media_server/server_probe.dart';
 import '../../data/media_server/server_profile.dart';
 import '../../data/media_server/server_repository.dart';
@@ -21,6 +22,8 @@ import '../../shared/localization.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/server_brand.dart';
 import '../../shared/widgets.dart';
+import 'server_config_dialogs.dart';
+import 'server_config_files.dart';
 
 final ugreenFingerprintProbeProvider =
     Provider<Future<String> Function(String)>(
@@ -37,9 +40,74 @@ class ServersSection extends ConsumerStatefulWidget {
 class _ServersSectionState extends ConsumerState<ServersSection> {
   String? _switchingServerId;
   Object? _switchError;
+  bool _transferring = false;
+
+  bool get _busy => _switchingServerId != null || _transferring;
+
+  Future<void> _importConfig() async {
+    if (_busy) return;
+    setState(() => _transferring = true);
+    try {
+      final bytes = await ref.read(serverConfigFilesProvider).pick();
+      if (!mounted || bytes == null) return;
+      final incoming = ServerConfig.decode(bytes);
+      final current = await ref.read(serversProvider.future);
+      if (!mounted) return;
+      final preview = previewServerConfigMerge(current, incoming);
+      final confirmed = await confirmServerConfigImport(context, preview);
+      if (!mounted || !confirmed) return;
+      final result = await ref
+          .read(serversProvider.notifier)
+          .importConfig(incoming);
+      if (mounted) {
+        notifyUser(
+          context,
+          context.l10n.serverImportDone(
+            result.added.length,
+            result.skipped.length,
+          ),
+        );
+      }
+    } on FormatException {
+      if (mounted) notifyUser(context, context.l10n.serverImportInvalid);
+    } catch (_) {
+      if (mounted) notifyUser(context, context.l10n.serverImportError);
+    } finally {
+      if (mounted) setState(() => _transferring = false);
+    }
+  }
+
+  Future<void> _exportConfig(BuildContext buttonContext) async {
+    if (_busy) return;
+    final box = buttonContext.findRenderObject() as RenderBox?;
+    final origin = box == null
+        ? null
+        : box.localToGlobal(Offset.zero) & box.size;
+    setState(() => _transferring = true);
+    try {
+      final includeCredentials = await chooseServerConfigExport(context);
+      if (!mounted || includeCredentials == null) return;
+      final servers = await ref.read(serversProvider.future);
+      if (!mounted || servers.isEmpty) return;
+      final bytes = ServerConfig.encode(
+        servers,
+        includeCredentials: includeCredentials,
+      );
+      final result = await ref
+          .read(serverConfigFilesProvider)
+          .export(bytes, sharePositionOrigin: origin);
+      if (mounted && result == ServerConfigExportResult.saved) {
+        notifyUser(context, context.l10n.serverExportSaved);
+      }
+    } catch (_) {
+      if (mounted) notifyUser(context, context.l10n.serverExportError);
+    } finally {
+      if (mounted) setState(() => _transferring = false);
+    }
+  }
 
   Future<void> _switchServer(String id) async {
-    if (_switchingServerId != null) return;
+    if (_busy) return;
     setState(() {
       _switchingServerId = id;
       _switchError = null;
@@ -67,27 +135,65 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
               Expanded(
                 child: Text(
                   l.servers,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: context.theme.typography.body.lg.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              FButton.icon(
-                key: const ValueKey('add-server'),
-                variant: .ghost,
-                onPress: _switchingServerId != null
-                    ? null
-                    : () => _showEditor(context, ref),
-                semanticsLabel: l.addServer,
-                child: const Icon(FLucideIcons.plus),
+              _headerAction(
+                'add-server',
+                l.addServer,
+                FLucideIcons.plus,
+                _busy ? null : () => _showEditor(context, ref),
+              ),
+              Builder(
+                builder: (buttonContext) => FPopoverMenu(
+                  menuAnchor: .topRight,
+                  childAnchor: .bottomRight,
+                  menuBuilder: (context, controller, _) => [
+                    FItemGroup(
+                      children: [
+                        FItem(
+                          key: const ValueKey('import-servers'),
+                          title: Text(l.serverImport),
+                          prefix: const Icon(FLucideIcons.fileUp),
+                          enabled: !_busy && servers.hasValue,
+                          onPress: () {
+                            controller.hide();
+                            _importConfig();
+                          },
+                        ),
+                        FItem(
+                          key: const ValueKey('export-servers'),
+                          title: Text(l.serverExport),
+                          prefix: const Icon(FLucideIcons.fileDown),
+                          enabled:
+                              !_busy && (servers.value?.isNotEmpty ?? false),
+                          onPress: () {
+                            controller.hide();
+                            _exportConfig(buttonContext);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                  builder: (context, controller, _) => _headerAction(
+                    'server-config-menu',
+                    l.serverConfigMenu,
+                    FLucideIcons.ellipsis,
+                    _busy ? null : controller.toggle,
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
           if (_switchError != null) ...[
-            ErrorNotice(_switchError!),
             const SizedBox(height: 16),
+            ErrorNotice(_switchError!),
           ],
+          const SizedBox(height: 16),
           servers.when(
             data: (items) => items.isEmpty
                 ? EmptyNotice(
@@ -95,7 +201,7 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
                     child: FButton(
                       builder: responsiveButtonContent,
                       mainAxisSize: MainAxisSize.min,
-                      onPress: () => _showEditor(context, ref),
+                      onPress: _busy ? null : () => _showEditor(context, ref),
                       child: Text(l.addServer),
                     ),
                   )
@@ -107,13 +213,13 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
                           server: server,
                           active: server.id == items.first.id,
                           switching: server.id == _switchingServerId,
-                          onSwitch: _switchingServerId != null
+                          onSwitch: _busy
                               ? null
                               : () => _switchServer(server.id),
-                          onEdit: _switchingServerId != null
+                          onEdit: _busy
                               ? null
                               : () => _showEditor(context, ref, server: server),
-                          onDelete: _switchingServerId != null
+                          onDelete: _busy
                               ? null
                               : () => _confirmDelete(context, ref, server),
                         ),
@@ -131,6 +237,22 @@ class _ServersSectionState extends ConsumerState<ServersSection> {
       ),
     );
   }
+
+  Widget _headerAction(
+    String key,
+    String label,
+    IconData icon,
+    VoidCallback? onPress,
+  ) => FTooltip(
+    tipBuilder: (context, controller) => Text(label),
+    child: FButton.icon(
+      key: ValueKey(key),
+      variant: .ghost,
+      onPress: onPress,
+      semanticsLabel: label,
+      child: Icon(icon),
+    ),
+  );
 
   Future<void> _showEditor(
     BuildContext context,
@@ -340,7 +462,7 @@ class _ServerEditorState extends ConsumerState<_ServerEditor> {
     });
     try {
       final observed = await ref.read(ugreenFingerprintProbeProvider)(baseUrl);
-      if (!_acceptsResponse(revision)) return;
+      if (!mounted || !_acceptsResponse(revision)) return;
       setState(() => _fetchingFingerprint = false);
       final confirmed = await showFDialog<bool>(
         context: context,

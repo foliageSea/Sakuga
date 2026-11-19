@@ -10,6 +10,7 @@ import 'package:sakuga/core/runtime_environment.dart';
 import 'package:sakuga/core/settings/settings.dart';
 import 'package:sakuga/core/window/desktop_window.dart';
 import 'package:sakuga/data/media_server/server_repository.dart';
+import 'package:sakuga/features/settings/server_config_files.dart';
 import 'package:sakuga/features/settings/settings_page.dart';
 
 import 'fakes.dart';
@@ -31,6 +32,7 @@ ProviderContainer appContainer({
   MemorySettings? settingsRepository,
   ServerRepository? serverRepository,
   LogExportService? logExporter,
+  ServerConfigFiles? serverConfigFiles,
   RuntimeEnvironment? environment,
   AppSettings settings = const AppSettings(language: 'en'),
 }) => ProviderContainer(
@@ -48,6 +50,8 @@ ProviderContainer appContainer({
     logExportServiceProvider.overrideWithValue(
       logExporter ?? FakeLogExporter(),
     ),
+    if (serverConfigFiles != null)
+      serverConfigFilesProvider.overrideWithValue(serverConfigFiles),
     packageInfoProvider.overrideWith(
       (ref) async => PackageInfo(
         appName: 'Sakuga',

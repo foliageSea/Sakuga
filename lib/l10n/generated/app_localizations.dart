@@ -650,6 +650,90 @@ abstract class AppLocalizations {
   /// **'No servers'**
   String get noServers;
 
+  /// No description provided for @serverConfigMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Server configuration actions'**
+  String get serverConfigMenu;
+
+  /// No description provided for @serverImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import server configuration'**
+  String get serverImport;
+
+  /// No description provided for @serverExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export server configuration'**
+  String get serverExport;
+
+  /// No description provided for @serverImportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get serverImportAction;
+
+  /// No description provided for @serverExportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get serverExportAction;
+
+  /// No description provided for @serverExportCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Include login credentials'**
+  String get serverExportCredentials;
+
+  /// No description provided for @serverExportCredentialsWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'The JSON file will contain unencrypted API keys or login tokens. Store it securely.'**
+  String get serverExportCredentialsWarning;
+
+  /// No description provided for @serverExportSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Server configuration saved.'**
+  String get serverExportSaved;
+
+  /// No description provided for @serverExportError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export the server configuration.'**
+  String get serverExportError;
+
+  /// No description provided for @serverImportInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid, oversized, or unsupported server configuration file.'**
+  String get serverImportInvalid;
+
+  /// No description provided for @serverImportError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not import the server configuration.'**
+  String get serverImportError;
+
+  /// No description provided for @serverImportNew.
+  ///
+  /// In en, this message translates to:
+  /// **'To add: {count}'**
+  String serverImportNew(int count);
+
+  /// No description provided for @serverImportSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicates to skip: {count}'**
+  String serverImportSkipped(int count);
+
+  /// No description provided for @serverImportDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Added: {added} · Skipped: {skipped}'**
+  String serverImportDone(int added, int skipped);
+
   /// No description provided for @deleteServer.
   ///
   /// In en, this message translates to:

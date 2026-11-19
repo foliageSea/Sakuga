@@ -301,6 +301,55 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noServers => '暂无服务器';
 
   @override
+  String get serverConfigMenu => '服务器配置操作';
+
+  @override
+  String get serverImport => '导入配置';
+
+  @override
+  String get serverExport => '导出配置';
+
+  @override
+  String get serverImportAction => '导入';
+
+  @override
+  String get serverExportAction => '导出';
+
+  @override
+  String get serverExportCredentials => '包含登录凭据';
+
+  @override
+  String get serverExportCredentialsWarning =>
+      'JSON 文件将包含未加密的 API 密钥或登录令牌，请妥善保管。';
+
+  @override
+  String get serverExportSaved => '服务器配置已保存。';
+
+  @override
+  String get serverExportError => '无法导出服务器配置。';
+
+  @override
+  String get serverImportInvalid => '服务器配置文件无效、过大或版本不受支持。';
+
+  @override
+  String get serverImportError => '无法导入服务器配置。';
+
+  @override
+  String serverImportNew(int count) {
+    return '将新增：$count 项';
+  }
+
+  @override
+  String serverImportSkipped(int count) {
+    return '将跳过重复项：$count 项';
+  }
+
+  @override
+  String serverImportDone(int added, int skipped) {
+    return '已新增 $added 项，跳过 $skipped 项。';
+  }
+
+  @override
   String get deleteServer => '删除服务器？';
 
   @override

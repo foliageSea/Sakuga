@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_exception.dart';
 import '../../core/settings/settings.dart';
+import 'server_config.dart';
 import 'server_profile.dart';
 
 abstract interface class ServerRepository {
@@ -104,6 +105,33 @@ class ServersNotifier extends AsyncNotifier<List<ServerProfile>> {
   Future<void> remove(String id) async {
     final current = state.value ?? await future;
     await _save(current.where((server) => server.id != id).toList());
+  }
+
+  Future<ServerConfigMerge> importConfig(List<ServerProfile> incoming) async {
+    final current = state.value ?? await future;
+    final preview = previewServerConfigMerge(current, incoming);
+    if (preview.added.isEmpty) return preview;
+
+    final usedIds = current.map((server) => server.id).toSet();
+    var nextId = DateTime.now().microsecondsSinceEpoch;
+    final added = <ServerProfile>[];
+    for (final server in preview.added) {
+      String id;
+      do {
+        id = (nextId++).toString();
+      } while (!usedIds.add(id));
+      added.add(
+        server.copyWith(
+          id: id,
+          // fnOS uses the local profile ID in place of a server-issued user ID.
+          userId: server.type == MediaServerType.fnmovie
+              ? (server.accessToken.isEmpty ? '' : id)
+              : server.userId,
+        ),
+      );
+    }
+    await _save([...current, ...added]);
+    return (added: added, skipped: preview.skipped);
   }
 
   Future<void> _save(List<ServerProfile> servers) async {
