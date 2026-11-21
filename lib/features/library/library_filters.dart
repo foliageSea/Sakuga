@@ -38,12 +38,9 @@ class _LibraryFilterPanelState extends ConsumerState<LibraryFilterPanel> {
         : const AsyncData<List<int>>([]);
     final yearOptions = {...?years.value, ?widget.query.year}.toList()
       ..sort((a, b) => b.compareTo(a));
-    return Container(
+    return Padding(
       key: const ValueKey('library-filter-panel'),
       padding: const EdgeInsets.only(top: 4, bottom: 20),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: context.theme.colors.border)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
