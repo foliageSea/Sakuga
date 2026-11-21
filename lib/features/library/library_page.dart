@@ -112,18 +112,19 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     _selectedYear = null;
   });
 
-  LibraryQuery _query(LibraryData library, String viewId) =>
-      !library.client.server.type.supportsLibraryOptions
-      ? LibraryQuery(userId: library.userId, viewId: viewId)
-      : LibraryQuery(
-          userId: library.userId,
-          viewId: viewId,
-          genre: _selectedGenre,
-          isPlayed: _isPlayed,
-          year: _selectedYear,
-          sort: _sort,
-          descending: _descending,
-        );
+  LibraryQuery _query(LibraryData library, String viewId) {
+    final type = library.client.server.type;
+    final advanced = type.supportsLibraryOptions;
+    return LibraryQuery(
+      userId: library.userId,
+      viewId: viewId,
+      genre: type.supportsLibraryGenreFilter ? _selectedGenre : null,
+      isPlayed: advanced ? _isPlayed : null,
+      year: advanced ? _selectedYear : null,
+      sort: advanced ? _sort : MediaSort.name,
+      descending: advanced && _descending,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +220,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           )
         : null;
     final toolbar = LibraryToolbar(
-      showLibraryOptions: server.type.supportsLibraryOptions,
+      showFilters: server.type.supportsLibraryGenreFilter,
+      showSort: server.type.supportsLibraryOptions,
       filtersVisible: _showFilters,
       hasFilters:
           _selectedGenre != null || _isPlayed != null || _selectedYear != null,
@@ -353,7 +355,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               ),
               const SizedBox(height: 8),
             ],
-            if (server.type.supportsLibraryOptions &&
+            if (server.type.supportsLibraryGenreFilter &&
                 _showFilters &&
                 _searchTerm.isEmpty &&
                 query != null)
@@ -363,6 +365,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   activeViewId,
                 )),
                 query: query,
+                showAdvancedFilters: server.type.supportsLibraryOptions,
                 onGenre: _selectGenre,
                 onPlayed: (value) => _updateView(() => _isPlayed = value),
                 onYear: (value) => _updateView(() => _selectedYear = value),

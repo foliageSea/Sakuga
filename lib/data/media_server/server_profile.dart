@@ -5,6 +5,8 @@ extension MediaServerCapabilities on MediaServerType {
       this == MediaServerType.jellyfin || this == MediaServerType.emby;
   bool get supportsManualPlayed => supportsPlaybackQuality;
   bool get supportsLibraryOptions => supportsPlaybackQuality;
+  bool get supportsLibraryGenreFilter =>
+      supportsLibraryOptions || this == MediaServerType.ugreen;
   bool get supportsRecentlyAdded =>
       supportsPlaybackQuality || this == MediaServerType.ugreen;
   bool get syncsPlaybackProgress => this != MediaServerType.ugreen;

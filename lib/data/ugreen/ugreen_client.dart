@@ -48,6 +48,7 @@ class UgreenClient implements MediaServerClient {
   );
 
   List<MediaLibrary>? _validatedViews;
+  final _genreIdsByLibrary = <String, Map<String, String>>{};
   // The series page already loads every episode to build its season cards.
   ({String seriesId, List<MediaItem> episodes, DateTime loadedAt})?
   _seasonSnapshot;
@@ -193,7 +194,34 @@ class UgreenClient implements MediaServerClient {
   }
 
   @override
-  Future<List<String>> genres(String userId, String parentId) async => const [];
+  Future<List<String>> genres(String userId, String parentId) async {
+    _check(userId);
+    final ids = await _fetchGenreIds(parentId);
+    return ids.keys.toList();
+  }
+
+  Future<Map<String, String>> _fetchGenreIds(String parentId) async {
+    final data = await _request(
+      '/Genres',
+      query: {
+        'UserId': server.userId,
+        'ParentId': parentId,
+        'Recursive': true,
+        'IncludeItemTypes': _defaultTypes
+            .map(MediaBrowserMapper.itemType)
+            .join(','),
+      },
+    );
+    final ids = <String, String>{};
+    for (final row in _rows(data).whereType<Map<String, dynamic>>()) {
+      final name = row['Name'];
+      final id = ugreenId(row['Id']);
+      if (name is String && name.trim().isNotEmpty && id != null) {
+        ids.putIfAbsent(name, () => id);
+      }
+    }
+    return _genreIdsByLibrary[parentId] = ids;
+  }
 
   @override
   Future<List<int>> years(String userId, String parentId) async => const [];
@@ -215,17 +243,27 @@ class UgreenClient implements MediaServerClient {
     if (parentId.isEmpty || startIndex < 0) {
       throw const AppException(FailureKind.invalidData);
     }
-    if (limit <= 0 || types.isEmpty) {
-      return const MediaItemsPage(
-        items: [],
-        totalRecordCount: 0,
-        hasMore: false,
-      );
+    const empty = MediaItemsPage(
+      items: [],
+      totalRecordCount: 0,
+      hasMore: false,
+    );
+    if (limit <= 0 || types.isEmpty) return empty;
+    String? genreId;
+    if (genre != null && genre.isNotEmpty) {
+      // UGOS may silently ignore an unknown GenreIds value. Resolve against
+      // fresh library options on the first page, then reuse them for paging.
+      final ids = startIndex == 0
+          ? await _fetchGenreIds(parentId)
+          : _genreIdsByLibrary[parentId] ?? await _fetchGenreIds(parentId);
+      genreId = ids[genre];
+      if (genreId == null) return empty;
     }
     final data = await _request(
       '$_userPath/Items',
       query: {
         'ParentId': parentId,
+        'GenreIds': ?genreId,
         'Recursive': true,
         'IncludeItemTypes': types.map(MediaBrowserMapper.itemType).join(','),
         'StartIndex': startIndex,

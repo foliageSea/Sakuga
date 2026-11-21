@@ -15,7 +15,8 @@ class LibraryToolbar extends StatelessWidget {
     required this.onView,
     required this.onSort,
     required this.onClear,
-    this.showLibraryOptions = true,
+    required this.showFilters,
+    required this.showSort,
     super.key,
   });
   final bool filtersVisible;
@@ -27,7 +28,8 @@ class LibraryToolbar extends StatelessWidget {
   final ValueChanged<bool> onView;
   final void Function(MediaSort, bool) onSort;
   final VoidCallback onClear;
-  final bool showLibraryOptions;
+  final bool showFilters;
+  final bool showSort;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +43,7 @@ class LibraryToolbar extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (showLibraryOptions) ...[
+        if (showFilters) ...[
           if (hasFilters) ...[
             FButton.icon(
               key: const ValueKey('library-clear-filters'),
@@ -68,6 +70,8 @@ class LibraryToolbar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+        ],
+        if (showSort) ...[
           FPopoverMenu(
             menuAnchor: .topRight,
             childAnchor: .bottomRight,

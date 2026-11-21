@@ -9,12 +9,14 @@ import 'library_providers.dart';
 class LibraryFilterPanel extends ConsumerStatefulWidget {
   const LibraryFilterPanel({
     required this.query,
+    required this.showAdvancedFilters,
     required this.onGenre,
     required this.onPlayed,
     required this.onYear,
     super.key,
   });
   final LibraryQuery query;
+  final bool showAdvancedFilters;
   final ValueChanged<String?> onGenre;
   final ValueChanged<bool?> onPlayed;
   final ValueChanged<int?> onYear;
@@ -31,7 +33,9 @@ class _LibraryFilterPanelState extends ConsumerState<LibraryFilterPanel> {
     final l = context.l10n;
     final query = (userId: widget.query.userId, viewId: widget.query.viewId);
     final genres = ref.watch(libraryGenresProvider(query));
-    final years = ref.watch(libraryYearsProvider(query));
+    final years = widget.showAdvancedFilters
+        ? ref.watch(libraryYearsProvider(query))
+        : const AsyncData<List<int>>([]);
     final yearOptions = {...?years.value, ?widget.query.year}.toList()
       ..sort((a, b) => b.compareTo(a));
     return Container(
@@ -43,14 +47,16 @@ class _LibraryFilterPanelState extends ConsumerState<LibraryFilterPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _FilterRow<bool>(
-            id: 'progress',
-            label: l.libraryProgress,
-            selected: widget.query.isPlayed,
-            options: {false: l.libraryUnwatched, true: l.libraryWatched},
-            onSelect: widget.onPlayed,
-          ),
-          const SizedBox(height: 6),
+          if (widget.showAdvancedFilters) ...[
+            _FilterRow<bool>(
+              id: 'progress',
+              label: l.libraryProgress,
+              selected: widget.query.isPlayed,
+              options: {false: l.libraryUnwatched, true: l.libraryWatched},
+              onSelect: widget.onPlayed,
+            ),
+            const SizedBox(height: 6),
+          ],
           _FilterRow<String>(
             id: 'genre',
             label: l.genre,
@@ -76,46 +82,49 @@ class _LibraryFilterPanelState extends ConsumerState<LibraryFilterPanel> {
                   )
                 : null,
           ),
-          const SizedBox(height: 6),
-          _FilterRow<int>(
-            id: 'year',
-            label: l.libraryYear,
-            selected: widget.query.year,
-            options: {
-              for (final year
-                  in _allYears
-                      ? yearOptions
-                      : {...yearOptions.take(8), ?widget.query.year})
-                year: '$year',
-            },
-            onSelect: widget.onYear,
-            trailing: years.isLoading
-                ? const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: FCircularProgress(),
-                  )
-                : years.hasError
-                ? FButton(
-                    key: const ValueKey('library-years-retry'),
-                    variant: .ghost,
-                    mainAxisSize: MainAxisSize.min,
-                    builder: responsiveButtonContent,
-                    onPress: () => ref.invalidate(libraryYearsProvider(query)),
-                    child: Text(l.libraryYearsLoadError),
-                  )
-                : yearOptions.length > 8
-                ? FButton(
-                    variant: .ghost,
-                    size: .sm,
-                    mainAxisSize: MainAxisSize.min,
-                    builder: responsiveButtonContent,
-                    onPress: () => setState(() => _allYears = !_allYears),
-                    child: Text(
-                      _allYears ? l.libraryFewerYears : l.libraryMoreYears,
-                    ),
-                  )
-                : null,
-          ),
+          if (widget.showAdvancedFilters) ...[
+            const SizedBox(height: 6),
+            _FilterRow<int>(
+              id: 'year',
+              label: l.libraryYear,
+              selected: widget.query.year,
+              options: {
+                for (final year
+                    in _allYears
+                        ? yearOptions
+                        : {...yearOptions.take(8), ?widget.query.year})
+                  year: '$year',
+              },
+              onSelect: widget.onYear,
+              trailing: years.isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: FCircularProgress(),
+                    )
+                  : years.hasError
+                  ? FButton(
+                      key: const ValueKey('library-years-retry'),
+                      variant: .ghost,
+                      mainAxisSize: MainAxisSize.min,
+                      builder: responsiveButtonContent,
+                      onPress: () =>
+                          ref.invalidate(libraryYearsProvider(query)),
+                      child: Text(l.libraryYearsLoadError),
+                    )
+                  : yearOptions.length > 8
+                  ? FButton(
+                      variant: .ghost,
+                      size: .sm,
+                      mainAxisSize: MainAxisSize.min,
+                      builder: responsiveButtonContent,
+                      onPress: () => setState(() => _allYears = !_allYears),
+                      child: Text(
+                        _allYears ? l.libraryFewerYears : l.libraryMoreYears,
+                      ),
+                    )
+                  : null,
+            ),
+          ],
         ],
       ),
     );

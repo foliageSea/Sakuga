@@ -86,7 +86,7 @@ class _Progress extends Fake implements PlaybackProgressRepository {
 }
 
 class _GenreClient extends FakeMediaServerClient {
-  _GenreClient() : super(server: _server);
+  _GenreClient({super.server = _server});
 
   final requests = <({String viewId, String? genre, int startIndex})>[];
   bool failGenres = false;
@@ -158,7 +158,7 @@ Future<ProviderContainer> _pumpLibrary(
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
 
-  final servers = MemoryServerRepository()..items = [_server];
+  final servers = MemoryServerRepository()..items = [client?.server ?? _server];
   final container = ProviderContainer(
     retry: (_, _) => null,
     overrides: [
@@ -278,6 +278,38 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('Ugreen offers genre filtering without advanced options', (
+    tester,
+  ) async {
+    final client = _GenreClient(
+      server: _server.copyWith(
+        type: MediaServerType.ugreen,
+        baseUrl: 'https://nas.test:9443',
+        userId: 'user-1',
+        accessToken: 'test-token',
+      ),
+    );
+    await _pumpLibrary(
+      tester,
+      const Size(720, 900),
+      client: client,
+      useRealItems: true,
+      expandFilters: true,
+    );
+    Finder key(String id) => find.byKey(ValueKey('library-$id'));
+    expect(key('progress'), findsNothing);
+    expect(key('year'), findsNothing);
+    expect(key('sort'), findsNothing);
+    await tester.tap(key('genre-Animation'));
+    await tester.pumpAndSettle();
+    expect(client.filters.last.genre, 'Animation');
+    expect(find.text('Animation title 0'), findsOneWidget);
+    await tester.tap(key('clear-filters'));
+    await tester.pumpAndSettle();
+    expect(client.filters.last.genre, isNull);
+    expect(find.text('All title 0'), findsOneWidget);
+  });
 
   testWidgets(
     'older selected year remains visible after collapsing year options',

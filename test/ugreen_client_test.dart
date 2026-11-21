@@ -227,6 +227,76 @@ void main() {
     },
   );
 
+  test(
+    'resolves library genre names to IDs and keeps the filter during paging',
+    () async {
+      var options = <Map<String, Object?>>[
+        {'Name': 'Animation', 'Id': 14},
+        {'Name': 'Drama', 'Id': '27'},
+        {'Name': 'No ID'},
+        {'Name': '', 'Id': 31},
+        {'Name': 'Animation', 'Id': 30},
+      ];
+      final adapter = _Adapter((request) {
+        final query = request.uri.queryParameters;
+        expect(query['ParentId'], '9');
+        if (request.uri.path == '/emby/Genres') {
+          expect(query['UserId'], '24');
+          expect(query['Recursive'], 'true');
+          return {'Items': options};
+        }
+        expect(request.uri.path, '/emby/Users/24/Items');
+        expect(query['GenreIds'], '14');
+        expect(query, isNot(contains('Genres')));
+        expect(query['IncludeItemTypes'], 'Series');
+        return {
+          'TotalRecordCount': 2,
+          'Items': [
+            {
+              'Id': 42 + int.parse(query['StartIndex']!),
+              'Type': 'Series',
+              'Genres': ['Animation'],
+            },
+          ],
+        };
+      });
+      final client = UgreenClient(server: _server, dio: adapter.dio);
+      await expectLater(client.genres('wrong', '9'), throwsA(_auth));
+      expect(await client.genres('24', '9'), ['Animation', 'Drama']);
+      Future<MediaItemsPage> fetch(String genre, {int start = 0}) =>
+          client.items(
+            '24',
+            '9',
+            genre: genre,
+            limit: 1,
+            startIndex: start,
+            types: {MediaType.series},
+          );
+      final first = await fetch('Animation');
+      expect(first.items.single.genres, ['Animation']);
+      expect(first.nextStartIndex, 1);
+      expect(first.totalRecordCount, 2);
+      final second = await fetch('Animation', start: first.nextStartIndex!);
+      expect(second.items.single.id, '43');
+      expect(second.hasMore, isFalse);
+      expect(adapter.requests.map((request) => request.uri.path), [
+        '/emby/Genres',
+        '/emby/Genres',
+        '/emby/Users/24/Items',
+        '/emby/Users/24/Items',
+      ]);
+
+      options = [
+        {'Name': 'Drama', 'Id': '27'},
+      ];
+      final stale = await fetch('Animation');
+      expect(stale.items, isEmpty);
+      expect(stale.totalRecordCount, 0);
+      expect(stale.hasMore, isFalse);
+      expect(adapter.requests.last.uri.path, '/emby/Genres');
+    },
+  );
+
   test('details use the single-item route, search uses SearchTerm, and resume is a read', () async {
     final adapter = _Adapter((request) {
       final row = {
@@ -250,7 +320,6 @@ void main() {
     expect(resumed.playbackPosition, const Duration(seconds: 2));
     expect(resumed.lastPlayedAt, DateTime.utc(2026, 1, 2, 3, 4, 5));
     expect((await client.latest('24', limit: 1)).single.id, '42');
-    expect(await client.genres('24', '9'), isEmpty);
     expect(await client.years('24', '9'), isEmpty);
     final [details, search, resume, latest] = adapter.requests;
     expect(latest.uri.path, search.uri.path);
