@@ -232,7 +232,10 @@ void main() {
       final row = {
         'Id': 42,
         'Type': request.uri.path.endsWith('/42') ? 'Series' : 'Movie',
-        'UserData': {'PlaybackPositionTicks': 20000000},
+        'UserData': {
+          'PlaybackPositionTicks': 20000000,
+          'LastPlayedDate': '2026-01-02T03:04:05Z',
+        },
       };
       return request.uri.path.endsWith('/42')
           ? row
@@ -243,10 +246,9 @@ void main() {
     final client = UgreenClient(server: _server, dio: adapter.dio);
     expect((await client.item('24', '42')).type, MediaType.series);
     expect((await client.search('24', ' a & b ')).single.id, '42');
-    expect(
-      (await client.resume('24')).single.playbackPosition,
-      const Duration(seconds: 2),
-    );
+    final resumed = (await client.resume('24')).single;
+    expect(resumed.playbackPosition, const Duration(seconds: 2));
+    expect(resumed.lastPlayedAt, DateTime.utc(2026, 1, 2, 3, 4, 5));
     expect((await client.latest('24', limit: 1)).single.id, '42');
     expect(await client.genres('24', '9'), isEmpty);
     expect(await client.years('24', '9'), isEmpty);
@@ -265,6 +267,8 @@ void main() {
     expect(search.uri.queryParameters, containsPair('SearchTerm', 'a & b'));
     expect(resume.uri.path, '/emby/Users/24/Items/Resume');
     expect(resume.method, 'GET');
+    expect(resume.uri.queryParameters, containsPair('SortBy', 'DatePlayed'));
+    expect(resume.uri.queryParameters, containsPair('SortOrder', 'Descending'));
   });
 
   test(

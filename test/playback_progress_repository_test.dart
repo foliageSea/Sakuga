@@ -49,6 +49,31 @@ void main() {
     });
   });
 
+  test('reads old progress and records a date on the next save', () async {
+    final preferences = SharedPreferencesAsync();
+    final repository = PreferencesPlaybackProgressRepository(preferences);
+    await preferences.setInt('sakuga.playback.v1.nas.user.episode', 70000000);
+
+    Future<SavedPlaybackProgress> readEntry() async => (await repository
+        .loadAllEntries(serverId: 'nas', userId: 'user'))['episode']!;
+    expect(await readEntry(), (positionTicks: 70000000, lastPlayedAt: null));
+    expect(
+      await repository.load(serverId: 'nas', userId: 'user', itemId: 'episode'),
+      70000000,
+    );
+
+    final before = DateTime.now();
+    await repository.save(
+      serverId: 'nas',
+      userId: 'user',
+      itemId: 'episode',
+      positionTicks: 80000000,
+    );
+    final entry = await readEntry();
+    expect(entry.positionTicks, 80000000);
+    expect(entry.lastPlayedAt?.isBefore(before), isFalse);
+  });
+
   test('clears matching pending progress after a successful sync', () async {
     final repository = PreferencesPlaybackProgressRepository(
       SharedPreferencesAsync(),

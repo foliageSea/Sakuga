@@ -409,7 +409,12 @@ class UgreenClient implements MediaServerClient {
     if (limit <= 0) return const [];
     final data = await _request(
       '$_userPath/Items/Resume',
-      query: {'Limit': limit, 'MediaTypes': 'Video'},
+      query: {
+        'Limit': limit,
+        'MediaTypes': 'Video',
+        'SortBy': 'DatePlayed',
+        'SortOrder': 'Descending',
+      },
     );
     return _parseItems(_rows(data)).take(limit).toList();
   }

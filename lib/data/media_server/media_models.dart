@@ -65,6 +65,7 @@ class MediaItem {
     this.parentIndexNumber,
     this.played = false,
     this.playbackPosition,
+    this.lastPlayedAt,
     this.reportedPlayedPercentage,
     this.primaryImageAspectRatio,
     this.overview,
@@ -93,6 +94,7 @@ class MediaItem {
   final int? parentIndexNumber;
   final bool played;
   final Duration? playbackPosition;
+  final DateTime? lastPlayedAt;
   final double? reportedPlayedPercentage;
   final double? primaryImageAspectRatio;
   final String? overview;
@@ -143,6 +145,7 @@ class MediaItem {
       parentIndexNumber: parentIndexNumber,
       played: played ?? (completed ? true : this.played),
       playbackPosition: completed ? Duration.zero : position,
+      lastPlayedAt: lastPlayedAt,
       primaryImageAspectRatio: primaryImageAspectRatio,
       overview: overview,
       genres: genres,

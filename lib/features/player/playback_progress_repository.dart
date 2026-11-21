@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/settings/settings.dart';
 import '../../data/media_server/media_models.dart';
 
+typedef SavedPlaybackProgress = ({int positionTicks, DateTime? lastPlayedAt});
+
 abstract interface class PlaybackProgressRepository {
   Future<int?> load({
     required String serverId,
@@ -12,6 +14,11 @@ abstract interface class PlaybackProgressRepository {
   });
 
   Future<Map<String, int>> loadAll({
+    required String serverId,
+    required String userId,
+  });
+
+  Future<Map<String, SavedPlaybackProgress>> loadAllEntries({
     required String serverId,
     required String userId,
   });
@@ -42,10 +49,23 @@ class PreferencesPlaybackProgressRepository
     required String serverId,
     required String userId,
     required String itemId,
-  }) => preferences.getInt(_key(serverId, userId, itemId));
+  }) async {
+    final key = _key(serverId, userId, itemId);
+    final values = await preferences.getAll(allowList: {key});
+    return _decode(values[key])?.positionTicks;
+  }
 
   @override
   Future<Map<String, int>> loadAll({
+    required String serverId,
+    required String userId,
+  }) async {
+    final entries = await loadAllEntries(serverId: serverId, userId: userId);
+    return entries.map((id, entry) => MapEntry(id, entry.positionTicks));
+  }
+
+  @override
+  Future<Map<String, SavedPlaybackProgress>> loadAllEntries({
     required String serverId,
     required String userId,
   }) async {
@@ -53,9 +73,10 @@ class PreferencesPlaybackProgressRepository
     final values = await preferences.getAll();
     return {
       for (final entry in values.entries)
-        if (entry.key.startsWith(prefix) && entry.value is int)
-          Uri.decodeComponent(entry.key.substring(prefix.length)):
-              entry.value! as int,
+        if (entry.key.startsWith(prefix))
+          Uri.decodeComponent(entry.key.substring(prefix.length)): ?_decode(
+            entry.value,
+          ),
     };
   }
 
@@ -65,7 +86,10 @@ class PreferencesPlaybackProgressRepository
     required String userId,
     required String itemId,
     required int positionTicks,
-  }) => preferences.setInt(_key(serverId, userId, itemId), positionTicks);
+  }) => preferences.setString(
+    _key(serverId, userId, itemId),
+    '$positionTicks:${DateTime.now().microsecondsSinceEpoch}',
+  );
 
   @override
   Future<void> clearIfMatches({
@@ -75,9 +99,26 @@ class PreferencesPlaybackProgressRepository
     required int positionTicks,
   }) async {
     final key = _key(serverId, userId, itemId);
-    if (await preferences.getInt(key) == positionTicks) {
+    final values = await preferences.getAll(allowList: {key});
+    if (_decode(values[key])?.positionTicks == positionTicks) {
       await preferences.remove(key);
     }
+  }
+
+  static SavedPlaybackProgress? _decode(Object? value) {
+    // Older releases wrote only ticks. Keep those positions without inventing
+    // a last-played date for them.
+    if (value is int) return (positionTicks: value, lastPlayedAt: null);
+    if (value is! String) return null;
+    final parts = value.split(':');
+    if (parts.length != 2) return null;
+    final ticks = int.tryParse(parts.first);
+    final micros = int.tryParse(parts.last);
+    if (ticks == null || micros == null) return null;
+    return (
+      positionTicks: ticks,
+      lastPlayedAt: DateTime.fromMicrosecondsSinceEpoch(micros, isUtc: true),
+    );
   }
 
   static String _key(String serverId, String userId, String itemId) =>
@@ -113,6 +154,17 @@ extension PlaybackProgressOverlay on PlaybackProgressRepository {
   }) async {
     try {
       return await loadAll(serverId: serverId, userId: userId);
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<Map<String, SavedPlaybackProgress>> tryLoadAllEntries({
+    required String serverId,
+    required String userId,
+  }) async {
+    try {
+      return await loadAllEntries(serverId: serverId, userId: userId);
     } catch (_) {
       return const {};
     }

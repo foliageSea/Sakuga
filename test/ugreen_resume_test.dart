@@ -22,8 +22,7 @@ class _Client extends FakeMediaServerClient {
         ),
       );
 
-  @override
-  Future<List<MediaItem>> resume(String userId, {int limit = 12}) async => [
+  late List<MediaItem> remote = [
     for (final id in ['both', 'completed', 'remote'])
       MediaItem(
         id: id,
@@ -34,11 +33,100 @@ class _Client extends FakeMediaServerClient {
   ];
 
   @override
+  Future<List<MediaItem>> resume(String userId, {int limit = 12}) async =>
+      remote;
+
+  @override
   Future<MediaItem> item(String userId, String itemId) async =>
       MediaItem(id: itemId, name: itemId, type: MediaType.movie);
 }
 
+class _Progress extends Fake implements PlaybackProgressRepository {
+  Map<String, SavedPlaybackProgress> entries = {};
+
+  @override
+  Future<Map<String, SavedPlaybackProgress>> loadAllEntries({
+    required String serverId,
+    required String userId,
+  }) async => entries;
+}
+
 void main() {
+  test(
+    'refresh keeps a stable order when NAS and local ordering change',
+    () async {
+      final tiedDate = DateTime.utc(2026, 1, 2);
+      final repository = _Progress()
+        ..entries = {
+          'local-legacy': (positionTicks: 70000000, lastPlayedAt: null),
+          'local-recent': (
+            positionTicks: 90000000,
+            lastPlayedAt: DateTime.utc(2026, 1, 3),
+          ),
+          'local-tied': (positionTicks: 80000000, lastPlayedAt: tiedDate),
+        };
+      final client = _Client()
+        ..remote = [
+          const MediaItem(
+            id: 'remote-undated',
+            name: '',
+            type: MediaType.movie,
+          ),
+          MediaItem(
+            id: 'nas-tied',
+            name: '',
+            type: MediaType.movie,
+            lastPlayedAt: tiedDate,
+          ),
+          MediaItem(
+            id: 'nas-latest',
+            name: '',
+            type: MediaType.movie,
+            lastPlayedAt: DateTime.utc(2026, 1, 4),
+          ),
+        ];
+      final container = ProviderContainer.test(
+        overrides: [
+          playbackProgressRepositoryProvider.overrideWithValue(repository),
+          libraryViewsProvider.overrideWith(
+            (ref) async =>
+                LibraryData(client: client, userId: 'user', views: const []),
+          ),
+        ],
+      );
+      container.listen(resumeItemsProvider, (_, _) {});
+      Future<List<String>> order() async => [
+        for (final item in await container.read(resumeItemsProvider.future))
+          item.id,
+      ];
+      const expected = [
+        'nas-latest',
+        'local-recent',
+        'local-tied',
+        'nas-tied',
+        'local-legacy',
+        'remote-undated',
+      ];
+      expect(await order(), expected);
+
+      client.remote = client.remote.reversed.toList();
+      repository.entries = Map.fromEntries(
+        repository.entries.entries.toList().reversed,
+      );
+      container.invalidate(resumeItemsProvider);
+      expect(await order(), expected);
+
+      repository.entries['local-legacy'] = (
+        positionTicks: 71000000,
+        lastPlayedAt: DateTime.utc(2026, 1, 5),
+      );
+      container.invalidate(resumeItemsProvider);
+      expect(await order(), [
+        'local-legacy',
+        ...expected.where((id) => id != 'local-legacy'),
+      ]);
+    },
+  );
   test(
     'UGREEN resumes local items, deduplicates and hides completed items',
     () async {

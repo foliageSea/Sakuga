@@ -76,6 +76,10 @@ class MediaBrowserMapper {
       parentIndexNumber: (json['ParentIndexNumber'] as num?)?.toInt(),
       played: userData['Played'] == true,
       playbackPosition: _duration(userData['PlaybackPositionTicks']),
+      lastPlayedAt: switch (userData['LastPlayedDate']) {
+        final String date => DateTime.tryParse(date),
+        _ => null,
+      },
       reportedPlayedPercentage: (userData['PlayedPercentage'] as num?)
           ?.toDouble(),
       primaryImageAspectRatio: (json['PrimaryImageAspectRatio'] as num?)
