@@ -7,3 +7,5 @@ icons_launcher:
       adaptive_foreground_image: assets/icons/sakuga-foreground.png
     macos:
       enable: true
+    windows:
+      enable: true
