@@ -168,4 +168,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release create "$RELEASE_TAG" --verify-tag --generate-notes \
-            dist/*.apk dist/*.dmg dist/*.zip
+            dist/*.apk dist/*.dmg dist/*-windows-x64.zip dist/*-windows-x64-setup.exe

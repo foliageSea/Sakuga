@@ -36,6 +36,10 @@ jobs:
             echo 'The selected ref does not contain the Windows runner. Use a ref that includes Windows support.' >&2
             exit 1
           fi
+          if [[ ! -f tool/build_windows_installer.ps1 ]]; then
+            echo 'The selected ref predates Windows installer support. Use a ref that includes the installer.' >&2
+            exit 1
+          fi
           version=$(bash tool/release.sh --version)
           name=${version%+*}
           number=${version##*+}
@@ -55,6 +59,48 @@ jobs:
         run: |
           flutter build windows --release --build-name="$env:BUILD_NAME" --build-number="$env:BUILD_NUMBER"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build Windows installer
+        shell: pwsh
+        env:
+          BUILD_NAME: ${{ steps.version.outputs.name }}
+          BUILD_NUMBER: ${{ steps.version.outputs.number }}
+        run: |
+          ./tool/build_windows_installer.ps1 -BuildName $env:BUILD_NAME -BuildNumber $env:BUILD_NUMBER
+      - name: Test Windows installer and uninstaller
+        timeout-minutes: 5
+        shell: pwsh
+        env:
+          BUILD_NAME: ${{ steps.version.outputs.name }}
+          BUILD_NUMBER: ${{ steps.version.outputs.number }}
+        run: |
+          $setup = (Resolve-Path "dist/Sakuga-$env:BUILD_NAME-$env:BUILD_NUMBER-windows-x64-setup.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP 'Sakuga installer smoke test'
+          $installLog = Join-Path $env:RUNNER_TEMP 'sakuga-install.log'
+          $uninstallLog = Join-Path $env:RUNNER_TEMP 'sakuga-uninstall.log'
+          function Invoke-Setup([string]$Exe, [string[]]$Options, [string]$Log) {
+            $result = Start-Process -FilePath $Exe -ArgumentList ($Options + @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', ('/LOG="{0}"' -f $Log))) -PassThru -Wait
+            if ($result.ExitCode -ne 0) {
+              if (Test-Path -LiteralPath $Log) { Get-Content -LiteralPath $Log }
+              throw "Installer process exited with code $($result.ExitCode): $Exe"
+            }
+          }
+          Invoke-Setup $setup @('/SP-', ('/DIR="{0}"' -f $installDir)) $installLog
+          try {
+            $bundle = (Resolve-Path 'build/windows/x64/runner/Release').Path
+            $files = Get-ChildItem -LiteralPath $bundle -File -Recurse -Force | ForEach-Object {
+              [IO.Path]::GetRelativePath($bundle, $_.FullName)
+            }
+            foreach ($file in ($files + @('LICENSE', 'THIRD_PARTY_NOTICES.md'))) {
+              if (!(Test-Path -LiteralPath (Join-Path $installDir $file) -PathType Leaf)) {
+                throw "Missing installed file: $file"
+              }
+            }
+          } finally {
+            Invoke-Setup (Join-Path $installDir 'unins000.exe') @() $uninstallLog
+          }
+          if (Test-Path -LiteralPath (Join-Path $installDir 'Sakuga.exe')) {
+            throw 'Sakuga.exe remains after uninstall.'
+          }
       - name: Package and verify Windows ZIP
         shell: pwsh
         env:
@@ -99,6 +145,8 @@ jobs:
       - uses: actions/upload-artifact@v6
         with:
           name: windows-release
-          path: dist/*.zip
+          path: |
+            dist/*-windows-x64.zip
+            dist/*-windows-x64-setup.exe
           if-no-files-found: error
           overwrite: true

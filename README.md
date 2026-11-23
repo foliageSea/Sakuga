@@ -155,6 +155,19 @@ fvm flutter build windows --release
 
 Windows 首版不提供播放器的截图复制及 GPU 用量显示。
 
+#### Windows 安装包（EXE）
+
+安装包不需要管理员权限，默认安装到当前用户的「本地应用数据 → Programs → Sakuga」，创建开始菜单快捷方式，也可选建桌面快捷方式。新版本可覆盖安装；可通过 Windows「已安装的应用」卸载，卸载不会删除用户设置。安装包与便携 ZIP 均未签名，可能触发 SmartScreen；安装包不包含 MSVC 运行库，缺少时请安装上方链接中的微软官方 x64 运行库。
+
+本地打包需安装 [Inno Setup 6.3 或更新的 6.x 版本](https://jrsoftware.org/isdl.php) 和 PowerShell 7。在项目根目录运行，下列版本号和构建号应与 Flutter 构建参数保持一致：
+
+```powershell
+fvm flutter build windows --release --build-name=0.1.5 --build-number=6
+./tool/build_windows_installer.ps1 -BuildName 0.1.5 -BuildNumber 6
+```
+
+[打包脚本](<tool/build_windows_installer.ps1>) 不会重新编译 Flutter，输出为 `dist/Sakuga-<版本>-<构建号>-windows-x64-setup.exe`。若未找到 Inno Setup，可用 `-IsccPath` 指定编译器路径。
+
 ### macOS DMG
 
 在 macOS 上安装 Xcode（完成首次启动配置）及 FVM 后执行：
@@ -245,10 +258,10 @@ tool/release.sh 0.1.1
 
 脚本会把 `pubspec.yaml` 的 `0.1.0+1` 更新为 `0.1.1+2`，提交版本变更，并将当前分支和 `v0.1.1` 标签一并推送到 `origin`。如果推送失败，可用同一版本号重试，不会再次增加构建号。不传版本号时，只按 `pubspec.yaml` 中已提交的版本创建并推送标签，不修改文件。
 
-[Release 工作流](<.github/workflows/release.yml>)会并行构建 Android arm64 APK、macOS Apple Silicon DMG 和 Windows x64 ZIP。三个构建都成功后才会创建 GitHub Release、生成发布说明并上传产物。失败时可在 Actions 页面重跑失败的任务，无需重新打标签。
-若标签已推送但没有触发构建，可在 **Release → Run workflow** 中填写包含 Windows 支持的已有发布标签手动运行；不为旧标签补构建 Windows 包。若只想验证 Windows，可在 [Windows Build 工作流](<.github/workflows/windows.yml>)的 **Run workflow** 中选择包含 Windows 支持的分支，仅生成可下载的 `windows-release` 构建产物，不创建 GitHub Release。
+[Release 工作流](<.github/workflows/release.yml>)会并行构建 Android arm64 APK、macOS Apple Silicon DMG 和 Windows x64 安装包（EXE）及便携包（ZIP）。三个平台都成功后才会创建 GitHub Release、生成发布说明并上传产物。失败时可在 Actions 页面重跑失败的任务，无需重新打标签。
+若标签已推送但没有触发构建，可在 **Release → Run workflow** 中填写包含 Windows 安装器支持的已有发布标签手动运行；不为旧标签补发安装包。若只想验证 Windows，可在 [Windows Build 工作流](<.github/workflows/windows.yml>)的 **Run workflow** 中选择包含 Windows 支持的分支，仅生成可下载的 `windows-release` 构建产物，不创建 GitHub Release。
 
-例如 `0.1.0+1` 会发布到 `v0.1.0`，产物命名为 `Sakuga-0.1.0-1-android-arm64-v8a.apk`、`Sakuga-0.1.0-1-macos-arm64.dmg` 和 `Sakuga-0.1.0-1-windows-x64.zip`。Android 沿用项目现有的发布签名；macOS 仍是 ad-hoc 签名，未做 Apple 公证，下载后可能受到 Gatekeeper 限制。
+例如 `0.1.0+1` 会发布到 `v0.1.0`，产物命名为 `Sakuga-0.1.0-1-android-arm64-v8a.apk`、`Sakuga-0.1.0-1-macos-arm64.dmg`、`Sakuga-0.1.0-1-windows-x64-setup.exe` 和 `Sakuga-0.1.0-1-windows-x64.zip`。Android 沿用项目现有的发布签名；macOS 仍是 ad-hoc 签名，未做 Apple 公证，下载后可能受到 Gatekeeper 限制。
 
 ## 应用图标
 
