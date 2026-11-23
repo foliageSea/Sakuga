@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,7 @@ import 'package:forui/forui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:sakuga/app/theme.dart';
 import 'package:sakuga/core/settings/settings.dart';
+import 'package:sakuga/core/window/desktop_window.dart';
 import 'package:sakuga/data/media_server/media_models.dart';
 import 'package:sakuga/data/media_server/server_profile.dart';
 import 'package:sakuga/features/detail/detail_providers.dart';
@@ -14,6 +16,7 @@ import 'package:sakuga/features/library/library_providers.dart';
 import 'package:sakuga/features/player/player_controls.dart';
 import 'package:sakuga/features/player/player_controls_controller.dart';
 import 'package:sakuga/features/player/player_episode_drawer.dart';
+import 'package:sakuga/features/player/player_window_drag_region.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
 
 import 'fakes.dart';
@@ -462,6 +465,169 @@ void main() {
   );
 
   testWidgets(
+    'player title moves the desktop window without taking video gestures',
+    (tester) async {
+      final window = _PlayerTestWindow();
+      final controller = _ControlsController()..playing = true;
+      final itemId = ValueNotifier<String?>(null);
+      final switching = ValueNotifier(false);
+      final fullscreen = ValueNotifier(false);
+      final title = ValueNotifier<String?>('Episode title');
+      addTearDown(window.dispose);
+      addTearDown(controller.dispose);
+      addTearDown(itemId.dispose);
+      addTearDown(switching.dispose);
+      addTearDown(fullscreen.dispose);
+      addTearDown(title.dispose);
+      final container = ProviderContainer(
+        overrides: [
+          desktopWindowProvider.overrideWithValue(window),
+          libraryViewsProvider.overrideWith(
+            (ref) async => LibraryData(
+              client: FakeMediaServerClient(
+                server: const ServerProfile(
+                  id: 'desktop-test',
+                  name: 'Desktop test',
+                  baseUrl: 'https://media.example',
+                ),
+              ),
+              userId: 'user',
+              views: const [],
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      var videoFullscreenToggles = 0;
+      var menuPresses = 0;
+      const dragKey = ValueKey('test-player-drag');
+      const menuKey = ValueKey('test-player-menu');
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            locale: const Locale('en'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              ...FLocalizations.localizationsDelegates,
+            ],
+            builder: (context, child) => FTheme(
+              data: createAppTheme(
+                const AppSettings(),
+                brightness: Brightness.dark,
+                touch: false,
+              ),
+              child: FToaster(child: child!),
+            ),
+            home: ValueListenableBuilder(
+              valueListenable: fullscreen,
+              builder: (context, fullscreen, _) => PlayerControls(
+                controller: controller,
+                onToggleFullscreen: () async => videoFullscreenToggles++,
+                onExitFullscreen: () async {},
+                fullscreen: fullscreen,
+                header: Row(
+                  children: [
+                    Expanded(
+                      child: PlayerWindowDragRegion(
+                        fullscreen: fullscreen,
+                        child: ValueListenableBuilder(
+                          valueListenable: title,
+                          builder: (context, title, _) => SizedBox(
+                            key: dragKey,
+                            height: 36,
+                            child: title == null ? null : Text(title),
+                          ),
+                        ),
+                      ),
+                    ),
+                    FButton(
+                      key: menuKey,
+                      onPress: () => menuPresses++,
+                      child: const Text('Menu'),
+                    ),
+                  ],
+                ),
+                itemId: itemId,
+                switching: switching,
+                onSelectEpisode: (_) async {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final dragRegion = find.byKey(dragKey);
+      final center = tester.getCenter(dragRegion);
+      final titlePoint = tester.getCenter(find.text('Episode title'));
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: const Offset(400, 200));
+      addTearDown(mouse.removePointer);
+
+      Future<void> doubleClick(Offset point) async {
+        await mouse.moveTo(point);
+        await tester.pumpAndSettle();
+        await tester.tapAt(point, kind: PointerDeviceKind.mouse);
+        await tester.pump(const Duration(milliseconds: 60));
+        await tester.tapAt(point, kind: PointerDeviceKind.mouse);
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> drag(Offset point) async {
+        await mouse.moveTo(point);
+        await tester.pumpAndSettle();
+        await mouse.down(point);
+        await mouse.moveBy(const Offset(40, 0));
+        await mouse.up();
+        await tester.pumpAndSettle();
+      }
+
+      await drag(center);
+      expect(window.drags, 1);
+      await doubleClick(titlePoint);
+      expect(window.maximized, isTrue);
+      await doubleClick(center);
+      expect(window.maximized, isFalse);
+      expect(videoFullscreenToggles, 0);
+      await tester.tap(find.byKey(menuKey), kind: PointerDeviceKind.mouse);
+      await tester.pumpAndSettle();
+      expect(menuPresses, 1);
+
+      title.value = null;
+      await tester.pumpAndSettle();
+      await drag(center);
+      expect(window.drags, 2);
+      fullscreen.value = true;
+      await tester.pumpAndSettle();
+      await drag(center);
+      expect(window.drags, 2);
+      await doubleClick(center);
+      expect(window.maximized, isFalse);
+
+      fullscreen.value = false;
+      window.setFullscreen(true);
+      await tester.pumpAndSettle();
+      await drag(center);
+      expect(window.drags, 2);
+      await doubleClick(center);
+      expect(window.maximized, isFalse);
+      window.setFullscreen(false);
+      await tester.pumpAndSettle();
+
+      await mouse.moveTo(const Offset(400, 200));
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      expect(dragRegion.hitTestable(), findsNothing);
+      final previousVideoToggles = videoFullscreenToggles;
+      await doubleClick(const Offset(400, 200));
+      expect(videoFullscreenToggles, previousVideoToggles + 1);
+      expect(window.maximized, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
     'topLeftOverlay stays visible in top-left when controls hide and shifts below header when shown',
     (tester) async {
       final controller = _ControlsController()..playing = true;
@@ -560,6 +726,15 @@ void main() {
       container.dispose();
     },
   );
+}
+
+class _PlayerTestWindow extends FakeWindow {
+  _PlayerTestWindow() : super(available: true);
+
+  void setFullscreen(bool value) {
+    fullScreen = value;
+    notifyListeners();
+  }
 }
 
 class _ControlsController extends PlayerControlsController {

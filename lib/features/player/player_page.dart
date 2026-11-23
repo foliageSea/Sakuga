@@ -34,6 +34,7 @@ import 'player_quality.dart';
 import 'player_buffer.dart';
 import '../../core/settings/settings.dart';
 import 'player_screenshot.dart';
+import 'player_window_drag_region.dart';
 
 // This provider outlives the route so pending saves can refresh the library
 // after the player is disposed, while still respecting container disposal.
@@ -963,7 +964,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                     header: _buildHeader(item, () async {
                       if (state.isFullscreen()) await state.exitFullscreen();
                       await _exitPlayer();
-                    }),
+                    }, fullscreen: state.isFullscreen()),
                     itemId: _currentItemId,
                     switching: _switchingEpisode,
                     onSelectEpisode: _selectEpisode,
@@ -1019,7 +1020,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     );
   }
 
-  Widget _buildHeader(MediaItem? item, VoidCallback onBack) {
+  Widget _buildHeader(
+    MediaItem? item,
+    VoidCallback onBack, {
+    required bool fullscreen,
+  }) {
     final generation = _openGeneration;
     return Row(
       children: [
@@ -1036,20 +1041,31 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             color: Color(0xFFFFFFFF),
           ),
         ),
-        if (item != null) ...[
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _title(item),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: context.theme.typography.body.md.copyWith(
-                color: const Color(0xFFFFFFFF),
-              ),
+        Expanded(
+          child: PlayerWindowDragRegion(
+            fullscreen: fullscreen,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 36),
+              child: item == null
+                  ? null
+                  : Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 12),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        heightFactor: 1,
+                        child: Text(
+                          _title(item),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.theme.typography.body.md.copyWith(
+                            color: const Color(0xFFFFFFFF),
+                          ),
+                        ),
+                      ),
+                    ),
             ),
           ),
-        ] else
-          const Spacer(),
+        ),
         const SizedBox(width: 8),
         PlayerSuperResolutionMenu(
           mode: _superResolutionMode,
