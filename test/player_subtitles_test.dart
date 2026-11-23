@@ -162,8 +162,10 @@ void main() {
       expect(repository.value.subtitleBackgroundOpacity, 0.25);
       expect(repository.value.subtitleVerticalPosition, 0.2);
 
-      await tester.tap(find.bySemanticsLabel('Close'));
+      expect(find.text('Close'), findsNothing);
+      await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
+      expect(find.byType(FDialog), findsNothing);
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
       expect(

@@ -8,7 +8,6 @@ import 'package:media_kit/media_kit.dart';
 
 import '../../core/settings/settings.dart';
 import '../../shared/localization.dart';
-import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import 'player_slider.dart';
 
@@ -317,17 +316,6 @@ class _SubtitleStyleSettingsState
             value: _shadowStrength,
             onChange: (value) => setState(() => _shadowStrength = value),
             onEnd: (_) => _save(),
-          ),
-          const SizedBox(height: 20),
-          Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: FButton(
-              builder: responsiveButtonContent,
-              mainAxisSize: MainAxisSize.min,
-              variant: .outline,
-              onPress: () => Navigator.of(context).pop(),
-              child: Text(l.close),
-            ),
           ),
         ],
       ),
