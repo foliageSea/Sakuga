@@ -982,7 +982,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get seekForwardSeconds => '前进秒数（→）';
 
   @override
-  String get seekSecondsInvalid => '请输入 1 到 600 之间的整数。';
+  String seekStepperValue(int count) {
+    return '$count 秒';
+  }
 
   @override
   String get screenshotShortcut => '复制带字幕截图';

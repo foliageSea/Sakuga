@@ -1988,11 +1988,11 @@ abstract class AppLocalizations {
   /// **'Forward seconds (→)'**
   String get seekForwardSeconds;
 
-  /// No description provided for @seekSecondsInvalid.
+  /// No description provided for @seekStepperValue.
   ///
   /// In en, this message translates to:
-  /// **'Enter a whole number from 1 to 600.'**
-  String get seekSecondsInvalid;
+  /// **'{count} s'**
+  String seekStepperValue(int count);
 
   /// No description provided for @screenshotShortcut.
   ///

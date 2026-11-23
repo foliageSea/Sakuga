@@ -1,10 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 
 import '../../core/settings/settings.dart';
 import '../../shared/localization.dart';
-import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 
 Future<void> showPlayerShortcutDialog(BuildContext context) =>
@@ -13,11 +14,14 @@ Future<void> showPlayerShortcutDialog(BuildContext context) =>
       useRootNavigator: true,
       useSafeArea: true,
       builder: (context, style, animation) => FDialog(
-        constraints: const BoxConstraints.tightFor(width: 480),
+        constraints: const BoxConstraints.tightFor(width: 400),
         animation: animation,
         builder: (context, style) => const _PlayerShortcutSettings(),
       ),
     );
+
+const _minSeconds = 1;
+const _maxSeconds = 600;
 
 class _PlayerShortcutSettings extends ConsumerStatefulWidget {
   const _PlayerShortcutSettings();
@@ -29,65 +33,31 @@ class _PlayerShortcutSettings extends ConsumerStatefulWidget {
 
 class _PlayerShortcutSettingsState
     extends ConsumerState<_PlayerShortcutSettings> {
-  late final TextEditingController _backward;
-  late final TextEditingController _forward;
-  bool _backwardInvalid = false;
-  bool _forwardInvalid = false;
-  bool _saving = false;
   Object? _error;
 
-  @override
-  void initState() {
-    super.initState();
-    final settings = ref.read(settingsProvider);
-    _backward = TextEditingController(text: '${settings.seekBackwardSeconds}');
-    _forward = TextEditingController(text: '${settings.seekForwardSeconds}');
-  }
-
-  @override
-  void dispose() {
-    _backward.dispose();
-    _forward.dispose();
-    super.dispose();
-  }
-
-  int? _seconds(String input) {
-    final text = input.trim();
-    if (!RegExp(r'^[0-9]+$').hasMatch(text)) return null;
-    final value = int.tryParse(text);
-    return value != null && value >= 1 && value <= 600 ? value : null;
-  }
-
-  Future<void> _save() async {
-    if (_saving) return;
-    final backward = _seconds(_backward.text);
-    final forward = _seconds(_forward.text);
-    setState(() {
-      _backwardInvalid = backward == null;
-      _forwardInvalid = forward == null;
-      _error = null;
-    });
-    if (backward == null || forward == null) return;
-    setState(() => _saving = true);
+  Future<void> _step({required bool forward, required int delta}) async {
+    int adjust(int value) => (value + delta).clamp(_minSeconds, _maxSeconds);
     try {
       await ref
           .read(settingsProvider.notifier)
           .update(
-            (settings) => settings.copyWith(
-              seekBackwardSeconds: backward,
-              seekForwardSeconds: forward,
-            ),
+            (settings) => forward
+                ? settings.copyWith(
+                    seekForwardSeconds: adjust(settings.seekForwardSeconds),
+                  )
+                : settings.copyWith(
+                    seekBackwardSeconds: adjust(settings.seekBackwardSeconds),
+                  ),
           );
-      if (mounted) Navigator.of(context).pop();
+      if (mounted && _error != null) setState(() => _error = null);
     } catch (error) {
       if (mounted) setState(() => _error = error);
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
     final l = context.l10n;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -100,52 +70,144 @@ class _PlayerShortcutSettingsState
             style: context.theme.dialogStyle.titleTextStyle,
           ),
           const SizedBox(height: 20),
-          FTextField(
+          _SeekSecondsStepper(
             key: const ValueKey('seek-backward-seconds'),
-            control: .managed(controller: _backward),
-            label: Text(l.seekBackwardSeconds),
-            keyboardType: TextInputType.number,
-            enabled: !_saving,
-            error: _backwardInvalid ? Text(l.seekSecondsInvalid) : null,
+            label: l.seekBackwardSeconds,
+            value: settings.seekBackwardSeconds,
+            onStep: (delta) => _step(forward: false, delta: delta),
           ),
           const SizedBox(height: 16),
-          FTextField(
+          _SeekSecondsStepper(
             key: const ValueKey('seek-forward-seconds'),
-            control: .managed(controller: _forward),
-            label: Text(l.seekForwardSeconds),
-            keyboardType: TextInputType.number,
-            enabled: !_saving,
-            error: _forwardInvalid ? Text(l.seekSecondsInvalid) : null,
+            label: l.seekForwardSeconds,
+            value: settings.seekForwardSeconds,
+            onStep: (delta) => _step(forward: true, delta: delta),
           ),
           if (_error != null) ...[
             const SizedBox(height: 16),
             ErrorNotice(_error!),
           ],
-          const SizedBox(height: 20),
-          Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 8,
-            runSpacing: 8,
+        ],
+      ),
+    );
+  }
+}
+
+class _SeekSecondsStepper extends StatelessWidget {
+  const _SeekSecondsStepper({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onStep,
+  });
+
+  final String label;
+  final int value;
+  final ValueChanged<int> onStep;
+
+  @override
+  Widget build(BuildContext context) {
+    const buttonSize = 44.0;
+    const labelGap = 16.0;
+    const valuePadding = 8.0;
+    final theme = context.theme;
+    final l = context.l10n;
+    final border = BorderSide(color: theme.colors.border);
+    final labelStyle = DefaultTextStyle.of(context).style;
+    final valueStyle = labelStyle.copyWith(
+      fontWeight: FontWeight.w600,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
+    Size measure(String text, TextStyle style) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        maxLines: 1,
+      )..layout();
+      final size = painter.size;
+      painter.dispose();
+      return size;
+    }
+
+    // Reserve room for three digits so the buttons don't move as values change.
+    final valueSize = measure(l.seekStepperValue(_maxSeconds), valueStyle);
+    final width =
+        2 * buttonSize +
+        valueSize.width.ceil() +
+        2 * (valuePadding + border.width);
+    final height = math.max(buttonSize, valueSize.height.ceilToDouble() + 12);
+    final control = SizedBox(
+      width: width,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.fromBorderSide(border),
+          borderRadius: theme.style.borderRadius.md,
+        ),
+        child: SizedBox(
+          height: height,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FButton(
-                key: const ValueKey('player-shortcuts-cancel'),
-                builder: responsiveButtonContent,
-                mainAxisSize: MainAxisSize.min,
-                variant: .outline,
-                onPress: _saving ? null : () => Navigator.of(context).pop(),
-                child: Text(l.cancel),
+              SizedBox(
+                width: buttonSize,
+                child: FButton.icon(
+                  variant: .ghost,
+                  semanticsLabel: '$label −1',
+                  onPress: value > _minSeconds ? () => onStep(-1) : null,
+                  child: const Icon(FLucideIcons.minus, size: 16),
+                ),
               ),
-              FButton(
-                key: const ValueKey('player-shortcuts-save'),
-                builder: responsiveButtonContent,
-                mainAxisSize: MainAxisSize.min,
-                onPress: _saving ? null : _save,
-                child: Text(l.save),
+              Expanded(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border(left: border, right: border),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: valuePadding,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(l.seekStepperValue(value), style: valueStyle),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: buttonSize,
+                child: FButton.icon(
+                  variant: .ghost,
+                  semanticsLabel: '$label +1',
+                  onPress: value < _maxSeconds ? () => onStep(1) : null,
+                  child: const Icon(FLucideIcons.plus, size: 16),
+                ),
               ),
             ],
           ),
-        ],
+        ),
       ),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final labelText = Text(label);
+        if (measure(label, labelStyle).width + labelGap + width >
+            constraints.maxWidth) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 8,
+            children: [labelText, control],
+          );
+        }
+        return Row(
+          spacing: labelGap,
+          children: [
+            Expanded(child: labelText),
+            control,
+          ],
+        );
+      },
     );
   }
 }

@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -18,19 +17,33 @@ import 'widget_test.dart' show appContainer, settle;
 
 const _backwardKey = ValueKey('seek-backward-seconds');
 const _forwardKey = ValueKey('seek-forward-seconds');
-const _saveKey = ValueKey('player-shortcuts-save');
-const _cancelKey = ValueKey('player-shortcuts-cancel');
+Finder _stepper(Key key, {required bool increase}) => find.ancestor(
+  of: find.descendant(
+    of: find.byKey(key),
+    matching: find.byIcon(increase ? FLucideIcons.plus : FLucideIcons.minus),
+  ),
+  matching: find.byType(FButton),
+);
 
-Finder _input(Key key) =>
-    find.descendant(of: find.byKey(key), matching: find.byType(EditableText));
+Finder _value(Key key, int seconds) =>
+    find.descendant(of: find.byKey(key), matching: find.text('$seconds s'));
 
-String _text(WidgetTester tester, Key key) =>
-    tester.widget<EditableText>(_input(key)).controller.text;
+Future<void> _step(
+  WidgetTester tester,
+  Key key, {
+  required bool increase,
+}) async {
+  final button = _stepper(key, increase: increase);
+  await tester.ensureVisible(button);
+  await tester.tap(button);
+  await tester.pumpAndSettle();
+}
 
 Future<ProviderContainer> _openDialog(
   WidgetTester tester,
   MemorySettings repository, {
   double textScale = 1,
+  Locale locale = const Locale('en'),
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -48,7 +61,7 @@ Future<ProviderContainer> _openDialog(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
-        locale: const Locale('en'),
+        locale: locale,
         localizationsDelegates: const [
           AppLocalizations.delegate,
           ...FLocalizations.localizationsDelegates,
@@ -76,14 +89,6 @@ Future<ProviderContainer> _openDialog(
   await tester.tap(find.text('Open'));
   await tester.pumpAndSettle();
   return container;
-}
-
-Future<void> _save(WidgetTester tester) async {
-  await tester.pumpAndSettle();
-  await tester.ensureVisible(find.byKey(_saveKey));
-  await tester.pumpAndSettle();
-  await tester.tap(find.byKey(_saveKey));
-  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -157,7 +162,7 @@ void main() {
     }
   });
 
-  testWidgets('save persists both intervals only after explicit submission', (
+  testWidgets('steppers save immediately and retain values after dismissal', (
     tester,
   ) async {
     final repository = MemorySettings()
@@ -166,126 +171,129 @@ void main() {
         seekForwardSeconds: 21,
       );
     final container = await _openDialog(tester, repository);
-    expect(_text(tester, _backwardKey), '8');
-    expect(_text(tester, _forwardKey), '21');
+    expect(_value(_backwardKey, 8), findsOneWidget);
+    expect(_value(_forwardKey, 21), findsOneWidget);
     final l = AppLocalizations.of(tester.element(find.byType(FDialog)));
+    expect(find.text(l.cancel), findsNothing);
+    expect(find.text(l.save), findsNothing);
+    expect(find.byType(EditableText), findsNothing);
     expect(find.text('S'), findsNothing);
-    expect(
-      find.text(
-        defaultTargetPlatform == TargetPlatform.android
-            ? l.saveScreenshotShortcut
-            : l.screenshotShortcut,
-      ),
-      findsNothing,
-    );
-    await tester.enterText(_input(_backwardKey), '1');
-    await tester.enterText(_input(_forwardKey), '600');
-    expect(repository.value.seekBackwardSeconds, 8);
+    expect(find.text(l.screenshotShortcut), findsNothing);
+    expect(find.text(l.saveScreenshotShortcut), findsNothing);
+
+    await _step(tester, _backwardKey, increase: false);
+    expect(repository.value.seekBackwardSeconds, 7);
     expect(repository.value.seekForwardSeconds, 21);
-    // Saving must preserve settings changed elsewhere while this dialog is open.
     await container
         .read(settingsProvider.notifier)
         .update((settings) => settings.copyWith(subtitleFontSize: 48));
-    await _save(tester);
+    final plus = _stepper(_forwardKey, increase: true);
+    await tester.tap(plus);
+    await tester.tap(plus);
+    await tester.pumpAndSettle();
+    expect(repository.value.seekBackwardSeconds, 7);
+    expect(repository.value.seekForwardSeconds, 23);
+    expect(repository.value.subtitleFontSize, 48);
+    expect(find.byType(FDialog), findsOneWidget);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
     expect(find.byType(FDialog), findsNothing);
-    final restored = AppSettings.fromJson(
-      jsonDecode(jsonEncode((await repository.load()).toJson()))
-          as Map<String, dynamic>,
-    );
-    expect(restored.seekBackwardSeconds, 1);
-    expect(restored.seekForwardSeconds, 600);
-    expect(restored.subtitleFontSize, 48);
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
-    expect(_text(tester, _backwardKey), '1');
-    expect(_text(tester, _forwardKey), '600');
+    expect(_value(_backwardKey, 7), findsOneWidget);
+    expect(_value(_forwardKey, 23), findsOneWidget);
   });
 
-  testWidgets('invalid input remains editable and cannot save either field', (
+  testWidgets('wide rows align compact steppers and reserve digit width', (
     tester,
   ) async {
-    final repository = MemorySettings();
-    final initial = repository.value;
+    final repository = MemorySettings()
+      ..value = const AppSettings(
+        seekBackwardSeconds: 9,
+        seekForwardSeconds: 99,
+      );
+    await _openDialog(tester, repository, locale: const Locale('zh'));
+    final content = tester.getRect(
+      find.descendant(
+        of: find.byType(FDialog),
+        matching: find.byType(SingleChildScrollView),
+      ),
+    );
+    final label = tester.getRect(find.text('后退秒数（←）'));
+    final minus = _stepper(_backwardKey, increase: false);
+    final plus = _stepper(_backwardKey, increase: true);
+    final before = tester.getRect(plus);
+    expect(content.width, closeTo(400, 2));
+    expect(tester.getCenter(minus).dy, closeTo(label.center.dy, 0.1));
+    expect(tester.getRect(minus).left, greaterThan(label.right));
+    expect(tester.getRect(minus).width, greaterThanOrEqualTo(44));
+    expect(
+      tester.getRect(_stepper(_forwardKey, increase: true)).left,
+      before.left,
+    );
+    expect(find.text('9 秒'), findsOneWidget);
+    await _step(tester, _backwardKey, increase: true);
+    expect(find.text('10 秒'), findsOneWidget);
+    expect(tester.getRect(plus), before);
+  });
+
+  testWidgets('steppers stop at one and six hundred seconds', (tester) async {
+    final repository = MemorySettings()
+      ..value = const AppSettings(
+        seekBackwardSeconds: 2,
+        seekForwardSeconds: 599,
+      );
     await _openDialog(tester, repository);
-    final l = AppLocalizations.of(tester.element(find.byType(FDialog)));
-    await tester.enterText(_input(_forwardKey), '37');
-    for (final invalid in ['', '0', '-1', '601', '1.5', 'abc', '0x10']) {
-      await tester.enterText(_input(_backwardKey), invalid);
-      await _save(tester);
-      expect(find.text(l.seekSecondsInvalid), findsOneWidget);
-      expect(_text(tester, _backwardKey), invalid);
-      expect(_text(tester, _forwardKey), '37');
-      expect(repository.value, same(initial));
-    }
-    await tester.enterText(_input(_backwardKey), '12');
-    await tester.enterText(_input(_forwardKey), '4.0');
-    await _save(tester);
-    expect(find.text(l.seekSecondsInvalid), findsOneWidget);
-    expect(_text(tester, _backwardKey), '12');
-    expect(_text(tester, _forwardKey), '4.0');
-    expect(repository.value, same(initial));
-    await tester.enterText(_input(_forwardKey), '25');
-    await _save(tester);
-    expect(find.byType(FDialog), findsNothing);
-    expect(repository.value.seekBackwardSeconds, 12);
-    expect(repository.value.seekForwardSeconds, 25);
+    await _step(tester, _backwardKey, increase: false);
+    await _step(tester, _forwardKey, increase: true);
+    expect(_value(_backwardKey, 1), findsOneWidget);
+    expect(_value(_forwardKey, 600), findsOneWidget);
+    expect(
+      tester.widget<FButton>(_stepper(_backwardKey, increase: false)).onPress,
+      isNull,
+    );
+    expect(
+      tester.widget<FButton>(_stepper(_forwardKey, increase: true)).onPress,
+      isNull,
+    );
+    expect(repository.value.seekBackwardSeconds, 1);
+    expect(repository.value.seekForwardSeconds, 600);
   });
 
-  testWidgets('cancel discards unsaved edits', (tester) async {
-    final repository = MemorySettings();
-    final initial = repository.value;
-    final container = await _openDialog(tester, repository);
-    await tester.enterText(_input(_backwardKey), '90');
-    await tester.enterText(_input(_forwardKey), '180');
-    await tester.tap(find.byKey(_cancelKey));
-    await tester.pumpAndSettle();
-    expect(find.byType(FDialog), findsNothing);
-    expect(repository.value, same(initial));
-    expect(container.read(settingsProvider), same(initial));
-    await tester.tap(find.text('Open'));
-    await tester.pumpAndSettle();
-    expect(_text(tester, _backwardKey), '5');
-    expect(_text(tester, _forwardKey), '5');
-  });
-
-  testWidgets('failed save keeps edits and allows retry', (tester) async {
+  testWidgets('failed step retains the saved value and allows retry', (
+    tester,
+  ) async {
     final repository = MemorySettings()..fail = true;
     final initial = repository.value;
     final container = await _openDialog(tester, repository);
-    await tester.enterText(_input(_backwardKey), '15');
-    await tester.enterText(_input(_forwardKey), '45');
-    await _save(tester);
+    await _step(tester, _backwardKey, increase: true);
     expect(find.byType(ErrorNotice), findsOneWidget);
-    expect(_text(tester, _backwardKey), '15');
-    expect(_text(tester, _forwardKey), '45');
+    expect(_value(_backwardKey, 5), findsOneWidget);
     expect(repository.value, same(initial));
     expect(container.read(settingsProvider), same(initial));
     repository.fail = false;
-    await _save(tester);
-    expect(find.byType(FDialog), findsNothing);
-    expect(repository.value.seekBackwardSeconds, 15);
-    expect(repository.value.seekForwardSeconds, 45);
-    expect(tester.takeException(), isNull);
+    await _step(tester, _backwardKey, increase: true);
+    expect(find.byType(ErrorNotice), findsNothing);
+    expect(_value(_backwardKey, 6), findsOneWidget);
+    expect(repository.value.seekBackwardSeconds, 6);
   });
 
-  testWidgets('narrow dialog supports large text and scrolls to save', (
-    tester,
-  ) async {
+  testWidgets('narrow dialog supports large text', (tester) async {
     tester.view.physicalSize = const Size(320, 480);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final repository = MemorySettings();
     await _openDialog(tester, repository, textScale: 2);
+    final label = tester.getRect(find.text('Backward seconds (←)'));
+    final button = tester.getRect(_stepper(_backwardKey, increase: true));
+    expect(button.top, greaterThan(label.bottom));
+    await _step(tester, _backwardKey, increase: true);
+    await _step(tester, _forwardKey, increase: false);
     expect(tester.takeException(), isNull);
-    await tester.ensureVisible(_input(_backwardKey));
-    await tester.enterText(_input(_backwardKey), '20');
-    await tester.ensureVisible(_input(_forwardKey));
-    await tester.enterText(_input(_forwardKey), '40');
-    await _save(tester);
-    expect(tester.takeException(), isNull);
-    expect(repository.value.seekBackwardSeconds, 20);
-    expect(repository.value.seekForwardSeconds, 40);
+    expect(repository.value.seekBackwardSeconds, 6);
+    expect(repository.value.seekForwardSeconds, 4);
   });
 
   testWidgets('General settings opens the shared shortcut dialog', (
@@ -309,8 +317,9 @@ void main() {
     expect(find.byKey(_backwardKey), findsOneWidget);
     expect(find.byKey(_forwardKey), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byKey(_cancelKey));
+    await tester.tapAt(const Offset(10, 10));
     await settle(tester);
+    expect(find.byType(FDialog), findsNothing);
     await tester.pumpWidget(const SizedBox());
     await settle(tester);
   });

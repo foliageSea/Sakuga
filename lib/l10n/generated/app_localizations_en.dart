@@ -1020,7 +1020,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seekForwardSeconds => 'Forward seconds (→)';
 
   @override
-  String get seekSecondsInvalid => 'Enter a whole number from 1 to 600.';
+  String seekStepperValue(int count) {
+    return '$count s';
+  }
 
   @override
   String get screenshotShortcut => 'Copy screenshot with subtitles';
