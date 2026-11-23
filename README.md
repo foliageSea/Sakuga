@@ -273,13 +273,16 @@ test/           单元与 Widget 测试
 - 界面不写注释性/说明性文本，只保留功能所需文案。
 - 播放器 UI 自绘，使用 Forui 主题 token；业务页面使用 Forui 组件。
 - 播放/超分/平台差异收敛在 `PlayerEngine` 与 `PlatformCapabilities` 后面。
-- 超分辨率实现参考了 [Kazumi](https://github.com/Predidit/Kazumi)，感谢 Kazumi 开发者和贡献者的开源分享。
 
 ## 许可
 
 Sakuga 原创代码采用 [Apache License 2.0](LICENSE)。第三方依赖、字体、着色器和图标继续适用各自的条款，见[第三方许可与署名](THIRD_PARTY_NOTICES.md)。
 
 Sakuga 是非官方媒体服务器客户端。
+
+## 致谢
+
+超分辨率实现参考了 [Kazumi](https://github.com/Predidit/Kazumi)，感谢 Kazumi 开发者和贡献者的开源分享。
 
 ## 文档
 
