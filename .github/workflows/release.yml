@@ -47,6 +47,7 @@ jobs:
   android:
     needs: version
     runs-on: ubuntu-24.04
+    environment: android-release
     env:
       BUILD_NAME: ${{ needs.version.outputs.name }}
       BUILD_NUMBER: ${{ needs.version.outputs.number }}
@@ -70,7 +71,27 @@ jobs:
           printf 'ANDROID_NDK_HOME=%s/ndk/%s\n' "$ANDROID_HOME" "$NDK_VERSION" >> "$GITHUB_ENV"
       - name: Build Android arm64 release APK
         shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          # Do not rebuild historical tags that still use the retired credentials.
+          if [[ -n "$(git ls-files -- android/key.properties android/sakuga-release.jks)" ]]; then
+            echo 'The selected tag still tracks legacy Android signing files. Use a tag with the signing migration.' >&2
+            exit 1
+          fi
+          : "${ANDROID_KEYSTORE_BASE64:?Missing ANDROID_KEYSTORE_BASE64 secret}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?Missing ANDROID_KEYSTORE_PASSWORD secret}"
+          : "${ANDROID_KEY_ALIAS:?Missing ANDROID_KEY_ALIAS secret}"
+          : "${ANDROID_KEY_PASSWORD:?Missing ANDROID_KEY_PASSWORD secret}"
+          umask 077
+          ANDROID_KEYSTORE_PATH=$(mktemp "$RUNNER_TEMP/sakuga-signing.XXXXXX")
+          export ANDROID_KEYSTORE_PATH
+          trap 'rm -f -- "$ANDROID_KEYSTORE_PATH"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          unset ANDROID_KEYSTORE_BASE64
           # Exclude other ABIs without letting Flutter offset Android's versionCode.
           flutter build apk --release --target-platform android-arm64 --split-per-abi \
             --android-project-arg=force-version-code-ignoring-abi=true \

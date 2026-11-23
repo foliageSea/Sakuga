@@ -8,9 +8,9 @@ GeneratedPluginRegistrant.java
 .cxx/
 /build/
 
-# Keep other signing files local; version the project release credentials.
+# Keep release signing files out of version control.
 key.properties
-**/*.keystore
-**/*.jks
-!/key.properties
-!/sakuga-release.jks
+*.keystore
+*.jks
+*.p12
+*.pfx

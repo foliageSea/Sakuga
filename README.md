@@ -159,9 +159,18 @@ tool/build_dmg.sh --build-name=0.1.0 --build-number=2
 
 ### Android 发布签名
 
-Release 构建使用仓库中的 `android/sakuga-release.jks`，别名为 `sakuga`，密码保存在同样纳入版本控制的 `android/key.properties` 中。克隆仓库后可直接构建，无需额外配置。`storeFile` 的相对路径以 `android/` 为基准。
+**GitHub Release：** 请生成并离线备份一把新的 Android 发布密钥，不要复用原先提交过的密钥。在 GitHub 仓库的 **Settings → Environments → android-release** 中添加以下 Environment Secrets，并将该环境限制为可信发布标签（例如 `v*.*.*`）；有条件时启用人工审批。发布标签应指向经过审核且包含此签名配置的提交。
 
-缺少签名配置时 release 构建会报错；debug 构建不需要发布密钥。
+| Secret | 内容 |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | 新密钥库文件的完整 Base64 编码（Base64 不是加密） |
+| `ANDROID_KEYSTORE_PASSWORD` | 密钥库密码 |
+| `ANDROID_KEY_ALIAS` | 私钥别名 |
+| `ANDROID_KEY_PASSWORD` | 私钥密码 |
+
+Actions 只在 Android 发布构建步骤注入签名材料，缺失时构建失败。后续官方版本应继续使用同一把新密钥，不要为每次发布生成新密钥。使用旧密钥签名的侧载 APK 通常不能被新签名版本直接覆盖，用户应先备份再卸载重装。停止追踪不会从历史中移除旧凭据；对外开源前，请清理所有将公开的分支和标签，或从清理后的源码新建公开仓库。
+
+**本地构建：** debug 不需要发布密钥。需要本地 release 时，创建不提交的 `android/key.properties`，设置 `storeFile`、`storePassword`、`keyAlias` 和 `keyPassword`。使用新密钥或专门的本地测试密钥；`storeFile` 的相对路径以 `android/` 为基准。缺少签名配置时 release 构建会报错。
 
 ```sh
 fvm flutter build apk --release --target-platform android-arm64
@@ -169,7 +178,7 @@ fvm flutter build apk --release --target-platform android-arm64
 fvm flutter build appbundle --release --target-platform android-arm64
 ```
 
-APK 输出为 `build/app/outputs/flutter-apk/app-release.apk`。后续更新需继续使用仓库中的同一发布密钥。
+本地 APK 输出为 `build/app/outputs/flutter-apk/app-release.apk`。
 
 Linux（本地开发/验证，非发布目标）：
 
