@@ -16,23 +16,26 @@ Future<void> showPlayerShortcutDialog(BuildContext context) =>
       builder: (context, style, animation) => FDialog(
         constraints: const BoxConstraints.tightFor(width: 400),
         animation: animation,
-        builder: (context, style) => const _PlayerShortcutSettings(),
+        builder: (context, style) => const SingleChildScrollView(
+          padding: EdgeInsets.all(20),
+          child: PlayerShortcutSettings(),
+        ),
       ),
     );
 
 const _minSeconds = 1;
 const _maxSeconds = 600;
 
-class _PlayerShortcutSettings extends ConsumerStatefulWidget {
-  const _PlayerShortcutSettings();
+class PlayerShortcutSettings extends ConsumerStatefulWidget {
+  const PlayerShortcutSettings({super.key});
 
   @override
-  ConsumerState<_PlayerShortcutSettings> createState() =>
+  ConsumerState<PlayerShortcutSettings> createState() =>
       _PlayerShortcutSettingsState();
 }
 
 class _PlayerShortcutSettingsState
-    extends ConsumerState<_PlayerShortcutSettings> {
+    extends ConsumerState<PlayerShortcutSettings> {
   Object? _error;
 
   Future<void> _step({required bool forward, required int delta}) async {
@@ -59,36 +62,33 @@ class _PlayerShortcutSettingsState
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final l = context.l10n;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            l.playbackShortcuts,
-            style: context.theme.dialogStyle.titleTextStyle,
-          ),
-          const SizedBox(height: 20),
-          _SeekSecondsStepper(
-            key: const ValueKey('seek-backward-seconds'),
-            label: l.seekBackwardSeconds,
-            value: settings.seekBackwardSeconds,
-            onStep: (delta) => _step(forward: false, delta: delta),
-          ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l.playbackShortcuts,
+          style: context.theme.dialogStyle.titleTextStyle,
+        ),
+        const SizedBox(height: 20),
+        _SeekSecondsStepper(
+          key: const ValueKey('seek-backward-seconds'),
+          label: l.seekBackwardSeconds,
+          value: settings.seekBackwardSeconds,
+          onStep: (delta) => _step(forward: false, delta: delta),
+        ),
+        const SizedBox(height: 16),
+        _SeekSecondsStepper(
+          key: const ValueKey('seek-forward-seconds'),
+          label: l.seekForwardSeconds,
+          value: settings.seekForwardSeconds,
+          onStep: (delta) => _step(forward: true, delta: delta),
+        ),
+        if (_error != null) ...[
           const SizedBox(height: 16),
-          _SeekSecondsStepper(
-            key: const ValueKey('seek-forward-seconds'),
-            label: l.seekForwardSeconds,
-            value: settings.seekForwardSeconds,
-            onStep: (delta) => _step(forward: true, delta: delta),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            ErrorNotice(_error!),
-          ],
+          ErrorNotice(_error!),
         ],
-      ),
+      ],
     );
   }
 }

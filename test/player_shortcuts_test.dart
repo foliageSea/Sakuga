@@ -296,14 +296,15 @@ void main() {
     expect(repository.value.seekForwardSeconds, 4);
   });
 
-  testWidgets('General settings opens the shared shortcut dialog', (
+  testWidgets('General settings shows editable shortcut controls inline', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final container = appContainer();
+    final repository = MemorySettings();
+    final container = appContainer(settingsRepository: repository);
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const SakugaApp()),
@@ -312,14 +313,19 @@ void main() {
     await settle(tester);
     await tester.tap(find.text('General'));
     await settle(tester);
-    await tester.tap(find.byKey(const ValueKey('player-shortcuts-settings')));
-    await settle(tester);
-    expect(find.byKey(_backwardKey), findsOneWidget);
-    expect(find.byKey(_forwardKey), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await tester.tapAt(const Offset(10, 10));
-    await settle(tester);
+    expect(find.text('Playback shortcuts'), findsOneWidget);
+    expect(_value(_backwardKey, 5), findsOneWidget);
+    expect(_value(_forwardKey, 5), findsOneWidget);
     expect(find.byType(FDialog), findsNothing);
+
+    await _step(tester, _backwardKey, increase: false);
+    await _step(tester, _forwardKey, increase: true);
+    expect(_value(_backwardKey, 4), findsOneWidget);
+    expect(_value(_forwardKey, 6), findsOneWidget);
+    expect(repository.value.seekBackwardSeconds, 4);
+    expect(repository.value.seekForwardSeconds, 6);
+    expect(find.byType(FDialog), findsNothing);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await settle(tester);
   });
