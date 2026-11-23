@@ -13,6 +13,7 @@ import 'package:sakuga/data/media_server/media_models.dart';
 import 'package:sakuga/data/media_server/media_server_factory.dart';
 import 'package:sakuga/data/media_server/server_profile.dart';
 import 'package:sakuga/data/media_server/server_repository.dart';
+import 'package:sakuga/features/detail/detail_page.dart';
 import 'package:sakuga/features/home/home_providers.dart';
 import 'package:sakuga/features/library/library_page.dart';
 import 'package:sakuga/features/library/library_providers.dart';
@@ -35,6 +36,9 @@ class _Client extends FakeMediaServerClient {
   final bool paginated;
 
   String get itemName => server.name;
+
+  MediaItem get libraryItem =>
+      MediaItem(id: 'same-item-id', name: itemName, type: MediaType.movie);
 
   final pageStarted = Completer<void>();
   final nextPage = Completer<MediaItemsPage>();
@@ -77,9 +81,7 @@ class _Client extends FakeMediaServerClient {
       return nextPage.future;
     }
     return MediaItemsPage(
-      items: [
-        MediaItem(id: 'same-item-id', name: itemName, type: MediaType.movie),
-      ],
+      items: [libraryItem],
       totalRecordCount: paginated ? 2 : 1,
     );
   }
@@ -134,6 +136,27 @@ class _WidgetClient extends _Client {
       ),
     ];
   }
+}
+
+class _SeriesClient extends _WidgetClient {
+  _SeriesClient(super.server);
+
+  @override
+  MediaItem get libraryItem =>
+      MediaItem(id: 'same-item-id', name: itemName, type: MediaType.series);
+
+  @override
+  Future<MediaItem> item(String userId, String itemId) async => libraryItem;
+
+  @override
+  Future<List<MediaItem>> seasons(String userId, String seriesId) async => [];
+
+  @override
+  Future<List<MediaItem>> episodes(
+    String userId,
+    String seriesId, {
+    String? seasonId,
+  }) async => [];
 }
 
 Future<ProviderContainer> _pumpLibrary(
@@ -199,6 +222,46 @@ Finder _option(Finder dialog, ServerProfile server) => find.descendant(
 
 void main() {
   for (final width in [390.0, 1280.0]) {
+    testWidgets('switching servers exits series details at width $width', (
+      tester,
+    ) async {
+      final repository = MemoryServerRepository()..items = [_a, _b];
+      final container = await _pumpLibrary(tester, repository, {
+        'a': _SeriesClient(_a),
+        'b': _SeriesClient(_b),
+      }, width: width);
+      final router = container.read(routerProvider);
+      final cardLayout = width < 600 ? 'mobile' : 'desktop';
+      await tester.tap(_key('library-$cardLayout-card-same-item-id'));
+      await tester.pumpAndSettle();
+      expect(router.state.uri.path, '/library/same-item-id');
+      expect(find.byType(DetailPage), findsOneWidget);
+
+      var dialog = await _openPicker(tester);
+      await tester.tap(_option(dialog, _a));
+      await tester.pumpAndSettle();
+      expect(router.state.uri.path, '/library/same-item-id');
+
+      repository.fail = true;
+      dialog = await _openPicker(tester);
+      await tester.tap(_option(dialog, _b));
+      await tester.pumpAndSettle();
+      expect(container.read(activeServerProvider), _a);
+      expect(router.state.uri.path, '/library/same-item-id');
+
+      // Let the error toast clear the mobile header before retrying.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      repository.fail = false;
+      dialog = await _openPicker(tester);
+      await tester.tap(_option(dialog, _b));
+      await tester.pumpAndSettle();
+      expect(container.read(activeServerProvider), _b);
+      expect(router.state.uri.path, '/library');
+      expect(find.byType(DetailPage), findsNothing);
+      expect(find.text('Server B feature'), findsOneWidget);
+    });
+
     testWidgets(
       'approved library switch resets browsing state at width $width',
       (tester) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../data/media_server/server_profile.dart';
 import '../../data/media_server/server_repository.dart';
@@ -66,6 +67,12 @@ class _LibraryServerActionState extends ConsumerState<LibraryServerAction> {
     setState(() => _switching = true);
     try {
       await ref.read(serversProvider.notifier).setActive(id);
+      if (!mounted || ref.read(activeServerProvider)?.id != id) return;
+      final router = GoRouter.maybeOf(context);
+      // Item IDs belong to the old server, even if the new server reuses them.
+      if (router != null && router.state.fullPath == '/library/:itemId') {
+        router.go('/library');
+      }
     } catch (error) {
       if (mounted) notifyUser(context, failureMessage(context, error));
     } finally {
