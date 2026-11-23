@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
@@ -955,7 +957,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                       ? PlayerSubtitles(player: _player)
                       : const SizedBox.expand(),
                   controlsBuilder: (context, copyScreenshot) => PlayerControls(
-                    onScreenshot: copyScreenshot,
+                    // The image clipboard channel is not implemented on Windows.
+                    onScreenshot:
+                        defaultTargetPlatform == TargetPlatform.windows
+                        ? null
+                        : copyScreenshot,
                     controller: _controlsController,
                     gesturesEnabled: !_loading && !_exiting && _error == null,
                     onToggleFullscreen: state.toggleFullscreen,

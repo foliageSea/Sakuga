@@ -135,8 +135,16 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
+  windows:
+    needs: version
+    uses: ./.github/workflows/windows.yml
+    with:
+      ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.sha }}
+      build-name: ${{ needs.version.outputs.name }}
+      build-number: ${{ needs.version.outputs.number }}
+
   publish:
-    needs: [android, macos]
+    needs: [android, macos, windows]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -149,6 +157,10 @@ jobs:
         with:
           name: macos-release
           path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: windows-release
+          path: dist
       - name: Publish GitHub Release
         shell: bash
         env:
@@ -156,4 +168,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release create "$RELEASE_TAG" --verify-tag --generate-notes \
-            dist/*.apk dist/*.dmg
+            dist/*.apk dist/*.dmg dist/*.zip

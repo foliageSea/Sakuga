@@ -1,0 +1,104 @@
+name: Windows Build
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+      build-name:
+        type: string
+        required: true
+      build-number:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - name: Resolve Windows build version
+        id: version
+        shell: bash
+        env:
+          EXPECTED_NAME: ${{ inputs.build-name }}
+          EXPECTED_NUMBER: ${{ inputs.build-number }}
+        run: |
+          if [[ ! -f windows/CMakeLists.txt ]]; then
+            echo 'The selected ref does not contain the Windows runner. Use a ref that includes Windows support.' >&2
+            exit 1
+          fi
+          version=$(bash tool/release.sh --version)
+          name=${version%+*}
+          number=${version##*+}
+          if [[ -n "$EXPECTED_NAME$EXPECTED_NUMBER" && "$version" != "$EXPECTED_NAME+$EXPECTED_NUMBER" ]]; then
+            echo 'The checked-out pubspec version differs from the validated release version.' >&2
+            exit 1
+          fi
+          printf 'name=%s\nnumber=%s\n' "$name" "$number" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version-file: .fvmrc
+      - name: Build Windows x64 release
+        shell: pwsh
+        env:
+          BUILD_NAME: ${{ steps.version.outputs.name }}
+          BUILD_NUMBER: ${{ steps.version.outputs.number }}
+        run: |
+          flutter build windows --release --build-name="$env:BUILD_NAME" --build-number="$env:BUILD_NUMBER"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package and verify Windows ZIP
+        shell: pwsh
+        env:
+          BUILD_NAME: ${{ steps.version.outputs.name }}
+          BUILD_NUMBER: ${{ steps.version.outputs.number }}
+        run: |
+          $bundle = (Resolve-Path 'build/windows/x64/runner/Release').Path
+          $requiredFiles = @(
+            'Sakuga.exe'
+            'flutter_windows.dll'
+            'libmpv-2.dll'
+            'media_kit_event_loop.dll'
+            'media_kit_video_plugin.dll'
+            'data/icudtl.dat'
+            'data/app.so'
+            'data/flutter_assets/AssetManifest.bin'
+          )
+          foreach ($file in $requiredFiles) {
+            if (!(Test-Path -LiteralPath (Join-Path $bundle $file) -PathType Leaf)) {
+              throw "Missing Windows build output: $file"
+            }
+          }
+          $version = (Get-Item -LiteralPath (Join-Path $bundle 'Sakuga.exe')).VersionInfo
+          $expectedVersion = "$env:BUILD_NAME.$env:BUILD_NUMBER"
+          $fileVersion = "$($version.FileMajorPart).$($version.FileMinorPart).$($version.FileBuildPart).$($version.FilePrivatePart)"
+          if ($fileVersion -ne $expectedVersion) {
+            throw "Expected executable version $expectedVersion, got $fileVersion"
+          }
+          $notices = @('LICENSE', 'THIRD_PARTY_NOTICES.md')
+          Copy-Item -LiteralPath $notices -Destination $bundle
+          $dist = (New-Item -ItemType Directory -Path dist -Force).FullName
+          $zip = Join-Path $dist "Sakuga-$env:BUILD_NAME-$env:BUILD_NUMBER-windows-x64.zip"
+          [System.IO.Compression.ZipFile]::CreateFromDirectory($bundle, $zip, 'Optimal', $false)
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            foreach ($file in ($requiredFiles + $notices)) {
+              if ($null -eq $archive.GetEntry($file)) { throw "Missing Windows ZIP entry: $file" }
+            }
+          } finally {
+            $archive.Dispose()
+          }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-release
+          path: dist/*.zip
+          if-no-files-found: error
+          overwrite: true

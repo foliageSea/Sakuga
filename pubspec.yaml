@@ -1,5 +1,5 @@
 name: sakuga
-description: A media server client for macOS and Android with Anime4K super resolution.
+description: A media server client for macOS, Android and Windows with Anime4K super resolution.
 publish_to: none
 version: 0.1.4+5
 

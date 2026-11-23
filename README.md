@@ -1,6 +1,6 @@
 # Sakuga
 
-Jellyfin / Emby / 飞牛影视 / 绿联影视第三方客户端，目标平台 macOS（Apple Silicon / arm64）与 Android（arm64-v8a）。
+Jellyfin / Emby / 飞牛影视 / 绿联影视第三方客户端，目标平台 macOS（Apple Silicon / arm64）、Android（arm64-v8a）及 Windows（x64）。
 基于 `forui_app` 模板（Flutter 3.47.6 + Forui 0.27.5 + Riverpod 3.4.3），播放内核为 media_kit / libmpv，支持 Anime4K 超分辨率。
 
 ## 媒体服务器功能对比
@@ -140,6 +140,21 @@ tool/build_dmg.sh
 fvm flutter build linux --debug
 ```
 
+### Windows x64
+
+在 Windows 10/11 x64 上安装 Visual Studio 的「使用 C++ 的桌面开发」工作负载（含 MSVC、Windows SDK 和 CMake 工具）及 FVM，然后在 PowerShell 中执行：
+
+```powershell
+fvm install
+fvm flutter pub get
+fvm flutter run -d windows
+fvm flutter build windows --release
+```
+
+本地构建输出为 [Release 目录](<build/windows/x64/runner/Release/>)。使用 GitHub Release 的 Windows ZIP 时，请将整个压缩包解压到同一目录，再运行其中的 Sakuga.exe；不要单独移动 exe。播放器依赖的 libmpv 已随包提供，无需另装 mpv。如果系统提示缺少 MSVC 运行库，请安装[微软官方 Visual C++ Redistributable（x64）](https://aka.ms/vc14/vc_redist.x64.exe)。ZIP 中的应用未做代码签名，下载后可能触发 SmartScreen 提示。
+
+Windows 首版不提供播放器的截图复制及 GPU 用量显示。
+
 ### macOS DMG
 
 在 macOS 上安装 Xcode（完成首次启动配置）及 FVM 后执行：
@@ -230,15 +245,15 @@ tool/release.sh 0.1.1
 
 脚本会把 `pubspec.yaml` 的 `0.1.0+1` 更新为 `0.1.1+2`，提交版本变更，并将当前分支和 `v0.1.1` 标签一并推送到 `origin`。如果推送失败，可用同一版本号重试，不会再次增加构建号。不传版本号时，只按 `pubspec.yaml` 中已提交的版本创建并推送标签，不修改文件。
 
-`Release` 工作流会并行构建 Android arm64 APK 和 macOS Apple Silicon DMG。两个构建都成功后才会创建 GitHub Release、生成发布说明并上传安装包。失败时可在 Actions 页面重跑失败的任务，无需重新打标签。
-若标签已推送但没有触发构建，可在 `Release` 工作流的 **Run workflow** 中填写已有标签（如 `v0.1.1`）手动运行。
+[Release 工作流](<.github/workflows/release.yml>)会并行构建 Android arm64 APK、macOS Apple Silicon DMG 和 Windows x64 ZIP。三个构建都成功后才会创建 GitHub Release、生成发布说明并上传产物。失败时可在 Actions 页面重跑失败的任务，无需重新打标签。
+若标签已推送但没有触发构建，可在 **Release → Run workflow** 中填写包含 Windows 支持的已有发布标签手动运行；不为旧标签补构建 Windows 包。若只想验证 Windows，可在 [Windows Build 工作流](<.github/workflows/windows.yml>)的 **Run workflow** 中选择包含 Windows 支持的分支，仅生成可下载的 `windows-release` 构建产物，不创建 GitHub Release。
 
-例如 `0.1.0+1` 会发布到 `v0.1.0`，产物为 `Sakuga-0.1.0-1-android-arm64-v8a.apk` 和 `Sakuga-0.1.0-1-macos-arm64.dmg`。Android 沿用项目现有的发布签名；macOS 仍是 ad-hoc 签名，未做 Apple 公证，下载后可能受到 Gatekeeper 限制。
+例如 `0.1.0+1` 会发布到 `v0.1.0`，产物命名为 `Sakuga-0.1.0-1-android-arm64-v8a.apk`、`Sakuga-0.1.0-1-macos-arm64.dmg` 和 `Sakuga-0.1.0-1-windows-x64.zip`。Android 沿用项目现有的发布签名；macOS 仍是 ad-hoc 签名，未做 Apple 公证，下载后可能受到 Gatekeeper 限制。
 
 ## 应用图标
 
 采用「漫画分镜」图标，SVG 与 1024 px PNG 源图位于 `assets/icons/`。
-`icons_launcher.yaml` 仅启用 Android 与 macOS；Android 自适应图标使用透明前景与独立背景色，macOS 使用带白色圆角底的完整图标。
+[图标生成配置](<icons_launcher.yaml>)启用 Android、macOS 与 Windows；Android 自适应图标使用透明前景与独立背景色，macOS 和 Windows 使用完整图标。
 
 更新 PNG 源图后，执行：
 
@@ -247,7 +262,7 @@ fvm flutter pub get
 fvm dart run icons_launcher:create
 ```
 
-生成资源位于 `android/app/src/main/res/` 与 `macos/Runner/Assets.xcassets/AppIcon.appiconset/`。重新构建并安装应用后生效。
+生成资源位于 [Android 资源目录](<android/app/src/main/res/>)、[macOS 图标集](<macos/Runner/Assets.xcassets/AppIcon.appiconset/>)与 [Windows ICO](<windows/runner/resources/app_icon.ico>)。重新构建应用后生效。
 
 ## 目录
 
@@ -265,6 +280,7 @@ assets/
 docs/           开发计划与调研
 macos/          macOS 工程
 android/        Android 工程
+windows/        Windows 工程
 test/           单元与 Widget 测试
 ```
 

@@ -16,7 +16,7 @@ Sakuga 原创代码采用 [Apache License 2.0](LICENSE)。第三方代码、依�
 
 超分辨率实现参考了 [Kazumi](https://github.com/Predidit/Kazumi) 的做法，感谢其开发者与贡献者。Kazumi 自身采用 GPL-3.0，本致谢不替代其许可证，也不对 Kazumi 代码重新授权。
 
-## APK 与 DMG 中的原生库
+## APK、DMG 与 Windows ZIP 中的原生库
 
 [锁定的原生资源清单](https://github.com/Predidit/media-kit/blob/83b7ca63772856e1ea0158916177e136f7b7b0be/media_kit/hook/native_bundles.json)指向以下构建：
 
@@ -24,5 +24,6 @@ Sakuga 原创代码采用 [Apache License 2.0](LICENSE)。第三方代码、依�
 | --- | --- | --- |
 | Android arm64 | [Predidit/libmpv-android-video-build v1.3.1](https://github.com/Predidit/libmpv-android-video-build/tree/v1.3.1) | [mpv 构建配方](https://github.com/Predidit/libmpv-android-video-build/blob/v1.3.1/buildscripts/scripts/mpv.sh)指定 `-Dgpl=false`。 |
 | macOS Apple Silicon | [Predidit/libmpv-darwin-build 0.6.8](https://github.com/Predidit/libmpv-darwin-build/tree/0.6.8) | [mpv 构建配方](https://github.com/Predidit/libmpv-darwin-build/blob/0.6.8/nix/packages/mk-pkg-mpv/default.nix)指定 `-Dgpl=false`。 |
+| Windows x64 | [Predidit/libmpv-win32-video-cmake 202609151348](https://github.com/Predidit/libmpv-win32-video-cmake/releases/tag/202609151348) | 锁定的归档为 `mpv-dev-x86_64-20260915-git-0b7ed67.7z`，随包提供 `libmpv-2.dll`；需按实际二进制核对许可和构建选项。 |
 
-这两处旗标仅说明 mpv 的构建配置，不能证明整套原生库的许可证或二进制分发合规。公开分发安装包前，按实际 APK 和 DMG 核对 FFmpeg、libmpv 及随附库的具体版本、构建选项、补丁和适用许可；随包提供所需声明和许可全文，并按适用条款提供对应源码、构建材料及满足替换或重新链接的要求。本清单不代替随包声明或对应源码。
+Android 和 macOS 的旗标仅说明 mpv 的构建配置，不能证明整套原生库的许可证或二进制分发合规。公开分发安装包前，按实际 APK、DMG 与 Windows ZIP 核对 FFmpeg、libmpv 及随附库的具体版本、构建选项、补丁和适用许可；随包提供所需声明和许可全文，并按适用条款提供对应源码、构建材料及满足替换或重新链接的要求。本清单不代替随包声明或对应源码。
