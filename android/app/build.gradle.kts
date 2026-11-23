@@ -7,26 +7,35 @@ plugins {
 }
 
 val keystorePropertiesFile = rootProject.file("key.properties")
+val actionsSigning = System.getenv("GITHUB_ACTIONS") == "true"
+val signingEnvironment = mapOf(
+    "storeFile" to "ANDROID_KEYSTORE_PATH",
+    "storePassword" to "ANDROID_KEYSTORE_PASSWORD",
+    "keyAlias" to "ANDROID_KEY_ALIAS",
+    "keyPassword" to "ANDROID_KEY_PASSWORD",
+)
 val keystoreProperties = Properties().apply {
-    if (keystorePropertiesFile.isFile) {
+    if (actionsSigning) {
+        signingEnvironment.forEach { (property, variable) ->
+            System.getenv(variable)?.let { setProperty(property, it) }
+        }
+    } else if (keystorePropertiesFile.isFile) {
         keystorePropertiesFile.inputStream().use { load(it) }
     }
 }
-val requiredSigningProperties = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
 
 // Keep debug builds available without credentials, but never publish an unsigned release.
 tasks.matching { it.name == "preReleaseBuild" }.configureEach {
     doFirst {
-        check(keystorePropertiesFile.isFile) {
-            "Release signing requires android/key.properties. Restore the signing files from Git."
-        }
-        requiredSigningProperties.forEach { name ->
-            check(!keystoreProperties.getProperty(name).isNullOrBlank()) {
-                "Missing release signing property: $name in android/key.properties"
+        signingEnvironment.forEach { (property, variable) ->
+            check(!keystoreProperties.getProperty(property).isNullOrBlank()) {
+                if (actionsSigning) "Missing release signing variable: $variable"
+                else "Missing release signing property: $property in android/key.properties"
             }
         }
         check(rootProject.file(keystoreProperties.getProperty("storeFile")).isFile) {
-            "Release keystore does not exist. Check storeFile in android/key.properties."
+            if (actionsSigning) "Release keystore does not exist at ANDROID_KEYSTORE_PATH."
+            else "Release keystore does not exist. Check storeFile in android/key.properties."
         }
     }
 }

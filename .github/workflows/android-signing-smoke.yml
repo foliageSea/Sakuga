@@ -1,0 +1,81 @@
+name: Android signing smoke test
+on:
+  push:
+    branches: ['ci/android-signing-check']
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    environment: android-release
+    env:
+      # Match flutter.ndkVersion in the SDK pinned by .fvmrc.
+      NDK_VERSION: '28.2.13676358'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version-file: .fvmrc
+      - name: Install Android NDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION"
+          printf 'ANDROID_NDK_HOME=%s/ndk/%s\n' "$ANDROID_HOME" "$NDK_VERSION" >> "$GITHUB_ENV"
+      - name: Read build version
+        shell: bash
+        run: |
+          version=$(tool/release.sh --version)
+          printf 'BUILD_NAME=%s\nBUILD_NUMBER=%s\n' "${version%+*}" "${version##*+}" >> "$GITHUB_ENV"
+      - name: Build Android arm64 release APK
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          # Do not rebuild historical tags that still use the retired credentials.
+          if [[ -n "$(git ls-files -- android/key.properties android/sakuga-release.jks)" ]]; then
+            echo 'The selected tag still tracks legacy Android signing files. Use a tag with the signing migration.' >&2
+            exit 1
+          fi
+          : "${ANDROID_KEYSTORE_BASE64:?Missing ANDROID_KEYSTORE_BASE64 secret}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?Missing ANDROID_KEYSTORE_PASSWORD secret}"
+          : "${ANDROID_KEY_ALIAS:?Missing ANDROID_KEY_ALIAS secret}"
+          : "${ANDROID_KEY_PASSWORD:?Missing ANDROID_KEY_PASSWORD secret}"
+          umask 077
+          ANDROID_KEYSTORE_PATH=$(mktemp "$RUNNER_TEMP/sakuga-signing.XXXXXX")
+          export ANDROID_KEYSTORE_PATH
+          trap 'rm -f -- "$ANDROID_KEYSTORE_PATH"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          unset ANDROID_KEYSTORE_BASE64
+          # Exclude other ABIs without letting Flutter offset Android's versionCode.
+          flutter build apk --release --target-platform android-arm64 --split-per-abi \
+            --android-project-arg=force-version-code-ignoring-abi=true \
+            --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            "dist/Sakuga-${BUILD_NAME}-${BUILD_NUMBER}-android-arm64-v8a.apk"
+      - name: Verify APK and expected certificate
+        shell: bash
+        run: |
+          shopt -s nullglob
+          apk=(dist/*.apk)
+          [[ ${#apk[@]} -eq 1 ]]
+          verifier=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          [[ -x "$verifier" ]]
+          report=$("$verifier" verify --verbose --print-certs "${apk[0]}")
+          printf '%s\n' "$report"
+          [[ $(awk -F ': ' '/^Signer #1 certificate SHA-256 digest:/ {print tolower($2)}' <<< "$report") == 21f000afb4aa25cbc5cda506b96439bf3003ed044d459cc1e22a363e1e1292b0 ]]
+      - uses: actions/upload-artifact@v6
+        with:
+          name: android-release
+          path: dist/*.apk
+          if-no-files-found: error
+          overwrite: true
+
