@@ -23,6 +23,7 @@ import 'live_logs_section.dart';
 import 'servers_section.dart';
 
 const _misansLicenseUrl = 'https://hyperos.mi.com/font/download';
+const _showDiagnosticsTabs = bool.fromEnvironment('SHOW_DIAGNOSTICS_TABS');
 
 final packageInfoProvider = FutureProvider((ref) => PackageInfo.fromPlatform());
 
@@ -420,57 +421,60 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                 ),
               ),
-              FTabEntry(
-                label: Text(l.logs),
-                child: _fillTab(
-                  Surface(
-                    expand: true,
-                    padding: MediaQuery.sizeOf(context).width < 480 ? 12 : 24,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Builder(
-                          builder: (buttonContext) => FButton(
-                            key: const ValueKey('export-logs'),
-                            builder: responsiveButtonContent,
-                            variant: .outline,
-                            prefix: const Icon(FLucideIcons.download),
-                            onPress: _exportingLogs
-                                ? null
-                                : () => _exportLogs(buttonContext),
-                            child: Text(
-                              _exportingLogs ? l.exportingLogs : l.exportLogs,
+              if (_showDiagnosticsTabs) ...[
+                FTabEntry(
+                  label: Text(l.logs),
+                  child: _fillTab(
+                    Surface(
+                      expand: true,
+                      padding: MediaQuery.sizeOf(context).width < 480 ? 12 : 24,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Builder(
+                            builder: (buttonContext) => FButton(
+                              key: const ValueKey('export-logs'),
+                              builder: responsiveButtonContent,
+                              variant: .outline,
+                              prefix: const Icon(FLucideIcons.download),
+                              onPress: _exportingLogs
+                                  ? null
+                                  : () => _exportLogs(buttonContext),
+                              child: Text(
+                                _exportingLogs ? l.exportingLogs : l.exportLogs,
+                              ),
                             ),
                           ),
-                        ),
-                        if (_logExportFailed) ...[
-                          const SizedBox(height: 16),
-                          FAlert(
-                            variant: .destructive,
-                            title: Text(l.logExportError),
-                          ),
+                          if (_logExportFailed) ...[
+                            const SizedBox(height: 16),
+                            FAlert(
+                              variant: .destructive,
+                              title: Text(l.logExportError),
+                            ),
+                          ],
+                          if (_logExportResult != null &&
+                              _logExportResult !=
+                                  LogExportResult.cancelled) ...[
+                            const SizedBox(height: 16),
+                            Text(switch (_logExportResult!) {
+                              LogExportResult.empty => l.noLogsToExport,
+                              LogExportResult.saved => l.logsExported,
+                              LogExportResult.shared => l.logsShared,
+                              LogExportResult.presented => l.logShareOpened,
+                              LogExportResult.cancelled => '',
+                            }),
+                          ],
+                          const Expanded(child: LiveLogsSection(fill: true)),
                         ],
-                        if (_logExportResult != null &&
-                            _logExportResult != LogExportResult.cancelled) ...[
-                          const SizedBox(height: 16),
-                          Text(switch (_logExportResult!) {
-                            LogExportResult.empty => l.noLogsToExport,
-                            LogExportResult.saved => l.logsExported,
-                            LogExportResult.shared => l.logsShared,
-                            LogExportResult.presented => l.logShareOpened,
-                            LogExportResult.cancelled => '',
-                          }),
-                        ],
-                        const Expanded(child: LiveLogsSection(fill: true)),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              FTabEntry(
-                label: Text(l.runtimeEnvironment),
-                child: tab(const Surface(child: RuntimeEnvironmentSection())),
-              ),
+                FTabEntry(
+                  label: Text(l.runtimeEnvironment),
+                  child: tab(const Surface(child: RuntimeEnvironmentSection())),
+                ),
+              ],
               FTabEntry(
                 label: Text(l.about),
                 child: tab(

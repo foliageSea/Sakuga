@@ -7,6 +7,8 @@ import 'package:material_ui/material_ui.dart';
 
 import 'widget_test.dart' show appContainer, settle;
 
+const _showDiagnosticsTabs = bool.fromEnvironment('SHOW_DIAGNOSTICS_TABS');
+
 void main() {
   for (final platform in [
     TargetPlatform.macOS,
@@ -18,7 +20,7 @@ void main() {
       PointerDeviceKind.trackpad,
     ]) {
       testWidgets(
-        'settings tabs swipe in both directions with $device on $platform',
+        'desktop settings tabs use clicks, not $device swipes, on $platform',
         (tester) async {
           tester.view.physicalSize = const Size(1200, 500);
           tester.view.devicePixelRatio = 1;
@@ -59,10 +61,11 @@ void main() {
           await settle(tester);
           expect(controller.page, closeTo(1, 0.001));
           await swipe(1);
-          expect(controller.page, closeTo(0, 0.001));
-          await swipe(-1);
           expect(controller.page, closeTo(1, 0.001));
           await swipe(-1);
+          expect(controller.page, closeTo(1, 0.001));
+          await tester.tap(find.text('Appearance'));
+          await settle(tester);
           expect(controller.page, closeTo(2, 0.001));
           expect(
             find.byKey(const ValueKey('theme-color-blue')).hitTestable(),
@@ -93,21 +96,31 @@ void main() {
           expect(position.pixels, greaterThan(0));
           expect(controller.page, closeTo(2, 0.001));
 
-          await swipe(1);
+          await tester.tap(find.text('General'));
+          await settle(tester);
           expect(controller.page, closeTo(1, 0.001));
           expect(
             find.byKey(const ValueKey('language-select')).hitTestable(),
             findsOneWidget,
           );
 
+          expect(
+            find.text('Logs'),
+            _showDiagnosticsTabs ? findsOneWidget : findsNothing,
+          );
+          expect(
+            find.text('Runtime environment'),
+            _showDiagnosticsTabs ? findsOneWidget : findsNothing,
+          );
           await tester.ensureVisible(find.text('About Sakuga'));
           await tester.tap(find.text('About Sakuga'));
           await settle(tester);
-          expect(controller.page, closeTo(5, 0.001));
+          final lastTab = _showDiagnosticsTabs ? 5 : 3;
+          expect(controller.page, closeTo(lastTab, 0.001));
           await swipe(-1);
-          expect(controller.page, closeTo(5, 0.001));
+          expect(controller.page, closeTo(lastTab, 0.001));
           await swipe(1);
-          expect(controller.page, closeTo(4, 0.001));
+          expect(controller.page, closeTo(lastTab, 0.001));
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox());
           await settle(tester);
@@ -120,7 +133,7 @@ void main() {
   testWidgets('overflowing settings tab labels support mouse dragging', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(600, 900);
+    tester.view.physicalSize = const Size(390, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
