@@ -275,12 +275,11 @@ test/           单元与 Widget 测试
 - 播放/超分/平台差异收敛在 `PlayerEngine` 与 `PlatformCapabilities` 后面。
 - 超分辨率实现参考了 [Kazumi](https://github.com/Predidit/Kazumi)，感谢 Kazumi 开发者和贡献者的开源分享。
 
-## 第三方
+## 许可
 
-- media_kit / libmpv / FFmpeg：见 `about` 页与各包许可。
-- Anime4K：MIT，`assets/shaders/LICENSE`。
-- MiSans：遵循 MiSans 字体知识产权许可协议。
-- Jellyfin / Emby：本项目为非官方客户端。
+Sakuga 原创代码采用 [Apache License 2.0](LICENSE)。第三方依赖、字体、着色器和图标继续适用各自的条款，见[第三方许可与署名](THIRD_PARTY_NOTICES.md)。
+
+Sakuga 是非官方媒体服务器客户端。
 
 ## 文档
 
