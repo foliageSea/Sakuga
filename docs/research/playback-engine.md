@@ -1,5 +1,7 @@
 # 播放内核与超分可行性（media_kit / mpv）
 
+> **历史调研。** 环境、版本、结论与建议均以调研时点为准；当前使用与开发步骤见[文档索引](../README.md)。
+
 > 目标项目：Jeffyfin（Flutter Jellyfin 客户端，macOS arm64 + Android）。取证日 2026-10-26。
 > 本机环境：Flutter 3.47.8 / Dart 3.13.7（`flutter --version`），native assets 已在 stable 默认开启。
 > 引用规范：pub.dev 版本号 / 仓库文件:行号 / URL。凡未实测的推断均已标注「需 spike」。

@@ -1,5 +1,7 @@
 # M0 状态：工程基建与内核验证
 
+> **历史阶段记录。** 下文的功能、平台和测试阻塞均以当时环境为准；当前开发与测试步骤见[本地开发与测试](development.md)。
+
 > 日期：2026-10-26 · 工程：`/home/foliage/projects/sakuga` · 版本：0.1.0+1
 > 环境：WSL2 Ubuntu 24.04 x86_64 / Flutter 3.47.6（FVM）/ Android SDK 已安装 / 无 Android 设备或模拟器 / 无 Mac。
 

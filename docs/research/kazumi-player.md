@@ -1,5 +1,7 @@
 # Kazumi v2.4.2 播放器与超分实现调研（面向 Flutter Jellyfin 客户端）
 
+> **历史调研。** 环境、版本、结论与建议均以调研时点为准；当前使用与开发步骤见[文档索引](../README.md)。
+
 调研对象：`/tmp/kazumi`（Predidit/Kazumi，`pubspec.yaml:4` 版本 2.4.2+20402，HEAD `36198d6`，Flutter 3.47.8 / Dart SDK >=3.10）。
 本文所有行号为该工作副本内的行号；跨仓库结论（media-kit fork）标注了 raw URL 与 ref。
 

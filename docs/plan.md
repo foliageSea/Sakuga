@@ -1,5 +1,7 @@
 # Sakuga 开发计划
 
+> **历史决策稿。** 下文保留当时的平台范围、排期和候选功能，不代表当前实现或承诺。现行指南见[文档索引](README.md)。
+
 > 版本：v0.3（决策稿） · 日期：2026-10-26 · 状态：**M0 进行中**（进度见 [m0-status.md](m0-status.md)）
 > 目标平台：macOS（Apple Silicon / arm64）+ Android（arm64-v8a）为正式目标；**Linux 作为本地开发/验证平台**（不做正式发布）。
 > 工程底座：`/home/foliage/projects/forui_app`（Flutter 3.47.6 + Forui 0.27.5 + Riverpod 3.4.3）

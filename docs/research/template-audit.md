@@ -1,5 +1,7 @@
 # forui_app 模板审计 → Sakuga 迁移清单
 
+> **历史调研。** 环境、版本、结论与建议均以调研时点为准；当前使用与开发步骤见[文档索引](../README.md)。
+
 - 审计对象：`/home/foliage/projects/forui_app`（git HEAD `e197723`，**只读**，未修改）
 - 审计主机：Linux 6.18 WSL2 x86_64；项目 SDK 为 FVM 3.47.6（`.fvmrc:2`），系统 Flutter 3.47.8 / Dart 3.13.7
 - 方法：逐文件阅读源码 + `pub.dev` API 与包归档解压比对 + Flutter 3.47.6 SDK 源码核对 + Gradle/AGP 最小复现探针（`/tmp/agp9probe`）

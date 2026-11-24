@@ -1,5 +1,7 @@
 # Linux 端支持记录
 
+> **历史调研。** 环境、版本、结论与建议均以调研时点为准；当前使用与开发步骤见[文档索引](../README.md)。
+
 > 日期：2026-10-26 · 环境：WSL2 Ubuntu 24.04 x86_64 / Flutter 3.47.6 / GTK3 可用
 > 结论：**Linux 已作为本地开发/验证平台接入**，可构建并播放；**不作为正式发布目标**。
 
@@ -36,7 +38,7 @@ WSLg 下用 X11 + 软件 GL：
 GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 ./build/linux/x64/debug/bundle/sakuga
 ```
 
-开发播放验证（token 只放命令行，不写入仓库）：
+开发播放验证（使用无需凭据的本地测试流；`--dart-define` 的值可能进入构建产物）：
 
 ```sh
 fvm flutter build linux --debug \
@@ -71,4 +73,4 @@ DEV_POSITION 1335
 - Linux 仅用于本地开发/验证：不打包 deb/AppImage，不做商店分发。
 - 窗口/快捷键/媒体键/打包/测试矩阵不在 v1 范围；后续要正式支持需单独立项。
 - `flutter test` 在 WSL 上仍受 media_kit native assets 编译问题阻塞（与 Linux 运行无关）。
-- 不要在仓库中写入测试服 token；`DEV_MEDIA_URL` 仅通过 `--dart-define` 临时传入。
+- 不要把测试服 token 写入仓库或构建参数。按[当前开发指南](../development.md)使用无凭据的测试流。
