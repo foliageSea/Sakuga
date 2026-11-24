@@ -1,4 +1,15 @@
-# Sakuga
+<p align="center">
+  <img src="assets/icons/sakuga.png" alt="Sakuga 应用图标" width="96" height="96">
+</p>
+
+<h1 align="center">Sakuga</h1>
+
+<p align="center">
+  <a href="https://github.com/foliageSea/sakuga/releases/latest"><img src="https://img.shields.io/github/v/release/foliageSea/sakuga?label=release" alt="最新发布"></a>
+  <a href="https://github.com/foliageSea/sakuga/actions/workflows/release.yml"><img src="https://github.com/foliageSea/sakuga/actions/workflows/release.yml/badge.svg?event=push" alt="Release 构建状态"></a>
+  <a href="#下载与安装"><img src="https://img.shields.io/badge/platform-Android%20%7C%20macOS%20%7C%20Windows-808080" alt="支持平台：Android、macOS、Windows"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="许可证：Apache 2.0"></a>
+</p>
 
 Sakuga 是 Jellyfin、Emby、飞牛影视和绿联影视的非官方客户端。它可以浏览和搜索媒体库、播放电影和剧集、从上次进度继续观看，并使用 Anime4K 在客户端改善动画画质。播放器基于 media_kit / libmpv。
 
