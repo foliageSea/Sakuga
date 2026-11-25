@@ -647,6 +647,24 @@ class _TitleBlock extends StatelessWidget {
         : theme.colors.mutedForeground;
     final background = onDark ? const Color(0x33FFFFFF) : theme.colors.muted;
     final logo = item.logo ?? fallbackItem?.logo;
+    final mobile = isMobileLayout(context);
+    final seriesTitle = item.isSeries
+        ? Text(
+            _detailItemTitle(context, item),
+            key: const ValueKey('detail-banner-title'),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style:
+                (mobile
+                        ? theme.typography.display.md
+                        : theme.typography.display.xl)
+                    .copyWith(
+                      color: onDark
+                          ? const Color(0xFFFFFFFF)
+                          : theme.colors.foreground,
+                    ),
+          )
+        : null;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -654,7 +672,7 @@ class _TitleBlock extends StatelessWidget {
         if (logo != null) ...[
           SizedBox(
             width: 420,
-            height: isMobileLayout(context) ? 80 : 120,
+            height: mobile ? 80 : 120,
             child: CachedNetworkImage(
               key: const ValueKey('detail-logo'),
               imageUrl: logo.url(width: 840),
@@ -665,9 +683,14 @@ class _TitleBlock extends StatelessWidget {
               alignment: Alignment.bottomLeft,
               fadeInDuration: const Duration(milliseconds: 200),
               placeholder: (_, _) => const SizedBox.shrink(),
-              errorWidget: (_, _, _) => const SizedBox.shrink(),
+              errorWidget: (_, _, _) => seriesTitle == null
+                  ? const SizedBox.shrink()
+                  : Align(alignment: Alignment.bottomLeft, child: seriesTitle),
             ),
           ),
+          const SizedBox(height: 10),
+        ] else if (seriesTitle != null) ...[
+          seriesTitle,
           const SizedBox(height: 10),
         ],
         if (item.communityRating case final rating?

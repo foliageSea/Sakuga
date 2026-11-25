@@ -649,7 +649,10 @@ void main() {
           find.byKey(const ValueKey('detail-season-season-1')),
           findsOneWidget,
         );
-        expect(find.text('A Series With Episodes'), findsOneWidget);
+        expect(
+          tester.widget<Text>(find.byKey(const ValueKey('detail-title'))).data,
+          _series().name,
+        );
       }
       expect(tester.takeException(), isNull);
     },
@@ -789,6 +792,25 @@ void main() {
 
   for (final size in [const Size(390, 844), const Size(1280, 800)]) {
     testWidgets(
+      'series banner shows its title without a logo at width ${size.width}',
+      (tester) async {
+        final series = _series();
+        await pumpDetailPage(
+          tester,
+          size: size,
+          item: () => series,
+          seasons: const [],
+          episodes: const [],
+        );
+
+        final bannerTitle = find.byKey(const ValueKey('detail-banner-title'));
+        expect(tester.widget<Text>(bannerTitle).data, series.name);
+        expect(find.byKey(const ValueKey('detail-logo')), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
       'detail uses header title and banner logo at width ${size.width}',
       (tester) async {
         await pumpDetailPage(
@@ -808,14 +830,21 @@ void main() {
           episodes: const [],
         );
 
-        expect(find.text(_title), findsOneWidget);
+        final headerTitle = find.byKey(const ValueKey('detail-title'));
+        expect(tester.widget<Text>(headerTitle).data, _title);
         final logoFinder = find.byKey(const ValueKey('detail-logo'));
         final logo = tester.widget<CachedNetworkImage>(logoFinder);
         expect(logo.imageUrl, contains('Images/Logo?maxWidth=840'));
         expect(logo.httpHeaders, {'X-Emby-Token': 'test-key'});
         expect(logo.fit, BoxFit.contain);
+        final fallback = logo.errorWidget!(
+          tester.element(logoFinder),
+          logo.imageUrl,
+          StateError('Logo unavailable'),
+        );
+        expect(((fallback as Align).child! as Text).data, _title);
         expect(
-          tester.getRect(find.text(_title)).bottom,
+          tester.getRect(headerTitle).bottom,
           lessThan(tester.getRect(logoFinder).top),
         );
         expect(tester.takeException(), isNull);
