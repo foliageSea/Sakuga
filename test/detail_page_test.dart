@@ -399,7 +399,7 @@ void main() {
 
   for (final size in [const Size(390, 844), const Size(1280, 1000)]) {
     testWidgets(
-      'season banner omits the duplicate series heading during loading and after completion at ${size.width}',
+      'season banner falls back to the season title without a logo at ${size.width}',
       (tester) async {
         final seasonData = Completer<MediaItem>();
         await pumpDetailPage(
@@ -421,13 +421,16 @@ void main() {
         seasonData.complete(
           const MediaItem(
             id: 'season-1',
-            name: 'Season 1',
+            name: '',
             type: MediaType.season,
             seriesId: 'series-1',
             indexNumber: 1,
           ),
         );
         await tester.pumpAndSettle();
+        final bannerTitle = find.byKey(const ValueKey('detail-banner-title'));
+        expect(tester.widget<Text>(bannerTitle).data, 'Season 1');
+        expect(find.byKey(const ValueKey('detail-logo')), findsNothing);
         expect(seriesHeading, findsNothing);
         expect(find.byKey(const ValueKey('detail-title')), findsOneWidget);
         expect(tester.takeException(), isNull);
@@ -538,7 +541,8 @@ void main() {
         expect(queries, [
           (userId: 'user-1', seriesId: 'series-1', seasonId: 'season-1'),
         ]);
-        expect(find.text('Season 1'), findsOneWidget);
+        final headerTitle = find.byKey(const ValueKey('detail-title'));
+        expect(tester.widget<Text>(headerTitle).data, 'Season 1');
         expect(find.byKey(const ValueKey('detail-series-name')), findsNothing);
         final episode = find.byKey(const ValueKey('detail-episode-episode-1'));
         await tester.ensureVisible(episode);

@@ -648,7 +648,7 @@ class _TitleBlock extends StatelessWidget {
     final background = onDark ? const Color(0x33FFFFFF) : theme.colors.muted;
     final logo = item.logo ?? fallbackItem?.logo;
     final mobile = isMobileLayout(context);
-    final seriesTitle = item.isSeries
+    final bannerTitle = item.isSeries || item.type == MediaType.season
         ? Text(
             _detailItemTitle(context, item),
             key: const ValueKey('detail-banner-title'),
@@ -683,14 +683,14 @@ class _TitleBlock extends StatelessWidget {
               alignment: Alignment.bottomLeft,
               fadeInDuration: const Duration(milliseconds: 200),
               placeholder: (_, _) => const SizedBox.shrink(),
-              errorWidget: (_, _, _) => seriesTitle == null
+              errorWidget: (_, _, _) => bannerTitle == null
                   ? const SizedBox.shrink()
-                  : Align(alignment: Alignment.bottomLeft, child: seriesTitle),
+                  : Align(alignment: Alignment.bottomLeft, child: bannerTitle),
             ),
           ),
           const SizedBox(height: 10),
-        ] else if (seriesTitle != null) ...[
-          seriesTitle,
+        ] else if (bannerTitle != null) ...[
+          bannerTitle,
           const SizedBox(height: 10),
         ],
         if (item.communityRating case final rating?
