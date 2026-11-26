@@ -165,6 +165,7 @@ class MediaMetaRow extends StatelessWidget {
                   : theme.colors.mutedForeground,
             );
     final count = item.childCount ?? item.recursiveItemCount;
+    final runtimeMinutes = item.runtime?.inMinutes ?? 0;
     return Wrap(
       spacing: mobile ? 14 : 20,
       runSpacing: 4,
@@ -179,6 +180,8 @@ class MediaMetaRow extends StatelessWidget {
           Text(item.officialRating!, style: style),
         if (item.genres.isNotEmpty)
           Text(item.genres.take(3).join(' · '), style: style),
+        if (item.type == MediaType.movie && runtimeMinutes > 0)
+          Text(context.l10n.libraryDuration(runtimeMinutes), style: style),
         if (item.type == MediaType.season && count != null && count > 0)
           Text(context.l10n.libraryEpisodeCount(count), style: style),
       ],

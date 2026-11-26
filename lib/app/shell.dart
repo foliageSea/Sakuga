@@ -50,7 +50,12 @@ class AppShell extends ConsumerWidget {
         ref.watch(mediaServerClientProvider(activeServer)).isConfigured;
     final canRefreshLibrary = isLibraryRootRoute && serverConfigured;
     final canRefreshHome = isHomeRoute && serverConfigured;
-    final immersive = isHomeRoute && posterBackground != null;
+    final detailSpec = detailBackgroundSpec;
+    final immersiveRoute = detailSpec != null
+        ? '/library/${detailSpec.itemId}'
+        : isHomeRoute && posterBackground != null
+        ? '/home'
+        : null;
     final overArtworkTheme = ref.watch(appThemesProvider).dark;
     final l = context.l10n;
     final labels = [l.home, l.library, l.settings];
@@ -59,132 +64,138 @@ class AppShell extends ConsumerWidget {
       FLucideIcons.film,
       FLucideIcons.settings2,
     ];
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final mobile = constraints.maxWidth < mobileBreakpoint;
-        final compact = constraints.maxWidth < 1024 || settings.compactSidebar;
-        final sidebarWidth = mobile ? 0.0 : (compact ? 76.0 : 200.0);
-        final theme = context.theme;
-        final colors = theme.colors;
-        final dark = colors.brightness == Brightness.dark;
-        final dividerColor = dark
-            ? colors.border
-            : colors.foreground.withValues(alpha: 0.09);
-        final sidebarActiveFill = colors.foreground.withValues(
-          alpha: dark ? 0.115 : 0.045,
-        );
-        final showTitleBar = window.available && !window.fullScreen;
-        // The home carousel artwork extends under the window chrome: the
-        // desktop title bar, or the phone header and status bar.
-        final immersiveDesktop = immersive && !mobile && showTitleBar;
-        final immersiveMobile = immersive && mobile && backLocation == null;
-        final refreshHomeButton = FButton.icon(
-          key: const ValueKey('home-refresh'),
-          variant: .ghost,
-          size: .sm,
-          semanticsLabel: l.refresh,
-          onPress: () => refreshHome(ref),
-          child: const Icon(FLucideIcons.refreshCw),
-        );
-        final Widget? titleBar = showTitleBar
-            ? DesktopTitleBar(
-                homeAction: immersiveDesktop && canRefreshHome
-                    ? refreshHomeButton
-                    : null,
-                controller: window,
-                libraryServerAction: const LibraryServerAction(compact: true),
-                compactSidebar: settings.compactSidebar,
-                onToggleCompactSidebar: () async {
-                  try {
-                    await ref
-                        .read(settingsProvider.notifier)
-                        .update(
-                          (value) => value.copyWith(
-                            compactSidebar: !value.compactSidebar,
-                          ),
-                        );
-                  } catch (error) {
-                    if (context.mounted) {
-                      notifyUser(context, failureMessage(context, error));
+    return ListenableBuilder(
+      listenable: window,
+      builder: (context, _) => LayoutBuilder(
+        builder: (context, constraints) {
+          final mobile = constraints.maxWidth < mobileBreakpoint;
+          final compact =
+              constraints.maxWidth < 1024 || settings.compactSidebar;
+          final sidebarWidth = mobile ? 0.0 : (compact ? 76.0 : 200.0);
+          final theme = context.theme;
+          final colors = theme.colors;
+          final dark = colors.brightness == Brightness.dark;
+          final dividerColor = dark
+              ? colors.border
+              : colors.foreground.withValues(alpha: 0.09);
+          final sidebarActiveFill = colors.foreground.withValues(
+            alpha: dark ? 0.115 : 0.045,
+          );
+          final showTitleBar = window.available && !window.fullScreen;
+          final immersiveDesktop =
+              showTitleBar &&
+              (detailSpec != null || (immersiveRoute != null && !mobile));
+          final immersiveMobile =
+              immersiveRoute != null && mobile && backLocation == null;
+          final overlayHeader = immersiveMobile || detailSpec != null;
+          final titleBarInset = immersiveDesktop ? 48.0 : 0.0;
+          final refreshHomeButton = FButton.icon(
+            key: const ValueKey('home-refresh'),
+            variant: .ghost,
+            size: .sm,
+            semanticsLabel: l.refresh,
+            onPress: () => refreshHome(ref),
+            child: const Icon(FLucideIcons.refreshCw),
+          );
+          final Widget? titleBar = showTitleBar
+              ? DesktopTitleBar(
+                  homeAction: immersiveDesktop && canRefreshHome
+                      ? refreshHomeButton
+                      : null,
+                  controller: window,
+                  libraryServerAction: const LibraryServerAction(compact: true),
+                  compactSidebar: settings.compactSidebar,
+                  onToggleCompactSidebar: () async {
+                    try {
+                      await ref
+                          .read(settingsProvider.notifier)
+                          .update(
+                            (value) => value.copyWith(
+                              compactSidebar: !value.compactSidebar,
+                            ),
+                          );
+                    } catch (error) {
+                      if (context.mounted) {
+                        notifyUser(context, failureMessage(context, error));
+                      }
                     }
-                  }
-                },
-                language: settings.language,
-                onLanguageChanged: (language) => _update(
-                  context,
-                  ref,
-                  (value) => value.copyWith(language: language),
-                ),
-                onToggleTheme: () => _update(
-                  context,
-                  ref,
-                  (value) => value.copyWith(
-                    themeMode:
-                        context.theme.colors.brightness == Brightness.dark
-                        ? ThemeMode.light
-                        : ThemeMode.dark,
+                  },
+                  language: settings.language,
+                  onLanguageChanged: (language) => _update(
+                    context,
+                    ref,
+                    (value) => value.copyWith(language: language),
                   ),
+                  onToggleTheme: () => _update(
+                    context,
+                    ref,
+                    (value) => value.copyWith(
+                      themeMode:
+                          context.theme.colors.brightness == Brightness.dark
+                          ? ThemeMode.light
+                          : ThemeMode.dark,
+                    ),
+                  ),
+                )
+              : null;
+          final Widget pageHeader = Builder(
+            builder: (headerContext) {
+              final pad = pagePadding(headerContext);
+              return FHeader(
+                key: ValueKey(
+                  mobile ? 'mobile-header' : 'desktop-detail-header',
                 ),
-              )
-            : null;
-        final Widget mobileHeader = Builder(
-          builder: (headerContext) {
-            final pad = pagePadding(headerContext);
-            return FHeader(
-              key: const ValueKey('mobile-header'),
-              style: .delta(
-                padding: .value(EdgeInsets.fromLTRB(pad, 8, pad, 10)),
-              ),
-              title: Row(
-                children: [
-                  if (detailBackgroundSpec != null) ...[
+                style: .delta(
+                  padding: .value(EdgeInsets.fromLTRB(pad, 8, pad, 10)),
+                ),
+                title: Row(
+                  children: [
+                    if (detailBackgroundSpec != null) ...[
+                      FButton.icon(
+                        key: const ValueKey('detail-back'),
+                        variant: .ghost,
+                        size: .sm,
+                        semanticsLabel: l.back,
+                        onPress: () => popDetailRoute(headerContext),
+                        child: const Icon(FLucideIcons.arrowLeft),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: detailBackgroundSpec != null
+                          ? DetailHeaderTitle(spec: detailBackgroundSpec!)
+                          : _HeaderTitle(labels[shell.currentIndex]),
+                    ),
+                  ],
+                ),
+                suffixes: [
+                  if (mobile && (!window.available || window.fullScreen))
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 160),
+                      child: const LibraryServerAction(compact: true),
+                    ),
+                  if (canRefreshLibrary || canRefreshHome)
                     FButton.icon(
-                      key: const ValueKey('detail-back'),
+                      key: ValueKey(
+                        canRefreshHome ? 'home-refresh' : 'library-refresh',
+                      ),
                       variant: .ghost,
                       size: .sm,
-                      semanticsLabel: l.back,
-                      onPress: () => popDetailRoute(headerContext),
-                      child: const Icon(FLucideIcons.arrowLeft),
+                      semanticsLabel: l.refresh,
+                      onPress: () {
+                        if (canRefreshHome) {
+                          refreshHome(ref);
+                        } else {
+                          ref.invalidate(libraryViewsProvider);
+                        }
+                      },
+                      child: const Icon(FLucideIcons.refreshCw),
                     ),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: detailBackgroundSpec != null
-                        ? DetailHeaderTitle(spec: detailBackgroundSpec!)
-                        : _HeaderTitle(labels[shell.currentIndex]),
-                  ),
                 ],
-              ),
-              suffixes: [
-                if (!window.available || window.fullScreen)
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: 160),
-                    child: const LibraryServerAction(compact: true),
-                  ),
-                if (canRefreshLibrary || canRefreshHome)
-                  FButton.icon(
-                    key: ValueKey(
-                      canRefreshHome ? 'home-refresh' : 'library-refresh',
-                    ),
-                    variant: .ghost,
-                    size: .sm,
-                    semanticsLabel: l.refresh,
-                    onPress: () {
-                      if (canRefreshHome) {
-                        refreshHome(ref);
-                      } else {
-                        ref.invalidate(libraryViewsProvider);
-                      }
-                    },
-                    child: const Icon(FLucideIcons.refreshCw),
-                  ),
-              ],
-            );
-          },
-        );
-        return ListenableBuilder(
-          listenable: window,
-          builder: (context, _) => WindowPosterBackgroundScope(
+              );
+            },
+          );
+          return WindowPosterBackgroundScope(
             active: posterBackground != null,
             shellHosted: true,
             child: Stack(
@@ -401,7 +412,7 @@ class AppShell extends ConsumerWidget {
                                               ],
                                             )
                                           : mobile && !immersiveMobile
-                                          ? mobileHeader
+                                          ? pageHeader
                                           : null,
                                       footer: mobile
                                           ? FBottomNavigationBar(
@@ -435,21 +446,24 @@ class AppShell extends ConsumerWidget {
                                           : null,
                                       child: _immersiveContent(
                                         ref,
-                                        immersive:
-                                            immersiveDesktop || immersiveMobile,
-                                        desktopInset: immersiveDesktop ? 48 : 0,
-                                        header: immersiveMobile
+                                        route: immersiveDesktop || overlayHeader
+                                            ? immersiveRoute
+                                            : null,
+                                        titleBarInset: titleBarInset,
+                                        header: overlayHeader
                                             ? ImmersiveChrome(
-                                                active: true,
+                                                route: immersiveRoute!,
                                                 overArtworkTheme:
                                                     overArtworkTheme,
                                                 child: Padding(
                                                   padding: EdgeInsets.only(
-                                                    top: MediaQuery.paddingOf(
-                                                      context,
-                                                    ).top,
+                                                    top: immersiveMobile
+                                                        ? MediaQuery.paddingOf(
+                                                            context,
+                                                          ).top
+                                                        : 0,
                                                   ),
-                                                  child: mobileHeader,
+                                                  child: pageHeader,
                                                 ),
                                               )
                                             : null,
@@ -478,7 +492,7 @@ class AppShell extends ConsumerWidget {
                           right: 0,
                           height: 48,
                           child: ImmersiveChrome(
-                            active: true,
+                            route: immersiveRoute!,
                             overArtworkTheme: overArtworkTheme,
                             child: titleBar,
                           ),
@@ -488,51 +502,58 @@ class AppShell extends ConsumerWidget {
                 ),
               ],
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
 
-/// Wraps the routed pages so an immersive home can lay its artwork under the
+/// Wraps the routed pages so artwork can extend under the
 /// window chrome, and tracks whether it has scrolled away from under it.
 Widget _immersiveContent(
   WidgetRef ref, {
-  required bool immersive,
-  required double desktopInset,
+  required String? route,
+  required double titleBarInset,
   required Widget? header,
   required Widget child,
 }) {
   final tracked = NotificationListener<ScrollUpdateNotification>(
     onNotification: (notification) {
-      if (immersive &&
+      if (route != null &&
           notification.depth == 0 &&
           notification.metrics.axis == Axis.vertical) {
         ref
-            .read(immersiveScrolledProvider.notifier)
+            .read(immersiveScrolledProvider(route).notifier)
             .set(notification.metrics.pixels > 4);
       }
       return false;
     },
     child: child,
   );
-  if (header == null) {
-    return ImmersiveScope(
-      active: immersive,
-      topInset: desktopInset,
-      child: tracked,
-    );
-  }
-  return _OverlaidHeader(header: header, child: tracked);
+  // Keep the routed subtree in the same position even when chrome changes;
+  // replacing it mid-transition would interrupt a poster Hero flight.
+  return _OverlaidHeader(
+    active: route != null,
+    header: header,
+    top: titleBarInset,
+    child: tracked,
+  );
 }
 
-/// Lays the phone header over the page and reports its measured height as
-/// the page's immersive top inset.
+/// Lays the page header over the artwork and reserves the combined height
+/// of the header and any custom window title bar.
 class _OverlaidHeader extends StatefulWidget {
-  const _OverlaidHeader({required this.header, required this.child});
+  const _OverlaidHeader({
+    required this.active,
+    required this.header,
+    required this.top,
+    required this.child,
+  });
 
-  final Widget header;
+  final bool active;
+  final Widget? header;
+  final double top;
   final Widget child;
 
   @override
@@ -570,25 +591,26 @@ class _OverlaidHeaderState extends State<_OverlaidHeader> {
     children: [
       Positioned.fill(
         child: ImmersiveScope(
-          active: true,
-          topInset: _height,
+          active: widget.active,
+          topInset: widget.top + (widget.header == null ? 0 : _height),
           child: widget.child,
         ),
       ),
-      Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        child: NotificationListener<SizeChangedLayoutNotification>(
-          onNotification: (_) {
-            _scheduleMeasure();
-            return true;
-          },
-          child: SizeChangedLayoutNotifier(
-            child: KeyedSubtree(key: _headerKey, child: widget.header),
+      if (widget.header case final header?)
+        Positioned(
+          top: widget.top,
+          left: 0,
+          right: 0,
+          child: NotificationListener<SizeChangedLayoutNotification>(
+            onNotification: (_) {
+              _scheduleMeasure();
+              return true;
+            },
+            child: SizeChangedLayoutNotifier(
+              child: KeyedSubtree(key: _headerKey, child: header),
+            ),
           ),
         ),
-      ),
     ],
   );
 }

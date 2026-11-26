@@ -6,11 +6,11 @@ import 'package:forui/forui.dart';
 
 /// Whether the immersive page has scrolled its artwork away from under the
 /// window chrome, so the chrome needs its own frosted backing.
-final immersiveScrolledProvider = NotifierProvider<ImmersiveScrolled, bool>(
-  ImmersiveScrolled.new,
-);
+final immersiveScrolledProvider = NotifierProvider.autoDispose
+    .family<ImmersiveScrolled, bool, String>(ImmersiveScrolled.new);
 
 class ImmersiveScrolled extends Notifier<bool> {
+  ImmersiveScrolled(String route);
   @override
   bool build() => false;
 
@@ -54,13 +54,13 @@ class ImmersiveScope extends InheritedWidget {
 /// page scrolls content beneath it.
 class ImmersiveChrome extends ConsumerWidget {
   const ImmersiveChrome({
-    required this.active,
+    required this.route,
     required this.overArtworkTheme,
     required this.child,
     super.key,
   });
 
-  final bool active;
+  final String route;
 
   /// Theme used while the chrome sits on top of the artwork.
   final FThemeData overArtworkTheme;
@@ -68,8 +68,7 @@ class ImmersiveChrome extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!active) return child;
-    final scrolled = ref.watch(immersiveScrolledProvider);
+    final scrolled = ref.watch(immersiveScrolledProvider(route));
     final theme = context.theme;
     final colors = theme.colors;
     final dark = colors.brightness == Brightness.dark;

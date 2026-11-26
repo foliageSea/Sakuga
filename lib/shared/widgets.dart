@@ -85,6 +85,7 @@ class PageScrollView extends StatelessWidget {
     this.animate = true,
     this.transparent = false,
     this.flushTop = false,
+    this.maxWidth = 1440,
     super.key,
   });
 
@@ -115,6 +116,9 @@ class PageScrollView extends StatelessWidget {
   /// without a [header].
   final bool flushTop;
 
+  /// Width cap for the scroll viewport; immersive artwork can use all of it.
+  final double maxWidth;
+
   static const _defaultHeaderGap = 16.0;
 
   @override
@@ -140,7 +144,7 @@ class PageScrollView extends StatelessWidget {
     final content = Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1440),
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: header == null
             ? scrollView
             : Column(

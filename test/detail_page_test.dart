@@ -39,10 +39,12 @@ const _title = 'A Long Movie Title For The Detail Page';
 
 /// A movie tall enough that the detail page always scrolls, with no image tags
 /// so the test never touches the network or the on-disk image cache.
-MediaItem _movie() => MediaItem(
+MediaItem _movie({Duration? position}) => MediaItem(
   id: 'movie-1',
   name: _title,
   type: MediaType.movie,
+  runtime: const Duration(minutes: 97),
+  playbackPosition: position,
   overview: List.filled(
     24,
     'An animated feature about a travelling theatre troupe.',
@@ -222,7 +224,8 @@ Future<void> expectBackButtonPinned(
 }) async {
   expect(_backButton, findsOneWidget);
   final pinnedAt = tester.getTopLeft(_backButton);
-  final titleBefore = tester.getTopLeft(find.text(_title));
+  final headerTitle = find.byKey(const ValueKey('detail-title'));
+  final titleBefore = tester.getTopLeft(headerTitle);
   final contentBefore = tester.getTopLeft(find.text('PG-13')).dy;
 
   final position = _pageScrollPosition(tester);
@@ -242,58 +245,52 @@ Future<void> expectBackButtonPinned(
     reason: 'the content should scroll under the pinned back button',
   );
   expect(tester.getTopLeft(_backButton), pinnedAt);
-  expect(tester.getTopLeft(find.text(_title)), titleBefore);
+  expect(tester.getTopLeft(headerTitle), titleBefore);
 }
 
 void main() {
-  const movieCard = ValueKey('detail-movie-movie-1');
-  for (final width in [320.0, 1280.0]) {
-    testWidgets(
-      'UGREEN movie plays from the card below credits at width $width',
-      (tester) async {
-        await pumpDetailPage(
-          tester,
-          server: _server.copyWith(type: MediaServerType.ugreen),
-          item: _movie,
-          size: Size(width, 800),
-          withPlayerRoute: true,
-        );
-        final card = find.byKey(movieCard);
-        await tester.scrollUntilVisible(card, 300, scrollable: _pageScrollable);
-        await tester.pumpAndSettle();
-        final lastCredit = find.text('Person 11');
-        expect(
-          tester.getTopLeft(card).dy,
-          greaterThan(tester.getBottomLeft(lastCredit).dy),
-        );
-        expect(card.hitTestable(), findsOneWidget);
-        final play = find.descendant(
-          of: card,
-          matching: find.byIcon(FLucideIcons.play),
-        );
-        expect(play.hitTestable(), findsOneWidget);
-        await tester.tap(play);
-        await tester.pumpAndSettle();
-        expect(find.text('player:movie-1'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
-  for (final type in MediaServerType.values.where(
-    (t) => t != MediaServerType.ugreen,
-  )) {
-    testWidgets('${type.name} keeps the original movie detail layout', (
+  for (final type in MediaServerType.values) {
+    testWidgets('${type.name} movie plays from the banner above the credits', (
       tester,
     ) async {
       await pumpDetailPage(
         tester,
         server: _server.copyWith(type: type),
         item: _movie,
+        size: Size(type == MediaServerType.ugreen ? 320 : 1280, 900),
+        withPlayerRoute: true,
       );
-      expect(find.byKey(movieCard), findsNothing);
-      expect(find.byIcon(FLucideIcons.play), findsNothing);
+      final play = find.byKey(const ValueKey('detail-play'));
+      final credits = find.byKey(const ValueKey('detail-about'));
+      expect(play.hitTestable(), findsOneWidget);
+      expect(
+        tester.getBottomLeft(play).dy,
+        lessThan(tester.getTopLeft(credits).dy),
+      );
+      expect(find.byKey(const ValueKey('detail-banner-title')), findsOneWidget);
+      expect(find.text('97 min'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('detail-overview-more')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('detail-movie-movie-1')), findsNothing);
+      await tester.tap(play);
+      await tester.pumpAndSettle();
+      expect(find.text('player:movie-1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('movie with progress offers to continue watching', (
+    tester,
+  ) async {
+    await pumpDetailPage(
+      tester,
+      item: () => _movie(position: const Duration(minutes: 20)),
+    );
+    expect(find.text('Continue watching'), findsOneWidget);
+  });
+
   testWidgets(
     'UGREEN season card loads episodes without fetching season again',
     (tester) async {
@@ -326,7 +323,6 @@ void main() {
       pending.complete([_episode()]);
       await tester.pumpAndSettle();
       expect(duplicateSeasonLookups, 0);
-      expect(find.byKey(movieCard), findsNothing);
       expect(find.text('1. Pilot'), findsOneWidget);
       expect(find.byType(LoadingNotice), findsNothing);
     },
@@ -1317,10 +1313,77 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('mobile movie artwork extends under the safe area and AppBar', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 560);
+    tester.view.padding = const FakeViewPadding(top: 24);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetPadding);
+
+    final movie = MediaItem(
+      id: 'movie-1',
+      name: _title,
+      type: MediaType.movie,
+      backdrop: const MediaImageResource(
+        urlTemplate: 'http://127.0.0.1:8096/movie/backdrop?width={width}',
+        cacheKey: 'movie-backdrop',
+      ),
+      people: _movie().people,
+    );
+    final servers = MemoryServerRepository()..items = [_server];
+    final container = ProviderContainer(
+      overrides: [
+        initialSettingsProvider.overrideWithValue(
+          const AppSettings(language: 'en'),
+        ),
+        settingsRepositoryProvider.overrideWithValue(MemorySettings()),
+        desktopWindowProvider.overrideWithValue(FakeWindow()),
+        serverRepositoryProvider.overrideWithValue(servers),
+        libraryViewsProvider.overrideWith(
+          (ref) async => LibraryData(
+            client: FakeMediaServerClient(server: _server),
+            userId: 'user-1',
+            views: const [],
+          ),
+        ),
+        libraryItemProvider.overrideWith((ref, query) async => movie),
+        randomItemsProvider.overrideWith((ref) async => const []),
+        resumeItemsProvider.overrideWith((ref) async => const []),
+        latestItemsProvider.overrideWith((ref) async => const []),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(routerProvider).go('/library/movie-1');
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const SakugaApp()),
+    );
+    await tester.pumpAndSettle();
+
+    final header = find.byKey(const ValueKey('mobile-header'));
+    final art = find.byKey(const ValueKey('detail-mobile-art'));
+    expect(tester.getRect(art).topLeft, Offset.zero);
+    expect(tester.getRect(art).width, 390);
+    expect(tester.getRect(header).top, 24);
+    expect(tester.getRect(header).bottom, lessThan(tester.getRect(art).bottom));
+    final frosted = find.byKey(const ValueKey('immersive-chrome-backing'));
+    expect(tester.widget<AnimatedOpacity>(frosted).opacity, 0);
+    await tester.dragFrom(const Offset(200, 290), const Offset(0, -250));
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedOpacity>(frosted).opacity, 1);
+    expect(_backButton.hitTestable(), findsOneWidget);
+    await tester.tap(_backButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(DetailPage), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'detail page uses series poster as global window background with Gaussian blur mask',
     (tester) async {
-      const windowSize = Size(1280, 900);
+      const windowSize = Size(1680, 900);
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = windowSize;
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -1436,6 +1499,19 @@ void main() {
       detailCompleter.complete(taggedSeries);
       await pumpFrames();
       expect(blurMaskFinder, findsOneWidget);
+      final artwork = tester.getRect(
+        find.byKey(const ValueKey('detail-desktop-art')),
+      );
+      final titleBar = tester.getRect(find.byType(DesktopTitleBar));
+      final detailHeader = tester.getRect(
+        find.byKey(const ValueKey('desktop-detail-header')),
+      );
+      expect(artwork.top, titleBar.top);
+      expect(artwork.left, tester.getRect(find.byType(FSidebar)).right);
+      expect(artwork.right, windowSize.width);
+      expect(detailHeader.top, titleBar.bottom);
+      expect(detailHeader.bottom, lessThan(artwork.bottom));
+      expect(_backButton.hitTestable(), findsOneWidget);
 
       // Toggling dark mode updates the mask cleanly without errors.
       await tester.tap(find.byKey(const ValueKey('toggle-theme')));

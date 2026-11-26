@@ -1,18 +1,17 @@
 import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind;
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_exception.dart';
-import '../../core/images/artwork_cache.dart';
 import '../../data/media_server/media_server_client.dart';
 import '../../data/media_server/media_server_factory.dart';
 import '../../data/media_server/media_models.dart';
 import '../../data/media_server/server_profile.dart';
+import '../../shared/immersive.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/poster_background.dart';
@@ -177,6 +176,7 @@ class DetailPage extends ConsumerWidget {
           return _DetailScaffold(
             title: preview.name,
             showLibrary: preview.type == MediaType.season,
+            hasArtwork: true,
             slivers: [
               SliverToBoxAdapter(
                 child: _Hero(
@@ -278,6 +278,7 @@ class _DetailBody extends ConsumerWidget {
         return _DetailScaffold(
           title: detailItemTitle(context, value),
           showLibrary: value.type == MediaType.season,
+          hasArtwork: true,
           slivers: [
             SliverToBoxAdapter(
               child: _Hero(
@@ -290,24 +291,6 @@ class _DetailBody extends ConsumerWidget {
                 seasonId: singleSeason?.id,
               ),
             ),
-            if (!value.isSeries && value.type != MediaType.season)
-              SliverToBoxAdapter(child: _About(item: value)),
-            if (client.server.type == MediaServerType.ugreen &&
-                value.type == MediaType.movie)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: _PlaybackTile(
-                    item: value,
-                    thumbnail:
-                        value.backdrop ??
-                        preview?.backdrop ??
-                        value.poster ??
-                        preview?.poster,
-                    translucent: WindowPosterBackgroundScope.isActive(context),
-                  ),
-                ),
-              ),
             if (value.isSeries)
               if (singleSeason != null)
                 _Episodes(
@@ -333,18 +316,17 @@ class _DetailBody extends ConsumerWidget {
                 ),
             // Season selection stays focused on seasons; cast and studios
             // belong to the episode views.
-            if (value.type == MediaType.season ||
-                (value.isSeries &&
-                    (singleSeason != null || isMobileLayout(context))))
-              SliverToBoxAdapter(
-                child: _About(item: value, showOverview: false),
-              ),
+            if (!value.isSeries ||
+                singleSeason != null ||
+                isMobileLayout(context))
+              SliverToBoxAdapter(child: _Credits(item: value)),
           ],
         );
       },
       loading: () => _DetailScaffold(
         title: preview?.name,
         showLibrary: preview?.type == MediaType.season,
+        hasArtwork: preview != null,
         slivers: [
           if (preview != null)
             SliverToBoxAdapter(
@@ -363,6 +345,7 @@ class _DetailBody extends ConsumerWidget {
       error: (error, _) => _DetailScaffold(
         title: preview?.name,
         showLibrary: preview?.type == MediaType.season,
+        hasArtwork: preview != null,
         slivers: [
           if (preview != null)
             SliverToBoxAdapter(
@@ -389,31 +372,43 @@ class _DetailBody extends ConsumerWidget {
   }
 }
 
-/// The detail page shell: the back bar is pinned above the scrolling content
-/// so it stays reachable in every state, including loading and errors.
+/// Keeps navigation reachable in every state. A host shell can overlay it
+/// on the artwork; standalone detail routes retain their pinned back bar.
 class _DetailScaffold extends StatelessWidget {
   const _DetailScaffold({
     required this.slivers,
     this.title,
     this.showLibrary = false,
+    this.hasArtwork = false,
   });
 
   final List<Widget> slivers;
+  final bool hasArtwork;
   final String? title;
   final bool showLibrary;
 
   @override
   Widget build(BuildContext context) {
-    final mobileShell =
-        isMobileLayout(context) &&
-        WindowPosterBackgroundScope.hasShell(context);
+    final inset = ImmersiveScope.insetOf(context);
+    final shellHasHeader = WindowPosterBackgroundScope.hasShell(context);
     return PageScrollView(
-      header: mobileShell
+      header: shellHasHeader
           ? null
           : _BackBar(title: title, showLibrary: showLibrary),
+      flushTop: inset != null,
+      maxWidth: inset == null ? 1440 : double.infinity,
       animate: false,
       transparent: true,
-      slivers: slivers,
+      slivers: [
+        if (inset != null && !hasArtwork)
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: inset + 24,
+              child: _DetailChromeScrim(inset),
+            ),
+          ),
+        ...slivers,
+      ],
     );
   }
 }
@@ -600,7 +595,6 @@ class _Hero extends StatelessWidget {
     final theme = context.theme;
     final mobile = isMobileLayout(context);
     final seriesDetail = item.isSeries || item.type == MediaType.season;
-    final posterWidth = mobile ? 96.0 : 132.0;
     final poster = AspectRatio(
       aspectRatio: 2 / 3,
       child: PosterHero(
@@ -615,8 +609,10 @@ class _Hero extends StatelessWidget {
     final backdropImage =
         item.backdrop ??
         fallbackItem?.backdrop ??
-        (seriesDetail ? item.poster ?? fallbackItem?.poster : null);
+        item.poster ??
+        fallbackItem?.poster;
     final backdrop = MediaImage(
+      key: const ValueKey('detail-desktop-art'),
       url: backdropImage?.url(width: 1920),
       headers: backdropImage?.headers ?? const {},
     );
@@ -628,12 +624,30 @@ class _Hero extends StatelessWidget {
                 : seriesId ?? item.seriesId ?? fallbackItem?.seriesId,
             seasonId: item.isSeries ? seasonId : item.id,
           )
+        : item.type == MediaType.movie
+        ? FButton(
+            key: const ValueKey('detail-play'),
+            size: .lg,
+            prefix: const Icon(FLucideIcons.play),
+            onPress: pending
+                ? null
+                : () => context.push(playerLocation(item.id)),
+            child: Text(
+              !item.played &&
+                      (item.playbackPosition ?? Duration.zero) > Duration.zero
+                  ? context.l10n.continueWatching
+                  : context.l10n.playPlayback,
+            ),
+          )
         : null;
     final overview = item.overview?.trim() ?? '';
-    if (mobile && seriesDetail) {
+    final inset = ImmersiveScope.insetOf(context);
+    final chromeHeight = inset ?? 0;
+    final pageInset = pagePadding(context);
+    if (mobile) {
       // Phones: edge-to-edge artwork fading into the page, with the centered
       // title art, facts, play action and synopsis stacked beneath it.
-      final bleed = pagePadding(context);
+      final topBleed = inset == null ? pageInset : 0.0;
       final screen = MediaQuery.sizeOf(context);
       final mobileArt =
           item.backdrop ??
@@ -647,15 +661,15 @@ class _Hero extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: artHeight - bleed,
+            height: artHeight + chromeHeight - topBleed,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
                 Positioned(
-                  top: -bleed,
-                  left: -bleed,
-                  right: -bleed,
-                  height: artHeight,
+                  top: -topBleed,
+                  left: -pageInset,
+                  right: -pageInset,
+                  bottom: 0,
                   child: ShaderMask(
                     blendMode: BlendMode.dstIn,
                     shaderCallback: (bounds) => const LinearGradient(
@@ -675,6 +689,14 @@ class _Hero extends StatelessWidget {
                           ),
                   ),
                 ),
+                if (inset != null)
+                  Positioned(
+                    top: 0,
+                    left: -pageInset,
+                    right: -pageInset,
+                    height: chromeHeight + 48,
+                    child: _DetailChromeScrim(chromeHeight),
+                  ),
                 Positioned(
                   left: 0,
                   right: 0,
@@ -700,183 +722,145 @@ class _Hero extends StatelessWidget {
         ],
       );
     }
-    if (mobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ClipRRect(
-            borderRadius: theme.style.borderRadius.lg,
-            child: AspectRatio(aspectRatio: 16 / 9, child: backdrop),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: posterWidth, child: poster),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _TitleBlock(
-                  item: item,
-                  fallbackItem: fallbackItem,
-                  onDark: false,
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
-    }
-    if (seriesDetail) {
-      final height = (MediaQuery.sizeOf(context).height * 0.6).clamp(
-        440.0,
-        600.0,
-      );
-      return ClipRRect(
-        borderRadius: theme.style.borderRadius.lg,
-        child: SizedBox(
-          height: height,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              backdrop,
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x00000000), Color(0xE6000000)],
-                    stops: [0.35, 1],
-                  ),
-                ),
-              ),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [Color(0x99000000), Color(0x00000000)],
-                    stops: [0, 0.6],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 32,
-                right: 32,
-                bottom: 28,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    SizedBox(width: 150, child: poster),
-                    const SizedBox(width: 28),
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final title = MediaTitleArt(
-                            item: item,
-                            fallbackItem: fallbackItem,
-                            onDark: true,
-                          );
-                          final details = [
-                            MediaMetaRow(item: item, onDark: true),
-                            if (overview.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              _Overview(
-                                text: overview,
-                                maxLines: 3,
-                                onDark: true,
-                              ),
-                            ],
-                          ];
-                          if (constraints.maxWidth < 720) {
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                title,
-                                const SizedBox(height: 12),
-                                ...details,
-                                const SizedBox(height: 20),
-                                ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 360,
-                                  ),
-                                  child: playButton,
-                                ),
-                              ],
-                            );
-                          }
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              SizedBox(
-                                width: 320,
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Align(
-                                      alignment: Alignment.bottomLeft,
-                                      child: title,
-                                    ),
-                                    const SizedBox(height: 20),
-                                    ?playButton,
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 40),
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: details,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    final height = (MediaQuery.sizeOf(context).height * 0.6).clamp(
+      440.0,
+      600.0,
+    );
+    final bleed = inset == null ? 0.0 : pageInset;
+    final background = Stack(
+      fit: StackFit.expand,
+      children: [
+        backdrop,
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x00000000), Color(0xE6000000)],
+              stops: [0.35, 1],
+            ),
           ),
         ),
-      );
-    }
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Color(0x99000000), Color(0x00000000)],
+              stops: [0, 0.6],
+            ),
+          ),
+        ),
+        if (inset != null)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: chromeHeight + 48,
+            child: _DetailChromeScrim(chromeHeight),
+          ),
+      ],
+    );
     return ClipRRect(
       borderRadius: theme.style.borderRadius.lg,
+      clipBehavior: inset == null ? Clip.antiAlias : Clip.none,
       child: SizedBox(
-        height: 340,
+        height: height + chromeHeight,
         child: Stack(
+          clipBehavior: Clip.none,
           fit: StackFit.expand,
           children: [
-            backdrop,
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0x1A000000), Color(0xF2000000)],
-                  stops: [0.25, 1],
-                ),
-              ),
+            Positioned.fill(
+              left: -bleed,
+              right: -bleed,
+              child: inset == null
+                  ? background
+                  : ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (bounds) => const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+                        stops: [0.92, 1],
+                      ).createShader(bounds),
+                      child: background,
+                    ),
             ),
             Positioned(
-              left: 24,
-              right: 24,
-              bottom: 20,
+              left: 32,
+              right: 32,
+              bottom: 28,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  SizedBox(width: posterWidth, child: poster),
-                  const SizedBox(width: 20),
+                  SizedBox(width: 150, child: poster),
+                  const SizedBox(width: 28),
                   Expanded(
-                    child: _TitleBlock(
-                      item: item,
-                      fallbackItem: fallbackItem,
-                      onDark: true,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final title = MediaTitleArt(
+                          item: item,
+                          fallbackItem: fallbackItem,
+                          onDark: true,
+                        );
+                        final details = [
+                          MediaMetaRow(item: item, onDark: true),
+                          if (overview.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            _Overview(
+                              text: overview,
+                              maxLines: 3,
+                              onDark: true,
+                            ),
+                          ],
+                        ];
+                        if (constraints.maxWidth < 720) {
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              title,
+                              const SizedBox(height: 12),
+                              ...details,
+                              const SizedBox(height: 20),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 360,
+                                ),
+                                child: playButton,
+                              ),
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            SizedBox(
+                              width: 320,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Align(
+                                    alignment: Alignment.bottomLeft,
+                                    child: title,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  ?playButton,
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 40),
+                            Expanded(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: details,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -889,76 +873,31 @@ class _Hero extends StatelessWidget {
   }
 }
 
-class _TitleBlock extends StatelessWidget {
-  const _TitleBlock({
-    required this.item,
-    required this.onDark,
-    this.fallbackItem,
-  });
+/// Keeps the overlaid controls readable on bright or still-loading artwork.
+class _DetailChromeScrim extends StatelessWidget {
+  const _DetailChromeScrim(this.inset);
 
-  final MediaItem item;
-  final MediaItem? fallbackItem;
-  final bool onDark;
+  final double inset;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-    final muted = onDark
-        ? const Color(0xCCFFFFFF)
-        : theme.colors.mutedForeground;
-    final background = onDark ? const Color(0x33FFFFFF) : theme.colors.muted;
-    final logo = item.logo ?? fallbackItem?.logo;
-    final mobile = isMobileLayout(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (logo != null) ...[
-          SizedBox(
-            width: 420,
-            height: mobile ? 80 : 120,
-            child: CachedNetworkImage(
-              key: const ValueKey('detail-logo'),
-              imageUrl: logo.url(width: 840),
-              httpHeaders: logo.headers,
-              cacheKey: artworkCacheKey(logo.url(width: 840), logo.headers),
-              cacheManager: ArtworkCacheManager.instance,
-              fit: BoxFit.contain,
-              alignment: Alignment.bottomLeft,
-              fadeInDuration: const Duration(milliseconds: 200),
-              placeholder: (_, _) => const SizedBox.shrink(),
-              errorWidget: (_, _, _) => const SizedBox.shrink(),
-            ),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: const [
+              Color(0xB3000000),
+              Color(0x99000000),
+              Color(0x00000000),
+            ],
+            stops: [0, (inset / constraints.maxHeight).clamp(0.0, 1.0), 1],
           ),
-          const SizedBox(height: 10),
-        ],
-        if (MediaRating.of(item) != null) ...[
-          MediaRating(item: item, onDark: onDark),
-          const SizedBox(height: 12),
-        ],
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            if (item.productionYear != null)
-              _Tag(
-                text: '${item.productionYear}',
-                foreground: muted,
-                background: background,
-              ),
-            if (item.officialRating != null)
-              _Tag(
-                text: item.officialRating!,
-                foreground: muted,
-                background: background,
-              ),
-            for (final genre in item.genres.take(3))
-              _Tag(text: genre, foreground: muted, background: background),
-          ],
         ),
-      ],
-    );
-  }
+      ),
+    ),
+  );
 }
 
 /// A clamped synopsis that offers the full text in a dialog only when it
@@ -1195,51 +1134,16 @@ class _PlayButtonState extends ConsumerState<_PlayButton> {
   }
 }
 
-class _Tag extends StatelessWidget {
-  const _Tag({
-    required this.text,
-    required this.foreground,
-    required this.background,
-  });
-
-  final String text;
-  final Color foreground;
-  final Color background;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: background,
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Text(
-      text,
-      style: context.theme.typography.body.xs.copyWith(color: foreground),
-    ),
-  );
-}
-
-class _About extends StatelessWidget {
-  const _About({required this.item, this.showOverview = true});
+class _Credits extends StatelessWidget {
+  const _Credits({required this.item});
 
   final MediaItem item;
-
-  /// Series and seasons show their synopsis in the banner instead.
-  final bool showOverview;
 
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
     final theme = context.theme;
-    final overview = showOverview ? item.overview?.trim() ?? '' : '';
     final sections = <List<Widget>>[
-      if (overview.isNotEmpty)
-        [
-          _SectionTitle(l.synopsis),
-          const SizedBox(height: 8),
-          Text(overview, style: theme.typography.body.sm),
-        ],
       if (item.people.isNotEmpty)
         [
           _SectionTitle(l.cast),
@@ -2093,162 +1997,6 @@ class _EpisodeCardState extends State<_EpisodeCard> {
                 ),
               ],
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PlaybackTile extends StatelessWidget {
-  const _PlaybackTile({
-    required this.item,
-    required this.thumbnail,
-    this.translucent = false,
-  });
-  final MediaItem item;
-  final MediaImageResource? thumbnail;
-  final bool translucent;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-    final code = item.isEpisode ? item.episodeCode : null;
-    final progress = item.progressFraction;
-    final overview = item.isEpisode ? item.overview?.trim() ?? '' : '';
-    final keyPrefix = item.isEpisode ? 'detail-episode' : 'detail-movie';
-    final title = !item.isEpisode || item.indexNumber == null
-        ? item.name
-        : context.l10n.episodeTitle(item.indexNumber!, item.name);
-    final duration = item.runtime;
-    final metadata = [
-      ?code,
-      if (duration != null && duration > Duration.zero)
-        context.l10n.libraryDuration(duration.inMinutes),
-    ].join(' · ');
-    final information = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          key: ValueKey('$keyPrefix-title-${item.id}'),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.typography.body.md.copyWith(fontWeight: FontWeight.w500),
-        ),
-        if (metadata.isNotEmpty || item.played) ...[
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (metadata.isNotEmpty)
-                Text(
-                  metadata,
-                  key: ValueKey('$keyPrefix-metadata-${item.id}'),
-                  style: theme.typography.body.xs.copyWith(
-                    color: theme.colors.mutedForeground,
-                  ),
-                ),
-              if (item.played)
-                Icon(
-                  FLucideIcons.check,
-                  size: 14,
-                  color: theme.colors.mutedForeground,
-                ),
-            ],
-          ),
-        ],
-        if (overview.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Text(
-            overview,
-            key: ValueKey('$keyPrefix-overview-${item.id}'),
-            maxLines: 4,
-            overflow: TextOverflow.ellipsis,
-            style: theme.typography.body.sm.copyWith(
-              color: theme.colors.mutedForeground,
-            ),
-          ),
-        ],
-      ],
-    );
-    final thumbnailFrame = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AspectRatio(
-          aspectRatio: 16 / 9,
-          child: ClipRRect(
-            borderRadius: theme.style.borderRadius.md,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                MediaImage(
-                  url: thumbnail?.url(),
-                  headers: thumbnail?.headers ?? const {},
-                ),
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0x66000000),
-                    ),
-                    child: const Icon(
-                      FLucideIcons.play,
-                      size: 20,
-                      color: Color(0xFFFFFFFF),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (progress != null) ...[
-          const SizedBox(height: 6),
-          MediaProgressBar(value: progress),
-        ],
-      ],
-    );
-    return Semantics(
-      button: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          key: ValueKey('$keyPrefix-${item.id}'),
-          behavior: HitTestBehavior.opaque,
-          onTap: () => context.push(playerLocation(item.id)),
-          child: Surface(
-            padding: 12,
-            translucent: translucent,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth < 320) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      thumbnailFrame,
-                      const SizedBox(height: 12),
-                      information,
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: constraints.maxWidth < 600 ? 112 : 240,
-                      child: thumbnailFrame,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(child: information),
-                  ],
-                );
-              },
-            ),
           ),
         ),
       ),
