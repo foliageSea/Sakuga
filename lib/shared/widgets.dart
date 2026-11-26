@@ -84,6 +84,7 @@ class PageScrollView extends StatelessWidget {
     this.controller,
     this.animate = true,
     this.transparent = false,
+    this.flushTop = false,
     super.key,
   });
 
@@ -109,6 +110,11 @@ class PageScrollView extends StatelessWidget {
   /// the page remains visible.
   final bool transparent;
 
+  /// Whether the first sliver starts at the very top, without page padding,
+  /// e.g. artwork extending under overlaid window chrome. Only applies
+  /// without a [header].
+  final bool flushTop;
+
   static const _defaultHeaderGap = 16.0;
 
   @override
@@ -123,7 +129,7 @@ class PageScrollView extends StatelessWidget {
           // the content, so the content itself needs neither.
           padding: EdgeInsets.fromLTRB(
             padding,
-            header == null ? padding : 0,
+            header == null && !flushTop ? padding : 0,
             padding,
             padding,
           ),

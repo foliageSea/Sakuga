@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
@@ -13,10 +14,12 @@ import '../../data/media_server/server_profile.dart';
 import '../../data/media_server/server_repository.dart';
 import '../../shared/localization.dart';
 import '../../shared/media_widgets.dart';
+import '../../shared/immersive.dart';
 import '../../shared/poster_background.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
 import '../detail/detail_page.dart';
+import '../detail/media_header.dart';
 import '../detail/played_status_button.dart';
 import '../library/library_providers.dart';
 import '../player/player_route.dart';
@@ -29,21 +32,27 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     final servers = ref.watch(serversProvider);
+    // The shell overlays its chrome while the carousel artwork extends under
+    // it; the chrome then hosts the refresh action instead of a page heading.
+    final immersive = ImmersiveScope.insetOf(context) != null;
     final content = PageScrollView(
       transparent: true,
       headerGap: 0,
-      header: PageHeading(
-        l.home,
-        hideTitleOnMobile: true,
-        action: FButton.icon(
-          key: const ValueKey('home-refresh'),
-          variant: .ghost,
-          size: .sm,
-          semanticsLabel: l.refresh,
-          onPress: () => refreshHome(ref),
-          child: const Icon(FLucideIcons.refreshCw),
-        ),
-      ),
+      flushTop: immersive,
+      header: immersive
+          ? null
+          : PageHeading(
+              l.home,
+              hideTitleOnMobile: true,
+              action: FButton.icon(
+                key: const ValueKey('home-refresh'),
+                variant: .ghost,
+                size: .sm,
+                semanticsLabel: l.refresh,
+                onPress: () => refreshHome(ref),
+                child: const Icon(FLucideIcons.refreshCw),
+              ),
+            ),
       slivers: [
         SliverToBoxAdapter(
           child: servers.when(
@@ -173,11 +182,17 @@ class _PosterCarouselSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(randomItemsProvider);
-    final height = isMobileLayout(context) ? 216.0 : 400.0;
+    final inset = ImmersiveScope.insetOf(context);
+    final height = carouselHeight(context) + (inset ?? 0);
     return items.when(
       data: (values) => values.isEmpty
           ? const SizedBox.shrink()
-          : _PosterCarousel(client: client, items: values, height: height),
+          : _PosterCarousel(
+              client: client,
+              items: values,
+              height: height,
+              immersiveInset: inset,
+            ),
       loading: () => SizedBox(
         height: height,
         child: const Surface(child: Center(child: FCircularProgress())),
@@ -187,11 +202,28 @@ class _PosterCarouselSection extends ConsumerWidget {
   }
 }
 
+/// Phone artwork height, matching the detail page's edge-to-edge header.
+double _mobileArtHeight(BuildContext context) {
+  final screen = MediaQuery.sizeOf(context);
+  return (screen.width * 0.9).clamp(
+    240.0,
+    math.max(240.0, screen.height * 0.5).toDouble(),
+  );
+}
+
+/// Featured carousel height: the detail banner on wide layouts; artwork plus
+/// the centered facts and page dots on phones.
+double carouselHeight(BuildContext context) {
+  if (isMobileLayout(context)) return _mobileArtHeight(context) + 60;
+  return (MediaQuery.sizeOf(context).height * 0.55).clamp(400.0, 560.0);
+}
+
 class _PosterCarousel extends ConsumerStatefulWidget {
   const _PosterCarousel({
     required this.client,
     required this.items,
     required this.height,
+    this.immersiveInset,
   });
 
   static const autoPlayInterval = Duration(seconds: 6);
@@ -200,6 +232,9 @@ class _PosterCarousel extends ConsumerStatefulWidget {
   final MediaServerClient client;
   final List<MediaItem> items;
   final double height;
+
+  /// Height of the window chrome overlaid on the artwork, when immersive.
+  final double? immersiveInset;
 
   @override
   ConsumerState<_PosterCarousel> createState() => _PosterCarouselState();
@@ -335,6 +370,154 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
         .watch(homeCarouselIndexProvider)
         .clamp(0, length - 1);
     final radius = theme.style.borderRadius.lg;
+    final dotColor = mobile ? theme.colors.foreground : const Color(0xFFFFFFFF);
+    final dots = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < length; i++)
+          GestureDetector(
+            key: ValueKey('home-carousel-dot-$i'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _goToPage(i + 1),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                width: i == activeIndex ? 18 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: i == activeIndex
+                      ? dotColor
+                      : dotColor.withValues(alpha: 0.32),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+    final pages = ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(
+        dragDevices: const {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+        },
+      ),
+      child: NotificationListener<ScrollEndNotification>(
+        onNotification: (notification) {
+          if (notification.depth == 0) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted &&
+                  _pageController.hasClients &&
+                  !_pageController.position.isScrollingNotifier.value) {
+                _normalizePage();
+              }
+            });
+          }
+          return false;
+        },
+        child: PageView.builder(
+          controller: _pageController,
+          itemCount: length > 1 ? length + 2 : 1,
+          onPageChanged: _handlePageChanged,
+          itemBuilder: (context, index) => _CarouselSlide(
+            client: widget.client,
+            item: widget.items[_itemIndex(index)],
+            mobile: mobile,
+            hasMultiple: length > 1,
+            immersiveInset: widget.immersiveInset,
+          ),
+        ),
+      ),
+    );
+
+    if (mobile) {
+      // Phones: edge-to-edge like the detail header, so the artwork bleeds
+      // past the page padding and fades into the page.
+      final bleed = pagePadding(context);
+      return SizedBox(
+        key: const ValueKey('home-poster-carousel'),
+        height: widget.height,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth + bleed * 2;
+            return OverflowBox(
+              minWidth: width,
+              maxWidth: width,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  pages,
+                  if (length > 1)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Center(child: dots),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    final arrows = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _CarouselArrowButton(
+          key: const ValueKey('home-carousel-prev'),
+          icon: FLucideIcons.chevronLeft,
+          onTap: () => _moveBy(-1),
+        ),
+        const SizedBox(width: 8),
+        _CarouselArrowButton(
+          key: const ValueKey('home-carousel-next'),
+          icon: FLucideIcons.chevronRight,
+          onTap: () => _moveBy(1),
+        ),
+      ],
+    );
+
+    if (widget.immersiveInset case final inset?) {
+      // Edge-to-edge under the title bar, fading into the page below.
+      final bleed = pagePadding(context);
+      return MouseRegion(
+        onEnter: (_) => _setHovered(true),
+        onExit: (_) => _setHovered(false),
+        child: SizedBox(
+          key: const ValueKey('home-poster-carousel'),
+          height: widget.height,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth + bleed * 2;
+              return OverflowBox(
+                minWidth: width,
+                maxWidth: width,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    pages,
+                    if (length > 1) ...[
+                      Positioned(top: inset + 16, right: bleed, child: arrows),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 12,
+                        child: Center(child: dots),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
 
     return MouseRegion(
       onEnter: (_) => _setHovered(true),
@@ -347,96 +530,14 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              ScrollConfiguration(
-                behavior: ScrollConfiguration.of(context).copyWith(
-                  dragDevices: const {
-                    PointerDeviceKind.touch,
-                    PointerDeviceKind.mouse,
-                    PointerDeviceKind.trackpad,
-                  },
-                ),
-                child: NotificationListener<ScrollEndNotification>(
-                  onNotification: (notification) {
-                    if (notification.depth == 0) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted &&
-                            _pageController.hasClients &&
-                            !_pageController
-                                .position
-                                .isScrollingNotifier
-                                .value) {
-                          _normalizePage();
-                        }
-                      });
-                    }
-                    return false;
-                  },
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: length > 1 ? length + 2 : 1,
-                    onPageChanged: _handlePageChanged,
-                    itemBuilder: (context, index) => _CarouselSlide(
-                      client: widget.client,
-                      item: widget.items[_itemIndex(index)],
-                      mobile: mobile,
-                      hasMultiple: length > 1,
-                    ),
-                  ),
-                ),
-              ),
+              pages,
               if (length > 1) ...[
+                Positioned(top: 16, right: 16, child: arrows),
                 Positioned(
-                  top: mobile ? 10 : 16,
-                  right: mobile ? 10 : 16,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _CarouselArrowButton(
-                        key: const ValueKey('home-carousel-prev'),
-                        icon: FLucideIcons.chevronLeft,
-                        onTap: () => _moveBy(-1),
-                      ),
-                      const SizedBox(width: 8),
-                      _CarouselArrowButton(
-                        key: const ValueKey('home-carousel-next'),
-                        icon: FLucideIcons.chevronRight,
-                        onTap: () => _moveBy(1),
-                      ),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  right: mobile ? 14 : 24,
-                  bottom: mobile ? 12 : 20,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 0; i < length; i++)
-                        GestureDetector(
-                          key: ValueKey('home-carousel-dot-$i'),
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => _goToPage(i + 1),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 3,
-                              vertical: 4,
-                            ),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 220),
-                              curve: Curves.easeOutCubic,
-                              width: i == activeIndex ? 18 : 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: i == activeIndex
-                                    ? const Color(0xFFFFFFFF)
-                                    : const Color(0x66FFFFFF),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                  left: 0,
+                  right: 0,
+                  bottom: 12,
+                  child: Center(child: dots),
                 ),
               ],
               IgnorePointer(
@@ -494,197 +595,264 @@ class _CarouselSlide extends StatelessWidget {
     required this.item,
     required this.mobile,
     required this.hasMultiple,
+    this.immersiveInset,
   });
 
   final MediaServerClient client;
   final MediaItem item;
   final bool mobile;
   final bool hasMultiple;
+  final double? immersiveInset;
+
+  /// Darkens the top of artwork that sits under window chrome so its light
+  /// controls stay legible.
+  Widget _chromeScrim(double inset) => Positioned(
+    top: 0,
+    left: 0,
+    right: 0,
+    height: inset * 2.5,
+    child: const IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0x8C000000), Color(0x00000000)],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _artwork() {
+    final backdrop = item.backdrop;
+    final poster = item.poster;
+    if (backdrop != null) {
+      return MediaImage(
+        url: backdrop.url(width: 1920),
+        headers: backdrop.headers,
+      );
+    }
+    if (poster == null) return const MediaPlaceholder();
+    return ClipRect(
+      child: ImageFiltered(
+        imageFilter: ImageFilter.blur(
+          sigmaX: 24,
+          sigmaY: 24,
+          tileMode: TileMode.clamp,
+        ),
+        child: Transform.scale(
+          scale: 1.15,
+          child: MediaImage(url: poster.url(), headers: poster.headers),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.theme;
     final posterUrl = item.poster?.url();
-    final backdropUrl = item.backdrop?.url(width: 1920);
-    final overview = item.overview?.trim() ?? '';
-    final pad = mobile ? 14.0 : 24.0;
-    final posterWidth = mobile ? 80.0 : 160.0;
-    final tags = <String>[
-      if (item.productionYear != null) '${item.productionYear}',
-      if (item.officialRating != null && item.officialRating!.isNotEmpty)
-        item.officialRating!,
-      ...item.genres.take(3),
-    ];
-
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         key: ValueKey('home-carousel-slide-${item.id}'),
         behavior: HitTestBehavior.opaque,
         onTap: () => _openDetail(context, item, posterUrl),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (backdropUrl != null)
-              MediaImage(
-                url: backdropUrl,
-                headers: item.backdrop?.headers ?? const {},
-              )
-            else if (posterUrl != null)
-              ClipRect(
-                child: ImageFiltered(
-                  imageFilter: ImageFilter.blur(
-                    sigmaX: 24,
-                    sigmaY: 24,
-                    tileMode: TileMode.clamp,
-                  ),
-                  child: Transform.scale(
-                    scale: 1.15,
-                    child: MediaImage(
-                      url: posterUrl,
-                      headers: item.poster?.headers ?? const {},
-                    ),
-                  ),
-                ),
-              )
-            else
-              const MediaPlaceholder(),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0x1F000000),
-                    Color(0x73000000),
-                    Color(0xE6000000),
-                  ],
-                  stops: [0.0, 0.48, 1.0],
-                ),
-              ),
-            ),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [Color(0x8C000000), Color(0x00000000)],
-                  stops: [0.0, 0.65],
-                ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                pad,
-                pad,
-                hasMultiple && !mobile ? pad + 112 : pad,
-                hasMultiple && mobile ? pad + 18 : pad,
-              ),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    SizedBox(
-                      width: posterWidth,
-                      child: AspectRatio(
-                        aspectRatio: 2 / 3,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: theme.style.borderRadius.md,
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x66000000),
-                                blurRadius: 16,
-                                offset: Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: theme.style.borderRadius.md,
-                            child: MediaImage(
-                              url: posterUrl,
-                              headers: item.poster?.headers ?? const {},
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: mobile ? 12 : 20),
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.displayTitle,
-                            maxLines: mobile ? 1 : 2,
-                            overflow: TextOverflow.ellipsis,
-                            style:
-                                (mobile
-                                        ? theme.typography.display.md
-                                        : theme.typography.display.xl)
-                                    .copyWith(
-                                      color: const Color(0xFFFFFFFF),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                          ),
-                          if (tags.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: [
-                                for (final tag in tags) _CarouselTag(text: tag),
-                              ],
-                            ),
-                          ],
-                          if (!mobile && overview.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            Flexible(
-                              child: Text(
-                                overview,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.typography.body.sm.copyWith(
-                                  color: const Color(0xCCFFFFFF),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+        child: mobile ? _mobile(context) : _wide(context),
       ),
     );
   }
-}
 
-class _CarouselTag extends StatelessWidget {
-  const _CarouselTag({required this.text});
+  /// Phone slide: faded edge-to-edge artwork with centered title art and
+  /// facts, mirroring the phone detail header.
+  Widget _mobile(BuildContext context) {
+    final bleed = pagePadding(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: _mobileArtHeight(context) + (immersiveInset ?? 0),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (bounds) => const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+                  stops: [0.55, 1],
+                ).createShader(bounds),
+                child: _artwork(),
+              ),
+              if (immersiveInset case final inset?) _chromeScrim(inset),
+              Positioned(
+                left: bleed,
+                right: bleed,
+                bottom: 0,
+                child: MediaTitleArt(
+                  item: item,
+                  onDark: false,
+                  center: true,
+                  keyPrefix: 'home-carousel-${item.id}',
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: bleed),
+          child: MediaMetaRow(item: item, onDark: false, center: true),
+        ),
+      ],
+    );
+  }
 
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: const Color(0x33FFFFFF),
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Text(
-      text,
-      style: context.theme.typography.body.xs.copyWith(
-        color: const Color(0xEBFFFFFF),
-      ),
-    ),
-  );
+  /// Wide slide: the detail banner with poster, title art, facts and synopsis.
+  Widget _wide(BuildContext context) {
+    final theme = context.theme;
+    final overview = item.overview?.trim() ?? '';
+    final overviewStyle = theme.typography.body.md.copyWith(
+      color: const Color(0xE6FFFFFF),
+      height: 1.6,
+    );
+    final inset = immersiveInset;
+    final side = inset == null ? 32.0 : pagePadding(context);
+    final slide = Stack(
+      fit: StackFit.expand,
+      children: [
+        _artwork(),
+        ?(inset == null ? null : _chromeScrim(inset)),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x00000000), Color(0xE6000000)],
+              stops: [0.35, 1],
+            ),
+          ),
+        ),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Color(0x99000000), Color(0x00000000)],
+              stops: [0, 0.6],
+            ),
+          ),
+        ),
+        Positioned(
+          left: side,
+          right: side,
+          bottom: hasMultiple ? 40 : 28,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              SizedBox(
+                width: 150,
+                child: AspectRatio(
+                  aspectRatio: 2 / 3,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: theme.style.borderRadius.md,
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x66000000),
+                          blurRadius: 16,
+                          offset: Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: theme.style.borderRadius.md,
+                      child: MediaImage(
+                        url: item.poster?.url(),
+                        headers: item.poster?.headers ?? const {},
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 28),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final title = MediaTitleArt(
+                      item: item,
+                      onDark: true,
+                      keyPrefix: 'home-carousel-${item.id}',
+                    );
+                    Widget synopsis(int lines) => Text(
+                      overview,
+                      maxLines: lines,
+                      overflow: TextOverflow.ellipsis,
+                      style: overviewStyle,
+                    );
+                    if (constraints.maxWidth < 720) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          title,
+                          const SizedBox(height: 12),
+                          MediaMetaRow(item: item, onDark: true),
+                          if (overview.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            synopsis(2),
+                          ],
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        SizedBox(
+                          width: 320,
+                          child: Align(
+                            alignment: Alignment.bottomLeft,
+                            child: title,
+                          ),
+                        ),
+                        const SizedBox(width: 40),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              MediaMetaRow(item: item, onDark: true),
+                              if (overview.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                synopsis(3),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (inset == null) return slide;
+    // Fade the bottom edge into the page instead of ending on a hard line.
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (bounds) => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+        stops: [0.88, 1],
+      ).createShader(bounds),
+      child: slide,
+    );
+  }
 }
 
 class _MediaSection extends StatelessWidget {

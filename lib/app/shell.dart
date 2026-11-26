@@ -13,9 +13,11 @@ import '../features/home/home_providers.dart';
 import '../features/library/library_providers.dart';
 import '../features/library/library_server_picker.dart';
 import '../shared/language_options.dart';
+import '../shared/immersive.dart';
 import '../shared/localization.dart';
 import '../shared/poster_background.dart';
 import '../shared/widgets.dart';
+import 'theme.dart';
 
 class AppShell extends ConsumerWidget {
   const AppShell({
@@ -48,6 +50,8 @@ class AppShell extends ConsumerWidget {
         ref.watch(mediaServerClientProvider(activeServer)).isConfigured;
     final canRefreshLibrary = isLibraryRootRoute && serverConfigured;
     final canRefreshHome = isHomeRoute && serverConfigured;
+    final immersive = isHomeRoute && posterBackground != null;
+    final overArtworkTheme = ref.watch(appThemesProvider).dark;
     final l = context.l10n;
     final labels = [l.home, l.library, l.settings];
     const icons = [
@@ -68,6 +72,115 @@ class AppShell extends ConsumerWidget {
             : colors.foreground.withValues(alpha: 0.09);
         final sidebarActiveFill = colors.foreground.withValues(
           alpha: dark ? 0.115 : 0.045,
+        );
+        final showTitleBar = window.available && !window.fullScreen;
+        // The home carousel artwork extends under the window chrome: the
+        // desktop title bar, or the phone header and status bar.
+        final immersiveDesktop = immersive && !mobile && showTitleBar;
+        final immersiveMobile = immersive && mobile && backLocation == null;
+        final refreshHomeButton = FButton.icon(
+          key: const ValueKey('home-refresh'),
+          variant: .ghost,
+          size: .sm,
+          semanticsLabel: l.refresh,
+          onPress: () => refreshHome(ref),
+          child: const Icon(FLucideIcons.refreshCw),
+        );
+        final Widget? titleBar = showTitleBar
+            ? DesktopTitleBar(
+                homeAction: immersiveDesktop && canRefreshHome
+                    ? refreshHomeButton
+                    : null,
+                controller: window,
+                libraryServerAction: const LibraryServerAction(compact: true),
+                compactSidebar: settings.compactSidebar,
+                onToggleCompactSidebar: () async {
+                  try {
+                    await ref
+                        .read(settingsProvider.notifier)
+                        .update(
+                          (value) => value.copyWith(
+                            compactSidebar: !value.compactSidebar,
+                          ),
+                        );
+                  } catch (error) {
+                    if (context.mounted) {
+                      notifyUser(context, failureMessage(context, error));
+                    }
+                  }
+                },
+                language: settings.language,
+                onLanguageChanged: (language) => _update(
+                  context,
+                  ref,
+                  (value) => value.copyWith(language: language),
+                ),
+                onToggleTheme: () => _update(
+                  context,
+                  ref,
+                  (value) => value.copyWith(
+                    themeMode:
+                        context.theme.colors.brightness == Brightness.dark
+                        ? ThemeMode.light
+                        : ThemeMode.dark,
+                  ),
+                ),
+              )
+            : null;
+        final Widget mobileHeader = Builder(
+          builder: (headerContext) {
+            final pad = pagePadding(headerContext);
+            return FHeader(
+              key: const ValueKey('mobile-header'),
+              style: .delta(
+                padding: .value(EdgeInsets.fromLTRB(pad, 8, pad, 10)),
+              ),
+              title: Row(
+                children: [
+                  if (detailBackgroundSpec != null) ...[
+                    FButton.icon(
+                      key: const ValueKey('detail-back'),
+                      variant: .ghost,
+                      size: .sm,
+                      semanticsLabel: l.back,
+                      onPress: () => popDetailRoute(headerContext),
+                      child: const Icon(FLucideIcons.arrowLeft),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: detailBackgroundSpec != null
+                        ? DetailHeaderTitle(spec: detailBackgroundSpec!)
+                        : _HeaderTitle(labels[shell.currentIndex]),
+                  ),
+                ],
+              ),
+              suffixes: [
+                if (!window.available || window.fullScreen)
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 160),
+                    child: const LibraryServerAction(compact: true),
+                  ),
+                if (canRefreshLibrary || canRefreshHome)
+                  FButton.icon(
+                    key: ValueKey(
+                      canRefreshHome ? 'home-refresh' : 'library-refresh',
+                    ),
+                    variant: .ghost,
+                    size: .sm,
+                    semanticsLabel: l.refresh,
+                    onPress: () {
+                      if (canRefreshHome) {
+                        refreshHome(ref);
+                      } else {
+                        ref.invalidate(libraryViewsProvider);
+                      }
+                    },
+                    child: const Icon(FLucideIcons.refreshCw),
+                  ),
+              ],
+            );
+          },
         );
         return ListenableBuilder(
           listenable: window,
@@ -91,366 +204,285 @@ class AppShell extends ConsumerWidget {
                       : theme.style.borderRadius.lg.topLeft,
                 ),
                 SafeArea(
-                  top: !window.available,
-                  child: Column(
+                  top: !window.available && !immersiveMobile,
+                  child: Stack(
                     children: [
-                      if (window.available && !window.fullScreen)
-                        DesktopTitleBar(
-                          controller: window,
-                          libraryServerAction: const LibraryServerAction(
-                            compact: true,
-                          ),
-                          compactSidebar: settings.compactSidebar,
-                          onToggleCompactSidebar: () async {
-                            try {
-                              await ref
-                                  .read(settingsProvider.notifier)
-                                  .update(
-                                    (value) => value.copyWith(
-                                      compactSidebar: !value.compactSidebar,
-                                    ),
-                                  );
-                            } catch (error) {
-                              if (context.mounted) {
-                                notifyUser(
-                                  context,
-                                  failureMessage(context, error),
-                                );
-                              }
-                            }
-                          },
-                          language: settings.language,
-                          onLanguageChanged: (language) => _update(
-                            context,
-                            ref,
-                            (value) => value.copyWith(language: language),
-                          ),
-                          onToggleTheme: () => _update(
-                            context,
-                            ref,
-                            (value) => value.copyWith(
-                              themeMode:
-                                  context.theme.colors.brightness ==
-                                      Brightness.dark
-                                  ? ThemeMode.light
-                                  : ThemeMode.dark,
-                            ),
-                          ),
-                        ),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 220),
-                              curve: Curves.easeOutCubic,
-                              alignment: Alignment.topLeft,
-                              child: SizedBox(
-                                width: sidebarWidth,
-                                child: mobile
-                                    ? null
-                                    : FSidebar(
-                                        style: .delta(
-                                          decoration: .boxDelta(
-                                            color: null,
-                                            border: const Border(),
-                                          ),
-                                          groupStyle: .delta(
-                                            itemStyle: .delta(
-                                              backgroundColor: FVariants(
-                                                const Color(0x00000000),
-                                                variants: {
-                                                  [
-                                                    .selected,
-                                                    .hovered,
-                                                    .pressed,
-                                                  ]: sidebarActiveFill,
-                                                  [.disabled]: const Color(
-                                                    0x00000000,
-                                                  ),
-                                                },
-                                              ),
+                      Column(
+                        children: [
+                          if (titleBar != null && !immersiveDesktop) titleBar,
+                          Expanded(
+                            child: Row(
+                              children: [
+                                AnimatedSize(
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                  alignment: Alignment.topLeft,
+                                  child: SizedBox(
+                                    width: sidebarWidth,
+                                    child: mobile
+                                        ? null
+                                        : Padding(
+                                            padding: EdgeInsets.only(
+                                              top: immersiveDesktop ? 48 : 0,
                                             ),
-                                          ),
-                                          constraints: BoxConstraints.tightFor(
-                                            width: sidebarWidth,
-                                          ),
-                                        ),
-                                        header: SizedBox(
-                                          width: double.infinity,
-                                          child: Padding(
-                                            padding: EdgeInsets.fromLTRB(
-                                              compact ? 16 : 24,
-                                              20,
-                                              compact ? 16 : 24,
-                                              24,
-                                            ),
-                                            child: Align(
-                                              alignment: compact
-                                                  ? Alignment.center
-                                                  : Alignment.centerLeft,
-                                              child: Image.asset(
-                                                'assets/icons/sakuga.png',
-                                                key: const ValueKey(
-                                                  'sidebar-logo',
-                                                ),
-                                                width: 32,
-                                                height: 32,
-                                                semanticLabel: l.appTitle,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        children: [
-                                          FSidebarGroup(
-                                            children: [
-                                              for (
-                                                var i = 0;
-                                                i < labels.length;
-                                                i++
-                                              )
-                                                FSidebarItem(
-                                                  icon: compact
-                                                      ? Expanded(
-                                                          child: Center(
-                                                            child: Icon(
-                                                              icons[i],
-                                                              semanticLabel:
-                                                                  labels[i],
-                                                            ),
-                                                          ),
-                                                        )
-                                                      : Icon(icons[i]),
-                                                  label: compact
-                                                      ? null
-                                                      : Text(labels[i]),
-                                                  selected:
-                                                      shell.currentIndex == i,
-                                                  onPress: () =>
-                                                      shell.goBranch(i),
-                                                ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Container(
-                                clipBehavior: Clip.antiAlias,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: mobile
-                                        ? Radius.zero
-                                        : theme.style.borderRadius.lg.topLeft,
-                                  ),
-                                  border: mobile
-                                      ? null
-                                      : Border(
-                                          top: BorderSide(
-                                            color: dividerColor,
-                                            width: theme.style.borderWidth,
-                                          ),
-                                          left: BorderSide(
-                                            color: dividerColor,
-                                            width: theme.style.borderWidth,
-                                          ),
-                                        ),
-                                ),
-                                child: FScaffold(
-                                  scaffoldStyle: .delta(
-                                    backgroundColor: const Color(0x00000000),
-                                    sidebarBackgroundColor: const Color(
-                                      0x00000000,
-                                    ),
-                                    footerDecoration: .boxDelta(
-                                      border: Border(
-                                        top: BorderSide(
-                                          color: dividerColor,
-                                          width: theme.style.borderWidth,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  childPad: false,
-                                  header: backLocation != null
-                                      ? FHeader.nested(
-                                          title: Text(
-                                            labels[shell.currentIndex],
-                                          ),
-                                          titleAlignment:
-                                              AlignmentDirectional.centerStart,
-                                          suffixes: [
-                                            if (!window.available ||
-                                                window.fullScreen)
-                                              ConstrainedBox(
-                                                constraints:
-                                                    const BoxConstraints(
-                                                      maxWidth: 160,
-                                                    ),
-                                                child:
-                                                    const LibraryServerAction(
-                                                      compact: true,
-                                                    ),
-                                              ),
-                                          ],
-                                          prefixes: [
-                                            FHeaderAction.back(
-                                              key: const ValueKey(
-                                                'appbar-back',
-                                              ),
-                                              semanticsLabel: l.back,
-                                              semanticsTooltip: l.back,
-                                              onPress: () {
-                                                if (context.canPop()) {
-                                                  context.pop();
-                                                } else {
-                                                  context.go(backLocation!);
-                                                }
-                                              },
-                                            ),
-                                          ],
-                                        )
-                                      : mobile
-                                      ? Builder(
-                                          builder: (headerContext) {
-                                            final pad = pagePadding(
-                                              headerContext,
-                                            );
-                                            return FHeader(
-                                              key: const ValueKey(
-                                                'mobile-header',
-                                              ),
+                                            child: FSidebar(
                                               style: .delta(
-                                                padding: .value(
-                                                  EdgeInsets.fromLTRB(
-                                                    pad,
-                                                    8,
-                                                    pad,
-                                                    10,
+                                                decoration: .boxDelta(
+                                                  color: null,
+                                                  border: const Border(),
+                                                ),
+                                                groupStyle: .delta(
+                                                  itemStyle: .delta(
+                                                    backgroundColor: FVariants(
+                                                      const Color(0x00000000),
+                                                      variants: {
+                                                        [
+                                                          .selected,
+                                                          .hovered,
+                                                          .pressed,
+                                                        ]: sidebarActiveFill,
+                                                        [
+                                                          .disabled,
+                                                        ]: const Color(
+                                                          0x00000000,
+                                                        ),
+                                                      },
+                                                    ),
+                                                  ),
+                                                ),
+                                                constraints:
+                                                    BoxConstraints.tightFor(
+                                                      width: sidebarWidth,
+                                                    ),
+                                              ),
+                                              header: SizedBox(
+                                                width: double.infinity,
+                                                child: Padding(
+                                                  padding: EdgeInsets.fromLTRB(
+                                                    compact ? 16 : 24,
+                                                    20,
+                                                    compact ? 16 : 24,
+                                                    24,
+                                                  ),
+                                                  child: Align(
+                                                    alignment: compact
+                                                        ? Alignment.center
+                                                        : Alignment.centerLeft,
+                                                    child: Image.asset(
+                                                      'assets/icons/sakuga.png',
+                                                      key: const ValueKey(
+                                                        'sidebar-logo',
+                                                      ),
+                                                      width: 32,
+                                                      height: 32,
+                                                      semanticLabel: l.appTitle,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
-                                              title: Row(
-                                                children: [
-                                                  if (detailBackgroundSpec !=
-                                                      null) ...[
-                                                    FButton.icon(
-                                                      key: const ValueKey(
-                                                        'detail-back',
+                                              children: [
+                                                FSidebarGroup(
+                                                  children: [
+                                                    for (
+                                                      var i = 0;
+                                                      i < labels.length;
+                                                      i++
+                                                    )
+                                                      FSidebarItem(
+                                                        icon: compact
+                                                            ? Expanded(
+                                                                child: Center(
+                                                                  child: Icon(
+                                                                    icons[i],
+                                                                    semanticLabel:
+                                                                        labels[i],
+                                                                  ),
+                                                                ),
+                                                              )
+                                                            : Icon(icons[i]),
+                                                        label: compact
+                                                            ? null
+                                                            : Text(labels[i]),
+                                                        selected:
+                                                            shell
+                                                                .currentIndex ==
+                                                            i,
+                                                        onPress: () =>
+                                                            shell.goBranch(i),
                                                       ),
-                                                      variant: .ghost,
-                                                      size: .sm,
-                                                      semanticsLabel: l.back,
-                                                      onPress: () =>
-                                                          popDetailRoute(
-                                                            headerContext,
-                                                          ),
-                                                      child: const Icon(
-                                                        FLucideIcons.arrowLeft,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 12),
                                                   ],
-                                                  Expanded(
-                                                    child:
-                                                        detailBackgroundSpec !=
-                                                            null
-                                                        ? DetailHeaderTitle(
-                                                            spec:
-                                                                detailBackgroundSpec!,
-                                                          )
-                                                        : _HeaderTitle(
-                                                            labels[shell
-                                                                .currentIndex],
-                                                          ),
-                                                  ),
-                                                ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Container(
+                                    clipBehavior: Clip.antiAlias,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: mobile || immersiveDesktop
+                                            ? Radius.zero
+                                            : theme
+                                                  .style
+                                                  .borderRadius
+                                                  .lg
+                                                  .topLeft,
+                                      ),
+                                      border: mobile || immersiveDesktop
+                                          ? null
+                                          : Border(
+                                              top: BorderSide(
+                                                color: dividerColor,
+                                                width: theme.style.borderWidth,
                                               ),
+                                              left: BorderSide(
+                                                color: dividerColor,
+                                                width: theme.style.borderWidth,
+                                              ),
+                                            ),
+                                    ),
+                                    child: FScaffold(
+                                      scaffoldStyle: .delta(
+                                        backgroundColor: const Color(
+                                          0x00000000,
+                                        ),
+                                        sidebarBackgroundColor: const Color(
+                                          0x00000000,
+                                        ),
+                                        footerDecoration: .boxDelta(
+                                          border: Border(
+                                            top: BorderSide(
+                                              color: dividerColor,
+                                              width: theme.style.borderWidth,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      childPad: false,
+                                      header: backLocation != null
+                                          ? FHeader.nested(
+                                              title: Text(
+                                                labels[shell.currentIndex],
+                                              ),
+                                              titleAlignment:
+                                                  AlignmentDirectional
+                                                      .centerStart,
                                               suffixes: [
                                                 if (!window.available ||
                                                     window.fullScreen)
                                                   ConstrainedBox(
-                                                    constraints: BoxConstraints(
-                                                      maxWidth: 160,
-                                                    ),
+                                                    constraints:
+                                                        const BoxConstraints(
+                                                          maxWidth: 160,
+                                                        ),
                                                     child:
                                                         const LibraryServerAction(
                                                           compact: true,
                                                         ),
                                                   ),
-                                                if (canRefreshLibrary ||
-                                                    canRefreshHome)
-                                                  FButton.icon(
-                                                    key: ValueKey(
-                                                      canRefreshHome
-                                                          ? 'home-refresh'
-                                                          : 'library-refresh',
-                                                    ),
-                                                    variant: .ghost,
-                                                    size: .sm,
-                                                    semanticsLabel: l.refresh,
-                                                    onPress: () {
-                                                      if (canRefreshHome) {
-                                                        refreshHome(ref);
-                                                      } else {
-                                                        ref.invalidate(
-                                                          libraryViewsProvider,
-                                                        );
-                                                      }
-                                                    },
-                                                    child: const Icon(
-                                                      FLucideIcons.refreshCw,
+                                              ],
+                                              prefixes: [
+                                                FHeaderAction.back(
+                                                  key: const ValueKey(
+                                                    'appbar-back',
+                                                  ),
+                                                  semanticsLabel: l.back,
+                                                  semanticsTooltip: l.back,
+                                                  onPress: () {
+                                                    if (context.canPop()) {
+                                                      context.pop();
+                                                    } else {
+                                                      context.go(backLocation!);
+                                                    }
+                                                  },
+                                                ),
+                                              ],
+                                            )
+                                          : mobile && !immersiveMobile
+                                          ? mobileHeader
+                                          : null,
+                                      footer: mobile
+                                          ? FBottomNavigationBar(
+                                              style: .delta(
+                                                decoration: .boxDelta(
+                                                  color: null,
+                                                  border: Border(
+                                                    top: BorderSide(
+                                                      color: dividerColor,
+                                                      width: theme
+                                                          .style
+                                                          .borderWidth,
                                                     ),
                                                   ),
-                                              ],
-                                            );
-                                          },
-                                        )
-                                      : null,
-                                  footer: mobile
-                                      ? FBottomNavigationBar(
-                                          style: .delta(
-                                            decoration: .boxDelta(
-                                              color: null,
-                                              border: Border(
-                                                top: BorderSide(
-                                                  color: dividerColor,
-                                                  width:
-                                                      theme.style.borderWidth,
                                                 ),
                                               ),
-                                            ),
-                                          ),
-                                          index: shell.currentIndex,
-                                          onChange: shell.goBranch,
-                                          children: [
-                                            for (
-                                              var i = 0;
-                                              i < labels.length;
-                                              i++
+                                              index: shell.currentIndex,
+                                              onChange: shell.goBranch,
+                                              children: [
+                                                for (
+                                                  var i = 0;
+                                                  i < labels.length;
+                                                  i++
+                                                )
+                                                  FBottomNavigationBarItem(
+                                                    icon: Icon(icons[i]),
+                                                    label: Text(labels[i]),
+                                                  ),
+                                              ],
                                             )
-                                              FBottomNavigationBarItem(
-                                                icon: Icon(icons[i]),
-                                                label: Text(labels[i]),
-                                              ),
-                                          ],
-                                        )
-                                      : null,
-                                  child: LibraryServerHeaderScope(
-                                    hasServerAction:
-                                        isLibraryRootRoute &&
-                                        ((window.available &&
-                                                !window.fullScreen) ||
-                                            mobile ||
-                                            backLocation != null),
-                                    child: shell,
+                                          : null,
+                                      child: _immersiveContent(
+                                        ref,
+                                        immersive:
+                                            immersiveDesktop || immersiveMobile,
+                                        desktopInset: immersiveDesktop ? 48 : 0,
+                                        header: immersiveMobile
+                                            ? ImmersiveChrome(
+                                                active: true,
+                                                overArtworkTheme:
+                                                    overArtworkTheme,
+                                                child: Padding(
+                                                  padding: EdgeInsets.only(
+                                                    top: MediaQuery.paddingOf(
+                                                      context,
+                                                    ).top,
+                                                  ),
+                                                  child: mobileHeader,
+                                                ),
+                                              )
+                                            : null,
+                                        child: LibraryServerHeaderScope(
+                                          hasServerAction:
+                                              isLibraryRootRoute &&
+                                              ((window.available &&
+                                                      !window.fullScreen) ||
+                                                  mobile ||
+                                                  backLocation != null),
+                                          child: shell,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
+                      if (titleBar != null && immersiveDesktop)
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: 48,
+                          child: ImmersiveChrome(
+                            active: true,
+                            overArtworkTheme: overArtworkTheme,
+                            child: titleBar,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -461,6 +493,104 @@ class AppShell extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Wraps the routed pages so an immersive home can lay its artwork under the
+/// window chrome, and tracks whether it has scrolled away from under it.
+Widget _immersiveContent(
+  WidgetRef ref, {
+  required bool immersive,
+  required double desktopInset,
+  required Widget? header,
+  required Widget child,
+}) {
+  final tracked = NotificationListener<ScrollUpdateNotification>(
+    onNotification: (notification) {
+      if (immersive &&
+          notification.depth == 0 &&
+          notification.metrics.axis == Axis.vertical) {
+        ref
+            .read(immersiveScrolledProvider.notifier)
+            .set(notification.metrics.pixels > 4);
+      }
+      return false;
+    },
+    child: child,
+  );
+  if (header == null) {
+    return ImmersiveScope(
+      active: immersive,
+      topInset: desktopInset,
+      child: tracked,
+    );
+  }
+  return _OverlaidHeader(header: header, child: tracked);
+}
+
+/// Lays the phone header over the page and reports its measured height as
+/// the page's immersive top inset.
+class _OverlaidHeader extends StatefulWidget {
+  const _OverlaidHeader({required this.header, required this.child});
+
+  final Widget header;
+  final Widget child;
+
+  @override
+  State<_OverlaidHeader> createState() => _OverlaidHeaderState();
+}
+
+class _OverlaidHeaderState extends State<_OverlaidHeader> {
+  final _headerKey = GlobalKey();
+  double _height = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleMeasure();
+  }
+
+  @override
+  void didUpdateWidget(covariant _OverlaidHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scheduleMeasure();
+  }
+
+  void _scheduleMeasure() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final height = _headerKey.currentContext?.size?.height;
+      if (height != null && height != _height) {
+        setState(() => _height = height);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: [
+      Positioned.fill(
+        child: ImmersiveScope(
+          active: true,
+          topInset: _height,
+          child: widget.child,
+        ),
+      ),
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: NotificationListener<SizeChangedLayoutNotification>(
+          onNotification: (_) {
+            _scheduleMeasure();
+            return true;
+          },
+          child: SizeChangedLayoutNotifier(
+            child: KeyedSubtree(key: _headerKey, child: widget.header),
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 Future<void> _update(
@@ -503,9 +633,14 @@ class DesktopTitleBar extends StatelessWidget {
     this.onLanguageChanged,
     this.onToggleTheme,
     this.libraryServerAction,
+    this.homeAction,
     super.key,
   });
   final DesktopWindowController controller;
+
+  /// Page action hosted in the title bar while the home artwork extends
+  /// underneath it.
+  final Widget? homeAction;
   final bool compactSidebar;
   final Future<void> Function()? onToggleCompactSidebar;
   final String language;
@@ -567,6 +702,11 @@ class DesktopTitleBar extends StatelessWidget {
               ),
             ),
           ),
+          if (homeAction case final action?)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: action,
+            ),
           if (libraryServerAction case final action?)
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 180),

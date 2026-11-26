@@ -472,6 +472,68 @@ void main() {
     );
   }
 
+  testWidgets('wide carousel slide mirrors the detail banner', (tester) async {
+    await pumpHome(
+      tester,
+      carousel: const [
+        MediaItem(
+          id: 'featured',
+          name: 'Featured Title',
+          type: MediaType.series,
+          overview: 'A featured synopsis.',
+          communityRating: 8.4,
+          productionYear: 2018,
+          genres: ['Animation', 'Comedy'],
+        ),
+      ],
+    );
+    final slide = find.byKey(const ValueKey('home-carousel-slide-featured'));
+    Finder inSlide(Finder finder) =>
+        find.descendant(of: slide, matching: finder);
+    expect(
+      inSlide(
+        find.byKey(const ValueKey('home-carousel-featured-banner-title')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      inSlide(find.byKey(const ValueKey('detail-rating'))),
+      findsOneWidget,
+    );
+    expect(inSlide(find.text('Animation · Comedy')), findsOneWidget);
+    expect(inSlide(find.text('A featured synopsis.')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final width in [320.0, 390.0]) {
+    testWidgets('phone carousel bleeds edge to edge at $width', (tester) async {
+      await pumpHome(
+        tester,
+        size: Size(width, 844),
+        carousel: [
+          for (final item in _loopItems)
+            MediaItem(
+              id: item.id,
+              name: item.name,
+              type: item.type,
+              productionYear: 2018,
+              genres: const ['Animation'],
+            ),
+        ],
+      );
+      final page = find.byType(PageView);
+      expect(tester.getRect(page).left, 0);
+      expect(tester.getRect(page).width, width);
+      final title = find.byKey(
+        const ValueKey('home-carousel-loop-1-banner-title'),
+      );
+      expect(tester.getCenter(title).dx, closeTo(width / 2, 1));
+      expect(find.byKey(const ValueKey('home-carousel-prev')), findsNothing);
+      expect(find.byKey(const ValueKey('home-carousel-dot-2')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('carousel arrows cross boundaries in the same direction', (
     tester,
   ) async {
@@ -838,6 +900,113 @@ void main() {
     await mouse.removePointer();
     expect(tester.takeException(), isNull);
   });
+
+  for (final mobile in [false, true]) {
+    testWidgets(
+      'home carousel extends under the ${mobile ? 'phone header' : 'title bar'}',
+      (tester) async {
+        // Short windows so the page content scrolls under the chrome.
+        final windowSize = mobile
+            ? const Size(390, 560)
+            : const Size(1280, 600);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = windowSize;
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        const featured = MediaItem(
+          id: 'featured-1',
+          name: 'Sunflower Circus',
+          type: MediaType.series,
+          poster: MediaImageResource(
+            urlTemplate: 'http://127.0.0.1:8096/Items/featured-1/Images/Primary?maxWidth={width}',
+            cacheKey: 'featured-1:poster',
+          ),
+          overview: 'A troupe of performers travelling across Japan.',
+        );
+        final servers = MemoryServerRepository()..items = [_server];
+        final container = ProviderContainer(
+          overrides: [
+            initialSettingsProvider.overrideWithValue(
+              const AppSettings(language: 'en'),
+            ),
+            settingsRepositoryProvider.overrideWithValue(MemorySettings()),
+            desktopWindowProvider.overrideWithValue(
+              FakeWindow(available: !mobile, macOS: true),
+            ),
+            serverRepositoryProvider.overrideWithValue(servers),
+            libraryViewsProvider.overrideWith(
+              (ref) async => LibraryData(
+                client: FakeMediaServerClient(server: _server),
+                userId: 'user-1',
+                views: const [],
+              ),
+            ),
+            randomItemsProvider.overrideWith((ref) async => const [featured]),
+            resumeItemsProvider.overrideWith(
+              (ref) async => [
+                for (var i = 0; i < 8; i++)
+                  MediaItem(
+                    id: 'resume-$i',
+                    name: 'Resume $i',
+                    type: MediaType.movie,
+                  ),
+              ],
+            ),
+            latestItemsProvider.overrideWith((ref) async => const []),
+          ],
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const SakugaApp(),
+          ),
+        );
+        for (var i = 0; i < 6; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+
+        final carousel = find.byKey(const ValueKey('home-poster-carousel'));
+        final page = find.byType(PageView);
+        expect(tester.getRect(page).top, 0);
+        if (mobile) {
+          final header = find.byKey(const ValueKey('mobile-header'));
+          expect(tester.getRect(header).top, 0);
+          expect(tester.getRect(page).left, 0);
+          expect(tester.getRect(page).width, windowSize.width);
+        } else {
+          expect(tester.getRect(find.byType(DesktopTitleBar)).top, 0);
+          expect(
+            find.descendant(
+              of: find.byType(DesktopTitleBar),
+              matching: find.byKey(const ValueKey('home-refresh')),
+            ),
+            findsOneWidget,
+          );
+          expect(find.text('Home'), findsNothing);
+          expect(
+            tester.getTopLeft(find.byKey(const ValueKey('sidebar-logo'))).dy,
+            greaterThan(48),
+          );
+        }
+        expect(find.byKey(const ValueKey('home-refresh')), findsOneWidget);
+
+        double backing() => tester
+            .widget<AnimatedOpacity>(
+              find.byKey(const ValueKey('immersive-chrome-backing')),
+            )
+            .opacity;
+        expect(backing(), 0);
+        await tester.drag(carousel, const Offset(0, -300));
+        for (var i = 0; i < 4; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        expect(backing(), 1);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
 
   testWidgets(
     'home random poster carousel rotates and updates global window blurred background',

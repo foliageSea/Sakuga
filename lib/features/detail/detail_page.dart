@@ -20,6 +20,7 @@ import '../../shared/widgets.dart';
 import '../library/library_providers.dart';
 import '../player/player_route.dart';
 import 'detail_providers.dart';
+import 'media_header.dart';
 
 /// Seed data carried from a tapped poster card so the detail header and
 /// poster [Hero] render on the first frame while full metadata loads.
@@ -275,7 +276,7 @@ class _DetailBody extends ConsumerWidget {
             (value.poster ?? preview?.poster)?.cacheKey ==
                 preview?.poster?.cacheKey;
         return _DetailScaffold(
-          title: _detailItemTitle(context, value),
+          title: detailItemTitle(context, value),
           showLibrary: value.type == MediaType.season,
           slivers: [
             SliverToBoxAdapter(
@@ -477,7 +478,7 @@ class DetailHeaderTitle extends ConsumerWidget {
       children: [
         Expanded(
           child: _DetailTitle(
-            value == null ? '' : _detailItemTitle(context, value),
+            value == null ? '' : detailItemTitle(context, value),
           ),
         ),
         if (value?.type == MediaType.season) ...[
@@ -678,7 +679,7 @@ class _Hero extends StatelessWidget {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: _BannerTitle(
+                  child: MediaTitleArt(
                     item: item,
                     fallbackItem: fallbackItem,
                     onDark: false,
@@ -690,7 +691,7 @@ class _Hero extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          _MetaRow(item: item, onDark: false, center: true),
+          MediaMetaRow(item: item, onDark: false, center: true),
           if (playButton != null) ...[const SizedBox(height: 18), playButton],
           if (overview.isNotEmpty) ...[
             const SizedBox(height: 14),
@@ -770,13 +771,13 @@ class _Hero extends StatelessWidget {
                     Expanded(
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final title = _BannerTitle(
+                          final title = MediaTitleArt(
                             item: item,
                             fallbackItem: fallbackItem,
                             onDark: true,
                           );
                           final details = [
-                            _MetaRow(item: item, onDark: true),
+                            MediaMetaRow(item: item, onDark: true),
                             if (overview.isNotEmpty) ...[
                               const SizedBox(height: 12),
                               _Overview(
@@ -888,77 +889,6 @@ class _Hero extends StatelessWidget {
   }
 }
 
-/// Series and season artwork title: the logo when available, otherwise (or
-/// when the logo fails to load) the item title in display type.
-class _BannerTitle extends StatelessWidget {
-  const _BannerTitle({
-    required this.item,
-    required this.onDark,
-    this.fallbackItem,
-    this.center = false,
-    this.pending = false,
-  });
-
-  final MediaItem item;
-  final MediaItem? fallbackItem;
-  final bool onDark;
-
-  /// Centers the title art in a fixed-height slot, as on the phone layout.
-  final bool center;
-
-  /// Keeps the slot empty while a logo may still arrive with full metadata.
-  final bool pending;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-    final mobile = isMobileLayout(context);
-    final alignment = center ? Alignment.bottomCenter : Alignment.bottomLeft;
-    final title = Text(
-      _detailItemTitle(context, item),
-      key: const ValueKey('detail-banner-title'),
-      textAlign: center ? TextAlign.center : TextAlign.start,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-      style:
-          (mobile ? theme.typography.display.sm : theme.typography.display.xl)
-              .copyWith(
-                color: onDark
-                    ? const Color(0xFFFFFFFF)
-                    : theme.colors.foreground,
-              ),
-    );
-    final logo = item.logo ?? fallbackItem?.logo;
-    if (center && logo == null) {
-      // A stable slot keeps the facts below from shifting when the title
-      // resolves to a logo or text.
-      return SizedBox(
-        height: 80,
-        child: pending
-            ? null
-            : Align(alignment: Alignment.bottomCenter, child: title),
-      );
-    }
-    if (logo == null) return title;
-    return SizedBox(
-      width: mobile ? double.infinity : 320,
-      height: mobile ? (center ? 80 : 56) : 120,
-      child: CachedNetworkImage(
-        key: const ValueKey('detail-logo'),
-        imageUrl: logo.url(width: 840),
-        httpHeaders: logo.headers,
-        cacheKey: artworkCacheKey(logo.url(width: 840), logo.headers),
-        cacheManager: ArtworkCacheManager.instance,
-        fit: BoxFit.contain,
-        alignment: alignment,
-        fadeInDuration: const Duration(milliseconds: 200),
-        placeholder: (_, _) => const SizedBox.shrink(),
-        errorWidget: (_, _, _) => Align(alignment: alignment, child: title),
-      ),
-    );
-  }
-}
-
 class _TitleBlock extends StatelessWidget {
   const _TitleBlock({
     required this.item,
@@ -1002,8 +932,8 @@ class _TitleBlock extends StatelessWidget {
           ),
           const SizedBox(height: 10),
         ],
-        if (_Rating.of(item) != null) ...[
-          _Rating(item: item, onDark: onDark),
+        if (MediaRating.of(item) != null) ...[
+          MediaRating(item: item, onDark: onDark),
           const SizedBox(height: 12),
         ],
         Wrap(
@@ -1026,94 +956,6 @@ class _TitleBlock extends StatelessWidget {
               _Tag(text: genre, foreground: muted, background: background),
           ],
         ),
-      ],
-    );
-  }
-}
-
-class _Rating extends StatelessWidget {
-  const _Rating({required this.item, required this.onDark});
-
-  final MediaItem item;
-  final bool onDark;
-
-  static double? of(MediaItem item) => switch (item.communityRating) {
-    final rating? when rating.isFinite && rating > 0 => rating,
-    _ => null,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-    return Row(
-      key: const ValueKey('detail-rating'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          FLucideIcons.star,
-          size: isMobileLayout(context) ? 15 : 18,
-          color: const Color(0xFFE2BB6A),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          of(item)!.toStringAsFixed(1),
-          style:
-              (isMobileLayout(context)
-                      ? theme.typography.body.sm
-                      : theme.typography.body.md)
-                  .copyWith(
-                    color: onDark
-                        ? const Color(0xFFFFFFFF)
-                        : theme.colors.foreground,
-                    fontWeight: FontWeight.w600,
-                  ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Plain-text series and season facts laid out as one line of metadata.
-class _MetaRow extends StatelessWidget {
-  const _MetaRow({
-    required this.item,
-    required this.onDark,
-    this.center = false,
-  });
-
-  final MediaItem item;
-  final bool onDark;
-  final bool center;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-    final mobile = isMobileLayout(context);
-    final style =
-        (mobile && !center
-                ? theme.typography.body.sm
-                : theme.typography.body.md)
-            .copyWith(
-              color: onDark
-                  ? const Color(0xE6FFFFFF)
-                  : theme.colors.mutedForeground,
-            );
-    final count = item.childCount ?? item.recursiveItemCount;
-    return Wrap(
-      spacing: mobile ? 14 : 20,
-      runSpacing: 4,
-      alignment: center ? WrapAlignment.center : WrapAlignment.start,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        if (_Rating.of(item) != null) _Rating(item: item, onDark: onDark),
-        if (item.productionYear != null)
-          Text('${item.productionYear}', style: style),
-        if (item.officialRating != null)
-          Text(item.officialRating!, style: style),
-        if (item.genres.isNotEmpty)
-          Text(item.genres.take(3).join(' · '), style: style),
-        if (item.type == MediaType.season && count != null && count > 0)
-          Text(context.l10n.libraryEpisodeCount(count), style: style),
       ],
     );
   }
@@ -1527,17 +1369,6 @@ class _PersonCard extends StatelessWidget {
   }
 }
 
-String _detailItemTitle(BuildContext context, MediaItem item) {
-  if (item.name.trim().isNotEmpty || item.type != MediaType.season) {
-    return item.name;
-  }
-  return switch (item.indexNumber) {
-    0 => context.l10n.specials,
-    final number? => context.l10n.seasonNumber(number),
-    null => context.l10n.season,
-  };
-}
-
 class _Seasons extends ConsumerWidget {
   const _Seasons({
     required this.client,
@@ -1686,7 +1517,7 @@ class _SeasonTabsEpisodesState extends State<_SeasonTabsEpisodes> {
                       bottom: 4,
                     ),
                     child: Text(
-                      _detailItemTitle(context, season),
+                      detailItemTitle(context, season),
                       style: theme.typography.body.md.copyWith(
                         fontWeight: season.id == seasonId
                             ? FontWeight.w600
@@ -1725,7 +1556,7 @@ class _SeasonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = _detailItemTitle(context, season);
+    final label = detailItemTitle(context, season);
     final preview = MediaItem(
       id: season.id,
       name: label,
