@@ -1017,53 +1017,51 @@ void main() {
     },
   );
 
-  testWidgets(
-    'mobile grid poster animates into detail page and back on return',
-    (tester) async {
-      await _pumpRoutedLibrary(
-        tester,
-        size: const Size(390, 900),
-        loadItem: (id) async => MediaItem(
-          id: id,
-          name: 'Series $id',
-          type: MediaType.movie,
-          primaryImageAspectRatio: 1.2,
-          overview: 'Mobile detail view.',
+  testWidgets('mobile series detail fades in without a jumping poster flight', (
+    tester,
+  ) async {
+    final item = Completer<MediaItem>();
+    await _pumpRoutedLibrary(
+      tester,
+      size: const Size(390, 900),
+      loadItem: (id) => item.future,
+    );
+
+    final posterFrame = _posterFrameFinder('b');
+    final cardRect = tester.getRect(posterFrame);
+    expect(cardRect.width / cardRect.height, closeTo(2 / 3, 0.01));
+
+    await tester.tap(find.text('Series b'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    // The card poster stays in place under the fade; nothing flies into
+    // the wide phone artwork.
+    expect(tester.getRect(posterFrame), cardRect);
+    // The preview has no backdrop, so the artwork waits for full metadata
+    // instead of showing the poster and swapping it out.
+    expect(find.byKey(const ValueKey('detail-mobile-art')), findsNothing);
+
+    item.complete(
+      const MediaItem(
+        id: 'b',
+        name: 'Series b',
+        type: MediaType.series,
+        backdrop: MediaImageResource(
+          urlTemplate:
+              'http://127.0.0.1:8096/Items/b/Images/Backdrop?maxWidth={width}',
+          cacheKey: 'b-backdrop',
         ),
-      );
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('detail-mobile-art')), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail-banner-title')), findsOneWidget);
 
-      // Scraped landscape artwork uses the same 2:3 frame in both views.
-      final posterFrame = _posterFrameFinder('b');
-      final cardRect = tester.getRect(posterFrame);
-      expect(cardRect.width / cardRect.height, closeTo(2 / 3, 0.01));
-
-      await tester.tap(find.text('Series b'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 120));
-
-      final pushMidRect = tester.getRect(posterFrame);
-      expect(pushMidRect, isNot(cardRect));
-
-      await tester.pumpAndSettle();
-      final detailRect = tester.getRect(posterFrame);
-      expect(detailRect.width / detailRect.height, closeTo(2 / 3, 0.01));
-
-      await tester.tap(find.byKey(const ValueKey('detail-back')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      final popMidRect = tester.getRect(posterFrame);
-
-      expect(
-        _isStrictlyBetween(popMidRect.width, cardRect.width, detailRect.width),
-        isTrue,
-      );
-
-      await tester.pumpAndSettle();
-      expect(tester.getRect(posterFrame), cardRect);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    await tester.tap(find.byKey(const ValueKey('detail-back')));
+    await tester.pumpAndSettle();
+    expect(tester.getRect(posterFrame), cardRect);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'app shell library branch animates poster hero on enter, mid-flight cancel and return',

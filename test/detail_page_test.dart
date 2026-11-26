@@ -81,6 +81,16 @@ MediaItem _season() => const MediaItem(
   childCount: 13,
 );
 
+MediaItem _seasonTwo() => const MediaItem(
+  id: 'season-2',
+  name: 'Season 2',
+  type: MediaType.season,
+  seriesId: 'series-1',
+  seriesName: 'A Series With Episodes',
+  indexNumber: 2,
+  childCount: 12,
+);
+
 MediaItem _episode() => const MediaItem(
   id: 'episode-1',
   name: 'Pilot',
@@ -193,13 +203,16 @@ Future<GoRouter> pumpDetailPage(
 
 Finder get _backButton => find.byKey(const ValueKey('detail-back'));
 
-ScrollPosition _pageScrollPosition(WidgetTester tester) {
-  final scrollable = find.descendant(
-    of: find.byType(CustomScrollView),
-    matching: find.byType(Scrollable),
-  );
-  return tester.state<ScrollableState>(scrollable).position;
-}
+/// The vertical page scrollable, excluding nested horizontal strips.
+Finder get _pageScrollable => find
+    .descendant(
+      of: find.byType(CustomScrollView),
+      matching: find.byType(Scrollable),
+    )
+    .first;
+
+ScrollPosition _pageScrollPosition(WidgetTester tester) =>
+    tester.state<ScrollableState>(_pageScrollable).position;
 
 /// Scrolls the page by [dy] and checks that the back button kept its place
 /// and title while the page content moved.
@@ -246,7 +259,7 @@ void main() {
           withPlayerRoute: true,
         );
         final card = find.byKey(movieCard);
-        await tester.scrollUntilVisible(card, 300);
+        await tester.scrollUntilVisible(card, 300, scrollable: _pageScrollable);
         await tester.pumpAndSettle();
         final lastCredit = find.text('Person 11');
         expect(
@@ -319,7 +332,7 @@ void main() {
     },
   );
 
-  for (final width in [390.0, 1280.0]) {
+  for (final width in [820.0, 1280.0]) {
     testWidgets('season can return directly to library at width $width', (
       tester,
     ) async {
@@ -327,7 +340,7 @@ void main() {
         tester,
         item: _series,
         size: Size(width, 1000),
-        seasons: [_season()],
+        seasons: [_season(), _seasonTwo()],
         episodes: [],
         itemById: (id) => id == 'season-1' ? _season() : _series(),
       );
@@ -354,7 +367,7 @@ void main() {
     });
   }
 
-  for (final size in [const Size(390, 844), const Size(1280, 1000)]) {
+  for (final size in [const Size(820, 1000), const Size(1280, 1000)]) {
     testWidgets(
       'cancelling a season push restores the series scroll and poster at ${size.width}',
       (tester) async {
@@ -364,7 +377,7 @@ void main() {
           item: _series,
           size: size,
           itemById: (id) => id == 'season-1' ? seasonData.future : _series(),
-          seasons: [_season()],
+          seasons: [_season(), _seasonTwo()],
           episodes: const [],
         );
         final season = find.byKey(const ValueKey('detail-season-season-1'));
@@ -397,7 +410,7 @@ void main() {
     );
   }
 
-  for (final size in [const Size(390, 844), const Size(1280, 1000)]) {
+  for (final size in [const Size(820, 1000), const Size(1280, 1000)]) {
     testWidgets(
       'season banner falls back to the season title without a logo at ${size.width}',
       (tester) async {
@@ -407,7 +420,7 @@ void main() {
           item: _series,
           size: size,
           itemById: (id) => id == 'season-1' ? seasonData.future : _series(),
-          seasons: [_season()],
+          seasons: [_season(), _seasonTwo()],
           episodes: const [],
         );
         final season = find.byKey(const ValueKey('detail-season-season-1'));
@@ -438,7 +451,7 @@ void main() {
     );
   }
 
-  for (final size in [const Size(390, 844), const Size(1280, 1000)]) {
+  for (final size in [const Size(820, 1000), const Size(1280, 1000)]) {
     testWidgets(
       'season transition fades out the previous detail and restores it on return at ${size.width}',
       (tester) async {
@@ -448,7 +461,7 @@ void main() {
           item: _series,
           size: size,
           itemById: (id) => id == 'season-1' ? seasonData.future : _series(),
-          seasons: [_season()],
+          seasons: [_season(), _seasonTwo()],
           episodes: [_episode()],
         );
         double routeOpacity(String id) {
@@ -497,65 +510,64 @@ void main() {
     );
   }
 
-  for (final size in [const Size(320, 760), const Size(1280, 1000)]) {
-    testWidgets(
-      'single season stays visible and opens numbered episode details at ${size.width}',
-      (tester) async {
-        final queries = <EpisodesQuery>[];
-        await pumpDetailPage(
-          tester,
-          item: _series,
-          size: size,
-          withPlayerRoute: true,
-          itemById: (id) => id == 'season-1' ? _season() : _series(),
-          seasons: [_season()],
-          loadEpisodes: (query) {
-            queries.add(query);
-            return [_episode()];
-          },
-        );
-        final season = find.byKey(const ValueKey('detail-season-season-1'));
-        expect(season, findsOneWidget);
-        final card = tester.widget<MediaPosterCard>(season);
-        expect(card.framed, isTrue);
-        expect(card.textAlign, TextAlign.start);
-        expect(card.subtitle, '13 episodes');
-        final surface = find.descendant(
-          of: season,
-          matching: find.byType(Surface),
-        );
-        expect(surface, findsOneWidget);
-        expect(
-          find.descendant(of: surface, matching: find.text('Season 1')),
-          findsOneWidget,
-        );
-        expect(
-          find.descendant(of: surface, matching: find.text('13 episodes')),
-          findsOneWidget,
-        );
-        expect(find.text('13 episodes'), findsOneWidget);
-        expect(queries, isEmpty);
-        await tester.ensureVisible(season);
-        await tester.tap(season);
-        await tester.pumpAndSettle();
-        expect(queries, [
-          (userId: 'user-1', seriesId: 'series-1', seasonId: 'season-1'),
-        ]);
-        final headerTitle = find.byKey(const ValueKey('detail-title'));
-        expect(tester.widget<Text>(headerTitle).data, 'Season 1');
-        expect(find.byKey(const ValueKey('detail-series-name')), findsNothing);
-        final episode = find.byKey(const ValueKey('detail-episode-episode-1'));
-        await tester.ensureVisible(episode);
-        await tester.pumpAndSettle();
-        expect(find.text('1. Pilot'), findsOneWidget);
-        expect(find.text('S01E01 · 24 min'), findsOneWidget);
-        expect(find.text(_episode().overview!), findsOneWidget);
-        await tester.tap(episode);
-        await tester.pumpAndSettle();
-        expect(find.text('player:episode-1'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      },
-    );
+  for (final size in [const Size(700, 1000), const Size(1280, 1000)]) {
+    testWidgets('season card opens numbered episode details at ${size.width}', (
+      tester,
+    ) async {
+      final queries = <EpisodesQuery>[];
+      await pumpDetailPage(
+        tester,
+        item: _series,
+        size: size,
+        withPlayerRoute: true,
+        itemById: (id) => id == 'season-1' ? _season() : _series(),
+        seasons: [_season(), _seasonTwo()],
+        loadEpisodes: (query) {
+          queries.add(query);
+          return [_episode()];
+        },
+      );
+      final season = find.byKey(const ValueKey('detail-season-season-1'));
+      expect(season, findsOneWidget);
+      final card = tester.widget<MediaPosterCard>(season);
+      expect(card.framed, isTrue);
+      expect(card.textAlign, TextAlign.start);
+      expect(card.subtitle, '13 episodes');
+      final surface = find.descendant(
+        of: season,
+        matching: find.byType(Surface),
+      );
+      expect(surface, findsOneWidget);
+      expect(
+        find.descendant(of: surface, matching: find.text('Season 1')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: surface, matching: find.text('13 episodes')),
+        findsOneWidget,
+      );
+      expect(find.text('13 episodes'), findsOneWidget);
+      expect(queries, isEmpty);
+      await tester.ensureVisible(season);
+      await tester.tap(season);
+      await tester.pumpAndSettle();
+      expect(queries, [
+        (userId: 'user-1', seriesId: 'series-1', seasonId: 'season-1'),
+      ]);
+      final headerTitle = find.byKey(const ValueKey('detail-title'));
+      expect(tester.widget<Text>(headerTitle).data, 'Season 1');
+      expect(find.byKey(const ValueKey('detail-series-name')), findsNothing);
+      final episode = find.byKey(const ValueKey('detail-episode-episode-1'));
+      await tester.ensureVisible(episode);
+      await tester.pumpAndSettle();
+      expect(find.text('1. Pilot'), findsOneWidget);
+      expect(find.text('00:24:00'), findsOneWidget);
+      expect(find.text(_episode().overview!), findsOneWidget);
+      await tester.tap(episode);
+      await tester.pumpAndSettle();
+      expect(find.text('player:episode-1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets(
       'detail shows a valid rating on movie and series metadata at ${size.width}',
@@ -568,7 +580,7 @@ void main() {
           item: () => MediaItem(
             id: 'movie-1',
             name: 'Rated title',
-            type: size.width < 600 ? MediaType.movie : MediaType.series,
+            type: size.width < 1000 ? MediaType.movie : MediaType.series,
             communityRating: 8.6,
           ),
         );
@@ -674,7 +686,7 @@ void main() {
         loadSeasons: (_) {
           attempts++;
           if (attempts == 1) throw const AppException(FailureKind.network);
-          return [_season()];
+          return [_season(), _seasonTwo()];
         },
         loadEpisodes: (_) {
           episodeRequests++;
@@ -856,6 +868,340 @@ void main() {
     );
   }
 
+  group('series and season redesign', () {
+    MediaItem ep(int n, {bool played = false, Duration? position}) => MediaItem(
+      id: 'episode-$n',
+      name: 'Episode name $n',
+      type: MediaType.episode,
+      seriesId: 'series-1',
+      seasonId: 'season-1',
+      indexNumber: n,
+      parentIndexNumber: 1,
+      runtime: const Duration(minutes: 13, seconds: 29),
+      played: played,
+      playbackPosition: position,
+      overview: 'Overview $n',
+    );
+
+    for (final size in [const Size(390, 844), const Size(1280, 800)]) {
+      testWidgets('season play opens the next episode at ${size.width}', (
+        tester,
+      ) async {
+        await pumpDetailPage(
+          tester,
+          size: size,
+          withPlayerRoute: true,
+          item: () => _season().copyForTest(overview: 'Season synopsis.'),
+          episodes: [ep(1, played: true), ep(2), ep(3)],
+        );
+        final play = find.byKey(const ValueKey('detail-play'));
+        expect(
+          find.descendant(of: play, matching: find.text('Episode 2')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('detail-episode-next-episode-2')),
+          findsOneWidget,
+        );
+        if (size.width >= 600) {
+          expect(
+            find.byKey(const ValueKey('detail-episode-duration-episode-1')),
+            findsOneWidget,
+          );
+          expect(find.text('00:13:29'), findsNWidgets(3));
+        } else {
+          expect(
+            find.byKey(const ValueKey('detail-episode-number-episode-3')),
+            findsOneWidget,
+          );
+        }
+        await tester.tap(play);
+        await tester.pumpAndSettle();
+        expect(find.text('player:episode-2'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('episodes switch between row and grid at ${size.width}', (
+        tester,
+      ) async {
+        await pumpDetailPage(
+          tester,
+          size: size,
+          item: _season,
+          episodes: [for (var i = 1; i <= 8; i++) ep(i)],
+        );
+        double top(int n) => tester
+            .getTopLeft(find.byKey(ValueKey('detail-episode-episode-$n')))
+            .dy;
+        expect(top(1), top(4));
+        expect(
+          find.byKey(const ValueKey('detail-episodes-row')),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(
+            ValueKey(
+              size.width < 600
+                  ? 'detail-episodes-toggle'
+                  : 'detail-episodes-grid-view',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('detail-episodes-row')), findsNothing);
+        expect(top(8), greaterThan(top(1)));
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final width in [320.0, 390.0, 480.0]) {
+      testWidgets('mobile season header fits the viewport at $width', (
+        tester,
+      ) async {
+        await pumpDetailPage(
+          tester,
+          size: Size(width, 844),
+          item: () => const MediaItem(
+            id: 'season-1',
+            name: 'Season 2',
+            type: MediaType.season,
+            seriesId: 'series-1',
+            indexNumber: 2,
+            childCount: 24,
+            communityRating: 8.4,
+            productionYear: 2014,
+            genres: ['Drama', 'Animation', 'Comedy'],
+            overview: 'A short synopsis.',
+            logo: MediaImageResource(
+              urlTemplate:
+                  'http://127.0.0.1:8096/Items/s/Images/Logo?maxWidth={width}',
+              cacheKey: 'season-logo',
+            ),
+          ),
+          episodes: [for (var i = 1; i <= 6; i++) ep(i)],
+        );
+        final logo = tester.getRect(find.byKey(const ValueKey('detail-logo')));
+        expect(logo.right, lessThanOrEqualTo(width));
+        expect(logo.height, lessThanOrEqualTo(80));
+        final play = tester.getRect(find.byKey(const ValueKey('detail-play')));
+        expect(play.bottom, lessThan(844 * 0.75));
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('detail-episodes-toggle')),
+        );
+        await tester.tap(find.byKey(const ValueKey('detail-episodes-toggle')));
+        await tester.pumpAndSettle();
+        double left(int n) => tester
+            .getTopLeft(find.byKey(ValueKey('detail-episode-episode-$n')))
+            .dx;
+        expect(left(2), greaterThan(left(1)), reason: 'two-column grid');
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('phone series switches seasons with tabs', (tester) async {
+      final queries = <EpisodesQuery>[];
+      const specials = MediaItem(
+        id: 'specials',
+        name: '',
+        type: MediaType.season,
+        seriesId: 'series-1',
+        indexNumber: 0,
+      );
+      await pumpDetailPage(
+        tester,
+        size: const Size(390, 844),
+        item: () => _series().copyForTest(people: _movie().people),
+        seasons: [specials, _season(), _seasonTwo()],
+        loadEpisodes: (query) {
+          queries.add(query);
+          return [
+            for (var i = 1; i <= 3; i++)
+              MediaItem(
+                id: '${query.seasonId}-$i',
+                name: 'Episode $i',
+                type: MediaType.episode,
+                indexNumber: i,
+              ),
+          ];
+        },
+      );
+      expect(
+        find.byKey(const ValueKey('detail-season-season-1')),
+        findsNothing,
+      );
+      expect(queries.last.seasonId, 'season-1');
+      expect(
+        find.byKey(const ValueKey('detail-episode-season-1-1')),
+        findsOneWidget,
+      );
+      final tab = find.byKey(const ValueKey('detail-season-tab-season-2'));
+      await tester.ensureVisible(tab);
+      await tester.pumpAndSettle();
+      await tester.tap(tab);
+      await tester.pumpAndSettle();
+      expect(queries.last.seasonId, 'season-2');
+      expect(
+        find.byKey(const ValueKey('detail-episode-season-2-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('detail-episode-season-1-1')),
+        findsNothing,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('detail-cast')),
+        300,
+        scrollable: _pageScrollable,
+      );
+      expect(find.text('Person 0'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a resumed season episode labels the play button', (
+      tester,
+    ) async {
+      await pumpDetailPage(
+        tester,
+        item: _season,
+        episodes: [
+          ep(1, played: true),
+          ep(2, position: const Duration(minutes: 3)),
+        ],
+      );
+      expect(find.text('Resume episode 2'), findsOneWidget);
+    });
+
+    testWidgets('series play loads episodes only when pressed', (tester) async {
+      final queries = <EpisodesQuery>[];
+      await pumpDetailPage(
+        tester,
+        withPlayerRoute: true,
+        item: _series,
+        seasons: [_season(), _seasonTwo()],
+        loadEpisodes: (query) {
+          queries.add(query);
+          return [ep(1, played: true), ep(2)];
+        },
+      );
+      expect(queries, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('detail-play')));
+      await tester.pumpAndSettle();
+      expect(queries, [
+        (userId: 'user-1', seriesId: 'series-1', seasonId: null),
+      ]);
+      expect(find.text('player:episode-2'), findsOneWidget);
+    });
+
+    testWidgets('long synopsis opens in a dialog', (tester) async {
+      final long = List.filled(40, 'A long mountain synopsis.').join(' ');
+      await pumpDetailPage(
+        tester,
+        item: () => _series().copyForTest(overview: long),
+        seasons: [_season(), _seasonTwo()],
+      );
+      final more = find.byKey(const ValueKey('detail-overview-more'));
+      expect(more, findsOneWidget);
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('detail-overview-full')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('detail-overview-close')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('detail-overview-full')), findsNothing);
+    });
+
+    testWidgets('short synopsis has no more action', (tester) async {
+      await pumpDetailPage(
+        tester,
+        item: _series,
+        seasons: [_season(), _seasonTwo()],
+      );
+      expect(find.byKey(const ValueKey('detail-overview')), findsOneWidget);
+      expect(find.byKey(const ValueKey('detail-overview-more')), findsNothing);
+      expect(find.text('Synopsis'), findsNothing);
+    });
+
+    testWidgets('season selection hides cast and studios', (tester) async {
+      await pumpDetailPage(
+        tester,
+        size: const Size(1280, 1400),
+        item: () => _series().copyForTest(people: _movie().people),
+        seasons: [_season(), _seasonTwo()],
+      );
+      expect(
+        find.byKey(const ValueKey('detail-season-season-1')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('detail-about')), findsNothing);
+      expect(find.text('Person 0'), findsNothing);
+    });
+
+    for (final size in [const Size(390, 844), const Size(1280, 1000)]) {
+      testWidgets(
+        'a single-season series lists its episodes directly at ${size.width}',
+        (tester) async {
+          final queries = <EpisodesQuery>[];
+          await pumpDetailPage(
+            tester,
+            size: size,
+            withPlayerRoute: true,
+            item: () => _series().copyForTest(people: _movie().people),
+            seasons: [_season()],
+            loadEpisodes: (query) {
+              queries.add(query);
+              return [ep(1, played: true), ep(2)];
+            },
+          );
+          expect(
+            find.byKey(const ValueKey('detail-season-season-1')),
+            findsNothing,
+          );
+          expect(queries, [
+            (userId: 'user-1', seriesId: 'series-1', seasonId: 'season-1'),
+          ]);
+          expect(
+            find.byKey(const ValueKey('detail-episode-episode-2')),
+            findsOneWidget,
+          );
+          final play = find.byKey(const ValueKey('detail-play'));
+          expect(
+            find.descendant(of: play, matching: find.text('Episode 2')),
+            findsOneWidget,
+          );
+          final about = find.byKey(const ValueKey('detail-about'));
+          await tester.scrollUntilVisible(
+            about,
+            300,
+            scrollable: _pageScrollable,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.getTopLeft(about).dy,
+            greaterThan(
+              tester
+                  .getTopLeft(
+                    find.byKey(const ValueKey('detail-episode-episode-1')),
+                  )
+                  .dy,
+            ),
+          );
+          await tester.scrollUntilVisible(
+            play,
+            -300,
+            scrollable: _pageScrollable,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(play);
+          await tester.pumpAndSettle();
+          expect(find.text('player:episode-2'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+
   testWidgets('the back button stays pinned while the detail page scrolls', (
     tester,
   ) async {
@@ -915,7 +1261,7 @@ void main() {
       size: const Size(1280, 1000),
       withPlayerRoute: true,
       itemById: (id) => id == 'season-1' ? _season() : _series(),
-      seasons: [_season()],
+      seasons: [_season(), _seasonTwo()],
       episodes: [episode],
     );
 
@@ -1133,4 +1479,21 @@ class _TaggedLibraryItems extends LibraryItemsController {
     ],
     totalRecordCount: 1,
   );
+}
+
+extension on MediaItem {
+  MediaItem copyForTest({String? overview, List<MediaPerson>? people}) =>
+      MediaItem(
+        id: id,
+        name: name,
+        type: type,
+        seriesId: seriesId,
+        seriesName: seriesName,
+        indexNumber: indexNumber,
+        childCount: childCount,
+        genres: genres,
+        productionYear: productionYear,
+        overview: overview ?? this.overview,
+        people: people ?? this.people,
+      );
 }

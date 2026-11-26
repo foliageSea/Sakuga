@@ -308,6 +308,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get studios => 'Studio';
 
   @override
+  String playEpisodeNumber(int number) {
+    return 'Episode $number';
+  }
+
+  @override
+  String resumeEpisodeNumber(int number) {
+    return 'Resume episode $number';
+  }
+
+  @override
+  String playSeasonEpisode(int season, int episode) {
+    return 'S$season E$episode';
+  }
+
+  @override
+  String resumeSeasonEpisode(int season, int episode) {
+    return 'Resume S$season E$episode';
+  }
+
+  @override
+  String get showMore => 'More';
+
+  @override
+  String get episodeRowView => 'Row view';
+
+  @override
+  String get episodeGridView => 'Grid view';
+
+  @override
   String get noItems => 'No items';
 
   @override

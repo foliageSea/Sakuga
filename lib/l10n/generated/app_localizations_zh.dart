@@ -273,7 +273,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String episodeTitle(int number, String title) {
-    return '$number. $title';
+    return '第 $number 集：$title';
   }
 
   @override
@@ -281,6 +281,35 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get studios => '制作';
+
+  @override
+  String playEpisodeNumber(int number) {
+    return '第 $number 集';
+  }
+
+  @override
+  String resumeEpisodeNumber(int number) {
+    return '继续 第 $number 集';
+  }
+
+  @override
+  String playSeasonEpisode(int season, int episode) {
+    return '第 $season 季 第 $episode 集';
+  }
+
+  @override
+  String resumeSeasonEpisode(int season, int episode) {
+    return '继续 第 $season 季 第 $episode 集';
+  }
+
+  @override
+  String get showMore => '更多';
+
+  @override
+  String get episodeRowView => '横向浏览';
+
+  @override
+  String get episodeGridView => '网格视图';
 
   @override
   String get noItems => '暂无内容';

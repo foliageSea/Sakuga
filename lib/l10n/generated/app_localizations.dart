@@ -614,6 +614,48 @@ abstract class AppLocalizations {
   /// **'Studio'**
   String get studios;
 
+  /// No description provided for @playEpisodeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Episode {number}'**
+  String playEpisodeNumber(int number);
+
+  /// No description provided for @resumeEpisodeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume episode {number}'**
+  String resumeEpisodeNumber(int number);
+
+  /// No description provided for @playSeasonEpisode.
+  ///
+  /// In en, this message translates to:
+  /// **'S{season} E{episode}'**
+  String playSeasonEpisode(int season, int episode);
+
+  /// No description provided for @resumeSeasonEpisode.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume S{season} E{episode}'**
+  String resumeSeasonEpisode(int season, int episode);
+
+  /// No description provided for @showMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get showMore;
+
+  /// No description provided for @episodeRowView.
+  ///
+  /// In en, this message translates to:
+  /// **'Row view'**
+  String get episodeRowView;
+
+  /// No description provided for @episodeGridView.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid view'**
+  String get episodeGridView;
+
   /// No description provided for @noItems.
   ///
   /// In en, this message translates to:

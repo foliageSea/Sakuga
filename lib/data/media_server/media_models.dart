@@ -42,11 +42,15 @@ class MediaPerson {
     required this.name,
     required this.role,
     required this.type,
+    this.image,
   });
   final String id;
   final String name;
   final String role;
   final String type;
+
+  /// Headshot artwork, when the server has one.
+  final MediaImageResource? image;
 }
 
 class MediaItem {

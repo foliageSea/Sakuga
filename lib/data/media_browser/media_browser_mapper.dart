@@ -99,6 +99,7 @@ class MediaBrowserMapper {
               name: person['Name'] as String? ?? '',
               role: person['Role'] as String? ?? '',
               type: person['Type'] as String? ?? '',
+              image: _image(person['Id'], person['PrimaryImageTag']),
             ),
           )
           .where((person) => person.name.isNotEmpty)
