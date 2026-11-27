@@ -936,11 +936,23 @@ void main() {
           for (final key in ['toggle', 'row-view', 'grid-view']) {
             expect(find.byKey(ValueKey('detail-episodes-$key')), findsNothing);
           }
+          expect(
+            find.byWidgetPredicate((widget) => widget is RawScrollbar),
+            findsNothing,
+          );
           await tester.drag(row, const Offset(-160, 0));
+          await tester.pump();
+          expect(
+            find.byWidgetPredicate((widget) => widget is RawScrollbar),
+            findsNothing,
+          );
           await tester.pumpAndSettle();
           expect(tester.getTopLeft(card(1)).dx, lessThan(first.dx));
           expect(tester.takeException(), isNull);
         },
+        variant: TargetPlatformVariant.only(
+          size.width < 600 ? TargetPlatform.android : TargetPlatform.windows,
+        ),
       );
     }
 

@@ -100,6 +100,7 @@ class PageScrollView extends StatelessWidget {
     this.animate = true,
     this.transparent = false,
     this.flushTop = false,
+    this.scrollbars = true,
     this.maxWidth = 1440,
     super.key,
   });
@@ -131,6 +132,9 @@ class PageScrollView extends StatelessWidget {
   /// without a [header].
   final bool flushTop;
 
+  /// Whether this page inherits platform scrollbars for its scrollables.
+  final bool scrollbars;
+
   /// Width cap for the scroll viewport; immersive artwork can use all of it.
   final double maxWidth;
 
@@ -156,7 +160,7 @@ class PageScrollView extends StatelessWidget {
         ),
       ],
     );
-    final content = Align(
+    final layout = Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
@@ -179,6 +183,13 @@ class PageScrollView extends StatelessWidget {
               ),
       ),
     );
+    final content = scrollbars
+        ? layout
+        : ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context)
+                .copyWith(scrollbars: false),
+            child: layout,
+          );
     final body = animate
         ? TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: 1),

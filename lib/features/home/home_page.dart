@@ -35,6 +35,7 @@ class HomePage extends ConsumerWidget {
     // it; the chrome then hosts the refresh action instead of a page heading.
     final immersive = ImmersiveScope.insetOf(context) != null;
     final content = PageScrollView(
+      scrollbars: false,
       transparent: true,
       headerGap: 0,
       flushTop: immersive,

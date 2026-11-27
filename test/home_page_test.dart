@@ -733,6 +733,11 @@ void main() {
         scrollDelta: const Offset(0, 120),
       ),
     );
+    await tester.pump();
+    expect(
+      find.byWidgetPredicate((widget) => widget is RawScrollbar),
+      findsNothing,
+    );
     await tester.pumpAndSettle();
     expect(page.pixels, greaterThan(0));
     expect(tester.takeException(), isNull);

@@ -391,6 +391,7 @@ class _DetailScaffold extends StatelessWidget {
     final inset = ImmersiveScope.insetOf(context);
     final shellHasHeader = WindowPosterBackgroundScope.hasShell(context);
     return PageScrollView(
+      scrollbars: false,
       header: shellHasHeader
           ? null
           : _BackBar(title: title, showLibrary: showLibrary),
