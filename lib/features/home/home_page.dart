@@ -38,6 +38,7 @@ class HomePage extends ConsumerWidget {
       transparent: true,
       headerGap: 0,
       flushTop: immersive,
+      maxWidth: immersive ? double.infinity : 1440,
       header: immersive
           ? null
           : PageHeading(
@@ -86,40 +87,57 @@ class HomePage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _PosterCarouselSection(client: data.client),
-                    _MediaSection(
-                      client: data.client,
-                      title: l.continueWatching,
-                      compact: true,
-                      posterAction:
-                          !data.client.server.type.supportsManualPlayed
-                          ? null
-                          : (item) => PlayedStatusButton(
-                              key: ValueKey((
-                                data.client.server,
-                                data.userId,
-                                item.id,
-                              )),
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        // Keep the media rows at their original reading width.
+                        constraints: BoxConstraints(
+                          maxWidth: 1440 - 2 * pagePadding(context),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _MediaSection(
                               client: data.client,
-                              userId: data.userId,
-                              item: item,
-                              iconOnly: true,
+                              title: l.continueWatching,
+                              compact: true,
+                              posterAction:
+                                  !data.client.server.type.supportsManualPlayed
+                                  ? null
+                                  : (item) => PlayedStatusButton(
+                                      key: ValueKey((
+                                        data.client.server,
+                                        data.userId,
+                                        item.id,
+                                      )),
+                                      client: data.client,
+                                      userId: data.userId,
+                                      item: item,
+                                      iconOnly: true,
+                                    ),
+                              items: ref.watch(resumeItemsProvider),
+                              onRetry: () =>
+                                  ref.invalidate(resumeItemsProvider),
+                              onTap: (item, posterUrl) =>
+                                  _resume(context, item, posterUrl),
                             ),
-                      items: ref.watch(resumeItemsProvider),
-                      onRetry: () => ref.invalidate(resumeItemsProvider),
-                      onTap: (item, posterUrl) =>
-                          _resume(context, item, posterUrl),
-                    ),
-                    if (data.client.server.type.supportsRecentlyAdded)
-                      _MediaSection(
-                        client: data.client,
-                        title: l.recentlyAdded,
-                        showEmpty:
-                            data.client.server.type == MediaServerType.ugreen,
-                        items: ref.watch(latestItemsProvider),
-                        onRetry: () => ref.invalidate(latestItemsProvider),
-                        onTap: (item, posterUrl) =>
-                            _openDetail(context, item, posterUrl),
+                            if (data.client.server.type.supportsRecentlyAdded)
+                              _MediaSection(
+                                client: data.client,
+                                title: l.recentlyAdded,
+                                showEmpty:
+                                    data.client.server.type ==
+                                    MediaServerType.ugreen,
+                                items: ref.watch(latestItemsProvider),
+                                onRetry: () =>
+                                    ref.invalidate(latestItemsProvider),
+                                onTap: (item, posterUrl) =>
+                                    _openDetail(context, item, posterUrl),
+                              ),
+                          ],
+                        ),
                       ),
+                    ),
                   ],
                 ),
                 loading: () => const LoadingNotice(),

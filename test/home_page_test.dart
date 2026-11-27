@@ -888,7 +888,7 @@ void main() {
         // Short windows so the page content scrolls under the chrome.
         final windowSize = mobile
             ? const Size(390, 560)
-            : const Size(1280, 600);
+            : const Size(1920, 600);
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = windowSize;
         addTearDown(tester.view.resetDevicePixelRatio);
@@ -915,7 +915,7 @@ void main() {
             ),
             settingsRepositoryProvider.overrideWithValue(MemorySettings()),
             desktopWindowProvider.overrideWithValue(
-              FakeWindow(available: !mobile, macOS: true),
+              FakeWindow(available: !mobile, macOS: true)..maximized = !mobile,
             ),
             serverRepositoryProvider.overrideWithValue(servers),
             libraryViewsProvider.overrideWith(
@@ -966,6 +966,14 @@ void main() {
           expect(tester.getRect(page).left, 0);
           expect(tester.getRect(page).width, windowSize.width);
         } else {
+          final sidebar = tester.getRect(find.byType(FSidebar));
+          final banner = tester.getRect(page);
+          expect(banner.left, sidebar.right);
+          expect(banner.right, windowSize.width);
+          expect(
+            tester.getTopLeft(find.text('Continue watching')).dx,
+            closeTo((sidebar.right + windowSize.width - 1440) / 2 + 32, 0.01),
+          );
           expect(tester.getRect(find.byType(DesktopTitleBar)).top, 0);
           expect(
             find.descendant(
