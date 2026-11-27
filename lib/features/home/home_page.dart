@@ -11,9 +11,10 @@ import '../../data/media_server/media_server_factory.dart';
 import '../../data/media_server/media_models.dart';
 import '../../data/media_server/server_profile.dart';
 import '../../data/media_server/server_repository.dart';
-import '../../shared/localization.dart';
-import '../../shared/media_widgets.dart';
 import '../../shared/immersive.dart';
+import '../../shared/localization.dart';
+import '../../shared/media_preview_card.dart';
+import '../../shared/media_widgets.dart';
 import '../../shared/poster_background.dart';
 import '../../shared/responsive_button.dart';
 import '../../shared/widgets.dart';
@@ -89,9 +90,8 @@ class HomePage extends ConsumerWidget {
                   children: [
                     _PosterCarouselSection(client: data.client),
                     _MediaSection(
-                      client: data.client,
                       title: l.continueWatching,
-                      compact: true,
+                      resumesPlayback: true,
                       posterAction:
                           !data.client.server.type.supportsManualPlayed
                           ? null
@@ -108,19 +108,21 @@ class HomePage extends ConsumerWidget {
                             ),
                       items: ref.watch(resumeItemsProvider),
                       onRetry: () => ref.invalidate(resumeItemsProvider),
-                      onTap: (item, posterUrl) =>
-                          _resume(context, item, posterUrl),
+                      onTap: (item) =>
+                          _resume(context, item, item.poster?.url()),
                     ),
                     if (data.client.server.type.supportsRecentlyAdded)
                       _MediaSection(
-                        client: data.client,
                         title: l.recentlyAdded,
                         showEmpty:
                             data.client.server.type == MediaServerType.ugreen,
                         items: ref.watch(latestItemsProvider),
                         onRetry: () => ref.invalidate(latestItemsProvider),
-                        onTap: (item, posterUrl) =>
-                            _openDetail(context, item, posterUrl),
+                        onTap: (item) => _openDetail(
+                          context,
+                          item,
+                          (item.seriesPoster ?? item.poster)?.url(),
+                        ),
                       ),
                   ],
                 ),
@@ -793,24 +795,28 @@ class _CarouselSlide extends StatelessWidget {
 
 class _MediaSection extends StatelessWidget {
   const _MediaSection({
-    required this.client,
     required this.title,
     required this.items,
     required this.onRetry,
     required this.onTap,
-    this.compact = false,
+    this.resumesPlayback = false,
     this.showEmpty = false,
     this.posterAction,
   });
 
-  final MediaServerClient client;
   final String title;
   final AsyncValue<List<MediaItem>> items;
   final VoidCallback onRetry;
-  final void Function(MediaItem item, String? posterUrl) onTap;
-  final bool compact;
+  final ValueChanged<MediaItem> onTap;
+  final bool resumesPlayback;
   final bool showEmpty;
   final Widget Function(MediaItem item)? posterAction;
+
+  String _previewTitle(MediaItem item) {
+    final title = item.displayTitle;
+    final episode = item.displaySubtitle;
+    return episode == null || episode == title ? title : '$title · $episode';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -846,36 +852,27 @@ class _MediaSection extends StatelessWidget {
                 ),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 12,
-                  ),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (var index = 0; index < values.length; index++) ...[
+                      for (final (index, item) in values.indexed) ...[
                         if (index > 0) const SizedBox(width: 12),
-                        Builder(
-                          builder: (context) {
-                            final item = values[index];
-                            final aspectRatio = compact ? 16 / 9 : 2 / 3;
-                            return SizedBox(
-                              width: compact ? 220 : 160,
-                              child: MediaPosterCard(
-                                client: client,
-                                item: item,
-                                progress: item.progressFraction,
-                                posterAction: posterAction?.call(item),
-                                aspectRatio: aspectRatio,
-                                reserveMetadataSpace: true,
-                                posterOverride: compact
-                                    ? null
-                                    : item.seriesPoster,
-                                onPosterTap: (posterUrl) =>
-                                    onTap(item, posterUrl),
-                              ),
-                            );
-                          },
+                        SizedBox(
+                          width: resumesPlayback ? 220 : 160,
+                          child: MediaPreviewCard(
+                            item: item,
+                            title: _previewTitle(item),
+                            aspectRatio: resumesPlayback ? 16 / 9 : 2 / 3,
+                            artwork: resumesPlayback
+                                ? item.poster
+                                : item.seriesPoster,
+                            posterAction: posterAction?.call(item),
+                            playOnTap:
+                                item.isEpisode ||
+                                (resumesPlayback && !item.isSeries),
+                            onTap: () => onTap(item),
+                          ),
                         ),
                       ],
                     ],

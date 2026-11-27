@@ -46,7 +46,7 @@ abstract class MediaBrowserClient implements MediaServerClient {
   /// Fields shared by every browse request: scraped image metadata plus the
   /// per-user playback state.
   static const _itemFields =
-      'RunTimeTicks,PrimaryImageAspectRatio,ImageTags,UserData,ChildCount,RecursiveItemCount';
+      'RunTimeTicks,PrimaryImageAspectRatio,ImageTags,UserData,ChildCount,RecursiveItemCount,Overview';
   static const _itemImageTypes = 'Primary,Backdrop,Logo';
 
   Map<String, String> get authHeaders;
@@ -621,7 +621,7 @@ abstract class MediaBrowserClient implements MediaServerClient {
       queryParameters: {
         'userId': userId,
         'seasonId': ?seasonId,
-        'fields': '$_itemFields,Overview',
+        'fields': _itemFields,
         'enableImageTypes': _itemImageTypes,
         'imageTypeLimit': 1,
       },

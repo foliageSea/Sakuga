@@ -24,7 +24,7 @@ const _server = ServerProfile(
   deviceId: 'device',
 );
 const _fields =
-    'RunTimeTicks,PrimaryImageAspectRatio,ImageTags,UserData,ChildCount,RecursiveItemCount';
+    'RunTimeTicks,PrimaryImageAspectRatio,ImageTags,UserData,ChildCount,RecursiveItemCount,Overview';
 const _images = 'Primary,Backdrop,Logo';
 
 void main() {
@@ -201,7 +201,7 @@ void main() {
       _expectUri(adapter.last, '/Shows/series/Episodes', {
         'userId': 'user',
         'seasonId': 'season',
-        'fields': '$_fields,Overview',
+        'fields': _fields,
         'enableImageTypes': _images,
         'imageTypeLimit': '1',
       });

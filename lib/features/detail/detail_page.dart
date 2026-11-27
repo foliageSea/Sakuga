@@ -12,6 +12,7 @@ import '../../data/media_server/media_models.dart';
 import '../../data/media_server/server_profile.dart';
 import '../../shared/immersive.dart';
 import '../../shared/localization.dart';
+import '../../shared/media_preview_card.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/poster_background.dart';
 import '../../shared/widgets.dart';
@@ -298,7 +299,7 @@ class _DetailBody extends ConsumerWidget {
                   seasonId: singleSeason.id,
                 )
               else
-                _Seasons(client: client, userId: userId, series: value),
+                _Seasons(userId: userId, series: value),
             if (value.type == MediaType.season)
               if (parentSeriesId != null)
                 _Episodes(
@@ -1266,12 +1267,7 @@ class _PersonCard extends StatelessWidget {
 }
 
 class _Seasons extends ConsumerWidget {
-  const _Seasons({
-    required this.client,
-    required this.userId,
-    required this.series,
-  });
-  final MediaServerClient client;
+  const _Seasons({required this.userId, required this.series});
   final String userId;
   final MediaItem series;
 
@@ -1319,11 +1315,7 @@ class _Seasons extends ConsumerWidget {
                       for (final season in values)
                         SizedBox(
                           width: width,
-                          child: _SeasonCard(
-                            client: client,
-                            season: season,
-                            series: series,
-                          ),
+                          child: _SeasonCard(season: season, series: series),
                         ),
                     ],
                   );
@@ -1441,12 +1433,7 @@ class _SeasonTabsEpisodesState extends State<_SeasonTabsEpisodes> {
 }
 
 class _SeasonCard extends StatelessWidget {
-  const _SeasonCard({
-    required this.client,
-    required this.season,
-    required this.series,
-  });
-  final MediaServerClient client;
+  const _SeasonCard({required this.season, required this.series});
   final MediaItem season;
   final MediaItem series;
 
@@ -1469,23 +1456,25 @@ class _SeasonCard extends StatelessWidget {
       communityRating: season.communityRating,
       officialRating: season.officialRating,
       genres: season.genres,
+      overview: season.overview,
+      runtime: season.runtime,
     );
     final count = season.childCount ?? season.recursiveItemCount;
     final metadata = [
       if (season.productionYear != null) '${season.productionYear}',
       if (count != null) context.l10n.libraryEpisodeCount(count),
     ].join(' · ');
-    return MediaPosterCard(
+    return MediaPreviewCard(
       key: ValueKey('detail-season-${season.id}'),
-      client: client,
+      aspectRatio: 2 / 3,
       item: preview,
       subtitle: metadata.isNotEmpty ? metadata : null,
       heroTag: posterHeroTag(season.id),
-      onPosterTap: (posterUrl) => context.push(
+      onTap: () => context.push(
         '/library/${season.id}',
         extra: DetailRouteExtra(
           item: preview,
-          posterUrl: posterUrl,
+          posterUrl: preview.poster?.url(),
           seriesId: series.id,
         ),
       ),
@@ -1668,170 +1657,29 @@ class _EpisodesState extends ConsumerState<_Episodes> {
   }
 }
 
-/// A 16:9 episode card with its runtime badge, watch state, and a two-line
-/// synopsis.
-class _EpisodeCard extends StatefulWidget {
+class _EpisodeCard extends StatelessWidget {
   const _EpisodeCard({required this.item, this.next = false});
 
   final MediaItem item;
-
-  /// Whether this is the episode the primary play action opens.
   final bool next;
 
   @override
-  State<_EpisodeCard> createState() => _EpisodeCardState();
-}
-
-class _EpisodeCardState extends State<_EpisodeCard> {
-  bool _hovered = false;
-
-  static String _clock(Duration duration) {
-    String two(int value) => value.toString().padLeft(2, '0');
-    return '${two(duration.inHours)}:${two(duration.inMinutes % 60)}:'
-        '${two(duration.inSeconds % 60)}';
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = context.theme;
-    final item = widget.item;
-    final radius = theme.style.borderRadius.md;
-    final progress = item.progressFraction;
-    final duration = item.runtime;
-    final overview = item.overview?.trim() ?? '';
-    final title = item.indexNumber == null
-        ? item.name
-        : context.l10n.episodeTitle(item.indexNumber!, item.name);
-    const badgeText = TextStyle(color: Color(0xFFFFFFFF));
-    final thumbnail = AspectRatio(
-      aspectRatio: 16 / 9,
-      child: ClipRRect(
-        borderRadius: radius,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            MediaImage(
-              url: item.poster?.url(),
-              headers: item.poster?.headers ?? const {},
-            ),
-            AnimatedOpacity(
-              opacity: _hovered ? 1 : 0,
-              duration: const Duration(milliseconds: 160),
-              child: ColoredBox(
-                color: const Color(0x33000000),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0x80000000),
-                    ),
-                    child: const Icon(
-                      FLucideIcons.play,
-                      size: 22,
-                      color: Color(0xFFFFFFFF),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (duration != null && duration > Duration.zero)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0x99000000),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    _clock(duration),
-                    key: ValueKey('detail-episode-duration-${item.id}'),
-                    style: theme.typography.body.xs.merge(badgeText),
-                  ),
-                ),
-              ),
-            if (item.played)
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  key: ValueKey('detail-episode-played-${item.id}'),
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0x99000000),
-                  ),
-                  child: const Icon(
-                    FLucideIcons.check,
-                    size: 14,
-                    color: Color(0xFFFFFFFF),
-                  ),
-                ),
-              ),
-            if (progress != null)
-              Positioned(
-                left: 8,
-                right: 8,
-                bottom: 8,
-                child: MediaProgressBar(value: progress),
-              ),
-            if (widget.next)
-              DecoratedBox(
-                key: ValueKey('detail-episode-next-${item.id}'),
-                decoration: BoxDecoration(
-                  border: Border.all(color: theme.colors.primary, width: 2),
-                  borderRadius: radius,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-    return Semantics(
-      button: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          key: ValueKey('detail-episode-${item.id}'),
-          behavior: HitTestBehavior.opaque,
-          onTap: () => context.push(playerLocation(item.id)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              thumbnail,
-              const SizedBox(height: 10),
-              Text(
-                title,
-                key: ValueKey('detail-episode-title-${item.id}'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.typography.body.md.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (overview.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  overview,
-                  key: ValueKey('detail-episode-overview-${item.id}'),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.typography.body.sm.copyWith(
-                    color: theme.colors.mutedForeground,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
+    final number = item.indexNumber;
+    return MediaPreviewCard(
+      key: ValueKey('detail-episode-${item.id}'),
+      item: item,
+      title: number == null
+          ? item.name
+          : context.l10n.episodeTitle(number, item.name),
+      playOnTap: true,
+      highlighted: next,
+      titleKey: ValueKey('detail-episode-title-${item.id}'),
+      overviewKey: ValueKey('detail-episode-overview-${item.id}'),
+      durationKey: ValueKey('detail-episode-duration-${item.id}'),
+      playedKey: ValueKey('detail-episode-played-${item.id}'),
+      highlightKey: ValueKey('detail-episode-next-${item.id}'),
+      onTap: () => context.push(playerLocation(item.id)),
     );
   }
 }

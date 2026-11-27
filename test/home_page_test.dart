@@ -24,8 +24,9 @@ import 'package:sakuga/features/home/home_page.dart';
 import 'package:sakuga/features/home/home_providers.dart';
 import 'package:sakuga/features/library/library_providers.dart';
 import 'package:sakuga/features/player/playback_progress_repository.dart';
-import 'package:sakuga/shared/media_widgets.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
+import 'package:sakuga/shared/media_preview_card.dart';
+import 'package:sakuga/shared/media_widgets.dart';
 import 'package:sakuga/shared/widgets.dart';
 
 import 'fakes.dart';
@@ -37,6 +38,8 @@ const _server = ServerProfile(
   apiKey: 'test-key',
 );
 
+const _resumedTitle = 'Resumed Series · S01E01 · Pilot';
+
 MediaItem _resumableEpisode({bool played = false}) => MediaItem(
   id: 'episode-1',
   name: 'Pilot',
@@ -47,6 +50,7 @@ MediaItem _resumableEpisode({bool played = false}) => MediaItem(
   indexNumber: 1,
   parentIndexNumber: 1,
   reportedPlayedPercentage: 42.0,
+  runtime: const Duration(minutes: 24, seconds: 7),
   played: played,
 );
 
@@ -246,7 +250,7 @@ void main() {
       latest: const [],
     );
 
-    final cards = find.byType(MediaPosterCard);
+    final cards = find.byType(MediaPreviewCard);
     expect(cards, findsNWidgets(3));
     final movieRect = tester.getRect(cards.at(0));
     final episodeRect = tester.getRect(cards.at(1));
@@ -299,16 +303,18 @@ void main() {
         expect(find.bySemanticsLabel('Pilot: Mark as played'), findsOneWidget);
         final card = find.ancestor(
           of: button,
-          matching: find.byType(MediaPosterCard),
+          matching: find.byType(MediaPreviewCard),
         );
         final poster = find.descendant(
           of: card,
-          matching: find.byType(PosterHero),
+          matching: find.byType(AspectRatio),
         );
         final bounds = tester.getRect(poster);
         final action = tester.getRect(button);
-        expect(bounds.right - action.right, closeTo(6, 0.1));
-        expect(bounds.bottom - action.bottom, closeTo(6, 0.1));
+        expect(action.left, greaterThan(bounds.left));
+        expect(action.top, greaterThan(bounds.top));
+        expect(action.center.dx, lessThan(bounds.center.dx));
+        expect(action.center.dy, greaterThan(bounds.center.dy));
         expect(bounds.contains(action.center), isTrue);
         await tester.tap(button);
         await tester.pumpAndSettle();
@@ -325,7 +331,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('played-status-confirm')));
         await tester.pumpAndSettle();
         expect(client.calls, [('user-1', 'episode-1', true)]);
-        expect(find.text('Resumed Series'), findsNothing);
+        expect(find.text(_resumedTitle), findsNothing);
         expect(find.text('player:episode-1'), findsNothing);
         expect(find.byType(HomePage), findsOneWidget);
         expect(tester.takeException(), isNull);
@@ -359,7 +365,7 @@ void main() {
       expect(find.byType(HomePage), findsOneWidget);
       client.pending!.complete();
       await tester.pumpAndSettle();
-      expect(find.text('Resumed Series'), findsNothing);
+      expect(find.text(_resumedTitle), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -380,7 +386,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('played-status-confirm')));
     await tester.pumpAndSettle();
-    expect(find.text('Resumed Series'), findsOneWidget);
+    expect(find.text(_resumedTitle), findsOneWidget);
     expect(
       find.descendant(
         of: button,
@@ -395,7 +401,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('played-status-confirm')));
     await tester.pumpAndSettle();
     expect(client.calls.length, 2);
-    expect(find.text('Resumed Series'), findsNothing);
+    expect(find.text(_resumedTitle), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -748,7 +754,7 @@ void main() {
   ) async {
     await pumpHome(tester);
 
-    await _tapCard(tester, 'Resumed Series');
+    await _tapCard(tester, _resumedTitle);
 
     expect(find.text('player:episode-1'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -764,57 +770,118 @@ void main() {
   });
 
   for (final width in [390.0, 1280.0]) {
-    testWidgets('recent cards use portrait series artwork at width $width', (
+    testWidgets('home media rows fill the viewport and align left at $width', (
       tester,
     ) async {
+      await pumpHome(tester, size: Size(width, 1200));
+
+      final rows = find.byWidgetPredicate(
+        (widget) =>
+            widget is SingleChildScrollView &&
+            widget.scrollDirection == Axis.horizontal,
+      );
+      expect(rows, findsNWidgets(2));
+      for (final (index, section) in [
+        'Continue watching',
+        'Recently added',
+      ].indexed) {
+        final row = rows.at(index);
+        final card = find.descendant(
+          of: row,
+          matching: find.byType(MediaPreviewCard),
+        );
+        expect(card, findsOneWidget);
+        final rowBounds = tester.getRect(row);
+        final titleBounds = tester.getRect(find.text(section));
+        expect(rowBounds.left, titleBounds.left);
+        expect(rowBounds.right, titleBounds.right);
+        final cardBounds = tester.getRect(card);
+        expect(cardBounds.left, rowBounds.left);
+        expect(cardBounds.right, lessThan(rowBounds.right));
+        final thumbnail = find.descendant(
+          of: card,
+          matching: find.byType(AspectRatio),
+        );
+        final size = tester.getSize(thumbnail);
+        expect(size.width, index == 0 ? 220 : 160);
+        expect(
+          size.width / size.height,
+          closeTo(index == 0 ? 16 / 9 : 2 / 3, 0.001),
+        );
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'recent cards prefer series posters over episode stills and backdrops',
+    (tester) async {
       await pumpHome(
         tester,
-        size: Size(width, 1200),
         resume: [],
         latest: const [
           MediaItem(
-            id: 'portrait-episode',
-            name: 'Portrait episode',
+            id: 'episode-with-still',
+            name: 'Episode with still',
             type: MediaType.episode,
-            primaryImageAspectRatio: 2 / 3,
             reportedPlayedPercentage: 42,
-          ),
-          MediaItem(
-            id: 'landscape-episode',
-            name: 'Landscape episode',
-            type: MediaType.episode,
-            primaryImageAspectRatio: 16 / 9,
+            poster: MediaImageResource(
+              urlTemplate: 'https://media.test/episode-still',
+              cacheKey: 'episode-still',
+            ),
             seriesPoster: MediaImageResource(
               urlTemplate: 'https://media.test/series-poster',
               cacheKey: 'series-poster',
             ),
           ),
-          MediaItem(id: 'series', name: 'Series', type: MediaType.series),
+          MediaItem(
+            id: 'episode-without-still',
+            name: 'Episode without still',
+            type: MediaType.episode,
+            seriesPoster: MediaImageResource(
+              urlTemplate: 'https://media.test/series-poster',
+              cacheKey: 'series-poster',
+            ),
+          ),
+          MediaItem(
+            id: 'series',
+            name: 'Series',
+            type: MediaType.series,
+            poster: MediaImageResource(
+              urlTemplate: 'https://media.test/series-poster',
+              cacheKey: 'series-poster',
+            ),
+            backdrop: MediaImageResource(
+              urlTemplate: 'https://media.test/series-backdrop',
+              cacheKey: 'series-backdrop',
+            ),
+          ),
         ],
       );
-      final cards = find.byType(MediaPosterCard);
+      final cards = find.byType(MediaPreviewCard);
       expect(cards, findsNWidgets(3));
-      final portrait = tester.getRect(cards.at(0));
-      final landscape = tester.getRect(cards.at(1));
-      final series = tester.getRect(cards.at(2));
-      expect(portrait.width, 160);
-      expect(landscape.width, 160);
-      expect(series.width, 160);
-      expect(landscape.top, portrait.top);
-      expect(series.top, portrait.top);
-      expect(portrait.height, lessThan(310));
-      expect(landscape.height, lessThan(310));
-      expect(series.height, lessThan(310));
-      final episodeCard = cards.at(1);
-      final artwork = tester.widget<MediaImage>(
-        find.descendant(of: episodeCard, matching: find.byType(MediaImage)),
+      for (final (index, image) in [
+        'series-poster',
+        'series-poster',
+        'series-poster',
+      ].indexed) {
+        final artwork = tester.widget<MediaImage>(
+          find.descendant(
+            of: cards.at(index),
+            matching: find.byType(MediaImage),
+          ),
+        );
+        expect(artwork.url, 'https://media.test/$image');
+      }
+      expect(
+        tester.widget<MediaProgressBar>(find.byType(MediaProgressBar)).value,
+        0.42,
       );
-      expect(artwork.url, 'https://media.test/series-poster');
-      expect(tester.widget<MediaPosterCard>(episodeCard).aspectRatio, 2 / 3);
-      expect(find.byType(MediaProgressBar), findsOneWidget);
+      await _tapCard(tester, 'Episode with still');
+      expect(find.text('player:episode-with-still'), findsOneWidget);
       expect(tester.takeException(), isNull);
-    });
-  }
+    },
+  );
 
   testWidgets('recently added opens the detail page', (tester) async {
     await pumpHome(tester);
@@ -825,64 +892,61 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('media cards wrap their content without fixed blank space', (
+  testWidgets('home preview cards show runtime and synopsis without a frame', (
     tester,
   ) async {
-    await pumpHome(tester);
+    const overview = 'An overview that can span two lines beneath a title.';
+    const movie = MediaItem(
+      id: 'preview-movie',
+      name: 'Preview Movie',
+      type: MediaType.movie,
+      runtime: Duration(hours: 1, minutes: 2, seconds: 3),
+      overview: overview,
+    );
+    await pumpHome(
+      tester,
+      latest: const [
+        movie,
+        MediaItem(
+          id: 'unknown-runtime',
+          name: 'Unknown runtime',
+          type: MediaType.movie,
+          runtime: Duration.zero,
+        ),
+      ],
+    );
 
-    final continueCard = find
-        .ancestor(
-          of: find.text('Resumed Series'),
-          matching: find.byType(Surface),
-        )
-        .first;
-    final recentCard = find
-        .ancestor(
-          of: find.text('Recent Series'),
-          matching: find.byType(Surface),
-        )
-        .first;
-
-    expect(tester.getSize(continueCard).height, lessThan(240));
-    expect(tester.getSize(recentCard).height, lessThan(310));
-    final titles = tester
-        .widgetList<Text>(find.byType(Text))
-        .where(
-          (text) =>
-              text.data == 'Resumed Series' || text.data == 'Recent Series',
-        );
-    expect(titles, isNotEmpty);
-    for (final title in titles) {
-      expect(title.maxLines, 1);
-      expect(title.overflow, TextOverflow.ellipsis);
-    }
-
-    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    await mouse.addPointer(location: Offset.zero);
-    for (final card in [continueCard, recentCard]) {
-      final restingRect = tester.getRect(card);
-      final title = find
-          .descendant(of: card, matching: find.byType(Text))
-          .first;
-      final restingTitleRect = tester.getRect(title);
-      await mouse.moveTo(restingRect.center + const Offset(20, 20));
-      await tester.pumpAndSettle();
-      expect(tester.getRect(card), isNot(restingRect));
-      expect(tester.getRect(title), isNot(restingTitleRect));
-
-      // Moving within the card changes its tilt without changing layout size.
-      final hoveredRect = tester.getRect(card);
-      await mouse.moveTo(restingRect.center - const Offset(20, 20));
-      await tester.pumpAndSettle();
-      expect(tester.getRect(card), isNot(hoveredRect));
-      expect(tester.getSize(card), restingRect.size);
-
-      await mouse.moveTo(Offset.zero);
-      await tester.pumpAndSettle();
-      expect(tester.getRect(card), restingRect);
-      expect(tester.getRect(title), restingTitleRect);
-    }
-    await mouse.removePointer();
+    final cards = find.byType(MediaPreviewCard);
+    expect(
+      find.descendant(of: cards, matching: find.byType(Surface)),
+      findsNothing,
+    );
+    expect(find.text('00:24:07'), findsOneWidget);
+    expect(find.text('01:02:03'), findsOneWidget);
+    expect(find.text('00:00:00'), findsNothing);
+    final card = cards.at(1);
+    final thumbnail = tester.getRect(
+      find.descendant(of: card, matching: find.byType(AspectRatio)),
+    );
+    final clip = tester.widget<ClipRRect>(
+      find.descendant(of: card, matching: find.byType(ClipRRect)).first,
+    );
+    expect(clip.borderRadius, isNot(BorderRadius.zero));
+    final badge = tester.getRect(find.text('01:02:03'));
+    expect(thumbnail.contains(badge.center), isTrue);
+    expect(badge.center.dx, greaterThan(thumbnail.center.dx));
+    expect(badge.center.dy, lessThan(thumbnail.center.dy));
+    final title = tester.widget<Text>(find.text('Preview Movie'));
+    expect(title.maxLines, 1);
+    expect(title.overflow, TextOverflow.ellipsis);
+    expect(title.style?.fontWeight, FontWeight.w600);
+    expect(
+      tester.getTopLeft(find.text('Preview Movie')).dy,
+      greaterThan(thumbnail.bottom),
+    );
+    final synopsis = tester.widget<Text>(find.text(overview));
+    expect(synopsis.maxLines, 2);
+    expect(synopsis.overflow, TextOverflow.ellipsis);
     expect(tester.takeException(), isNull);
   });
 

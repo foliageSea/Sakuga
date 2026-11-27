@@ -14,7 +14,7 @@ import 'ugreen_playback_proxy.dart';
 import 'ugreen_transport.dart';
 
 const _itemFields =
-    'RunTimeTicks,PrimaryImageAspectRatio,ImageTags,UserData,ChildCount,RecursiveItemCount';
+    'RunTimeTicks,PrimaryImageAspectRatio,ImageTags,UserData,ChildCount,RecursiveItemCount,Overview';
 const _defaultTypes = {
   MediaType.movie,
   MediaType.series,

@@ -23,6 +23,7 @@ import 'package:sakuga/features/detail/detail_providers.dart';
 import 'package:sakuga/features/home/home_providers.dart';
 import 'package:sakuga/features/library/library_providers.dart';
 import 'package:sakuga/l10n/generated/app_localizations.dart';
+import 'package:sakuga/shared/media_preview_card.dart';
 import 'package:sakuga/shared/media_widgets.dart';
 import 'package:sakuga/shared/widgets.dart';
 
@@ -81,6 +82,7 @@ MediaItem _season() => const MediaItem(
   seriesName: 'A Series With Episodes',
   indexNumber: 1,
   childCount: 13,
+  overview: 'Season one follows the troupe on its first tour.',
 );
 
 MediaItem _seasonTwo() => const MediaItem(
@@ -525,24 +527,16 @@ void main() {
       );
       final season = find.byKey(const ValueKey('detail-season-season-1'));
       expect(season, findsOneWidget);
-      final card = tester.widget<MediaPosterCard>(season);
-      expect(card.framed, isTrue);
-      expect(card.textAlign, TextAlign.start);
+      final card = tester.widget<MediaPreviewCard>(season);
       expect(card.subtitle, '13 episodes');
-      final surface = find.descendant(
-        of: season,
-        matching: find.byType(Surface),
-      );
-      expect(surface, findsOneWidget);
-      expect(
-        find.descendant(of: surface, matching: find.text('Season 1')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: surface, matching: find.text('13 episodes')),
-        findsOneWidget,
-      );
-      expect(find.text('13 episodes'), findsOneWidget);
+      Finder inside(Finder child) =>
+          find.descendant(of: season, matching: child);
+      final thumbnail = inside(find.byType(AspectRatio));
+      expect(tester.widget<AspectRatio>(thumbnail).aspectRatio, 2 / 3);
+      expect(inside(find.byType(Surface)), findsNothing);
+      expect(inside(find.text('Season 1')), findsOneWidget);
+      final overview = inside(find.text(_season().overview!));
+      expect(tester.widget<Text>(overview).maxLines, 2);
       expect(queries, isEmpty);
       await tester.ensureVisible(season);
       await tester.tap(season);
