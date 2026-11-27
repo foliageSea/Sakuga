@@ -68,8 +68,6 @@
   "librarySortRating": "Rating",
   "librarySortAscending": "Ascending",
   "librarySortDescending": "Descending",
-  "libraryGridView": "Poster view",
-  "libraryListView": "List view",
   "libraryCount": "{count, plural, =1{1 title} other{{count} titles}}",
   "librarySeasonCount": "{count, plural, =1{1 season} other{{count} seasons}}",
   "libraryEpisodeCount": "{count, plural, =1{1 episode} other{{count} episodes}}",

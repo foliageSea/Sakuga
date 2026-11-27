@@ -213,12 +213,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get librarySortDescending => '降序';
 
   @override
-  String get libraryGridView => '海报视图';
-
-  @override
-  String get libraryListView => '列表视图';
-
-  @override
   String libraryCount(int count) {
     return '$count 部';
   }

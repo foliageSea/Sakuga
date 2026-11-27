@@ -68,8 +68,6 @@
   "librarySortRating": "评分",
   "librarySortAscending": "升序",
   "librarySortDescending": "降序",
-  "libraryGridView": "海报视图",
-  "libraryListView": "列表视图",
   "libraryCount": "{count} 部",
   "librarySeasonCount": "{count} 季",
   "libraryEpisodeCount": "{count} 集",

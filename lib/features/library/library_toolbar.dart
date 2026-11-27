@@ -8,11 +8,9 @@ class LibraryToolbar extends StatelessWidget {
   const LibraryToolbar({
     required this.filtersVisible,
     required this.hasFilters,
-    required this.listView,
     required this.sort,
     required this.descending,
     required this.onToggleFilters,
-    required this.onView,
     required this.onSort,
     required this.onClear,
     required this.showFilters,
@@ -21,11 +19,9 @@ class LibraryToolbar extends StatelessWidget {
   });
   final bool filtersVisible;
   final bool hasFilters;
-  final bool listView;
   final MediaSort sort;
   final bool descending;
   final VoidCallback onToggleFilters;
-  final ValueChanged<bool> onView;
   final void Function(MediaSort, bool) onSort;
   final VoidCallback onClear;
   final bool showFilters;
@@ -131,27 +127,7 @@ class LibraryToolbar extends StatelessWidget {
               child: const Icon(FLucideIcons.arrowDownWideNarrow),
             ),
           ),
-          const SizedBox(width: 8),
         ],
-        FButton.icon(
-          key: const ValueKey('library-grid-view'),
-          variant: listView ? .ghost : .secondary,
-          size: .sm,
-          selected: !listView,
-          semanticsLabel: l.libraryGridView,
-          onPress: () => onView(false),
-          child: const Icon(FLucideIcons.layoutGrid),
-        ),
-        const SizedBox(width: 2),
-        FButton.icon(
-          key: const ValueKey('library-list-view'),
-          variant: listView ? .secondary : .ghost,
-          size: .sm,
-          selected: listView,
-          semanticsLabel: l.libraryListView,
-          onPress: () => onView(true),
-          child: const Icon(FLucideIcons.list),
-        ),
       ],
     );
   }

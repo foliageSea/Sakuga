@@ -298,7 +298,6 @@ void main() {
         await tester.tap(find.text('Server A Shows'));
         await tester.pumpAndSettle();
         for (final key in [
-          'library-list-view',
           'library-toggle-filters',
           'library-genre-Drama',
           'library-progress-false',
@@ -317,7 +316,12 @@ void main() {
             year: 2025,
           ),
         );
-        expect(_key('library-list-item-same-item-id'), findsOneWidget);
+        expect(
+          _key(
+            'library-${width < 600 ? 'mobile' : 'desktop'}-card-same-item-id',
+          ),
+          findsOneWidget,
+        );
         expect(_key('library-clear-filters'), findsOneWidget);
 
         await tester.enterText(search, 'old query');
@@ -352,7 +356,12 @@ void main() {
         );
         expect(find.text('Server A search hit'), findsNothing);
         expect(find.text('Server B feature'), findsOneWidget);
-        expect(_key('library-list-item-same-item-id'), findsOneWidget);
+        expect(
+          _key(
+            'library-${width < 600 ? 'mobile' : 'desktop'}-card-same-item-id',
+          ),
+          findsOneWidget,
+        );
         expect(_key('library-clear-filters'), findsNothing);
 
         if (search.evaluate().isEmpty) {

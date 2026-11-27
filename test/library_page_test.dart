@@ -33,11 +33,15 @@ const _server = ServerProfile(
   apiKey: 'test-key',
 );
 
+const _gridOverview =
+    'A long synopsis that should fit in at most two lines instead of pushing surrounding media out of the list.';
+
 MediaItem _item(String id, double ratio) => MediaItem(
   id: id,
   name: 'Series $id',
   type: MediaType.series,
   primaryImageAspectRatio: ratio,
+  overview: id == 'a' ? _gridOverview : null,
   productionYear: id == 'd' ? null : 2023,
   communityRating: 8.4,
   recursiveItemCount: id == 'd' ? null : 12,
@@ -219,66 +223,6 @@ Future<ProviderContainer> _pumpLibrary(
 }
 
 void main() {
-  const listItems = [
-    MediaItem(
-      id: 'watching',
-      name: 'A very long series title that should be truncated rather than crowding the progress, rating, or watched status columns',
-      type: MediaType.series,
-      productionYear: 2026,
-      recursiveItemCount: 12,
-      communityRating: 8.1,
-      reportedPlayedPercentage: 40,
-    ),
-    MediaItem(id: 'unrated', name: 'Unrated series', type: MediaType.series),
-    MediaItem(
-      id: 'watched',
-      name: 'Watched series',
-      type: MediaType.series,
-      communityRating: 7.6,
-      played: true,
-      reportedPlayedPercentage: 100,
-    ),
-  ];
-
-  for (final width in [360.0, 720.0, 1280.0]) {
-    testWidgets('compact library list aligns information at width $width', (
-      tester,
-    ) async {
-      await _pumpLibrary(tester, Size(width, 900), items: listItems);
-      await tester.tap(find.byKey(const ValueKey('library-list-view')));
-      await tester.pumpAndSettle();
-
-      Finder row(String id) => find.byKey(ValueKey('library-list-item-$id'));
-      Finder column(String name, String id) =>
-          find.byKey(ValueKey('library-list-$name-$id'));
-
-      final first = tester.getRect(row('watching'));
-      expect(first.height, closeTo(104, 1));
-      final title = tester.widget<Text>(find.text(listItems.first.name));
-      expect(title.maxLines, 1);
-      expect(title.overflow, TextOverflow.ellipsis);
-      expect(find.byType(MediaProgressBar), findsOneWidget);
-      expect(find.byIcon(FLucideIcons.circleCheck), findsOneWidget);
-
-      for (final name in ['rating', 'status']) {
-        final x = tester.getTopLeft(column(name, 'watching')).dx;
-        for (final id in ['unrated', 'watched']) {
-          expect(tester.getTopLeft(column(name, id)).dx, closeTo(x, 0.01));
-        }
-      }
-      final progress = tester.getRect(column('progress', 'watching'));
-      final titleRect = tester.getRect(find.text(listItems.first.name));
-      expect(progress.width, lessThanOrEqualTo(144));
-      if (first.width >= 640) {
-        expect(progress.left, greaterThan(titleRect.right));
-      } else {
-        expect(progress.left, titleRect.left);
-        expect(progress.top, greaterThan(titleRect.bottom));
-      }
-      expect(tester.takeException(), isNull);
-    });
-  }
-
   testWidgets('Ugreen offers genre filtering without advanced options', (
     tester,
   ) async {
@@ -337,34 +281,31 @@ void main() {
     },
   );
 
-  testWidgets('library poster cards show ratings and metadata inside frames', (
-    tester,
-  ) async {
-    await _pumpLibrary(tester, const Size(1280, 900));
-    final cards = tester.widgetList<MediaPosterCard>(
-      find.byType(MediaPosterCard),
-    );
-    expect(cards, isNotEmpty);
-    expect(
-      cards.every(
-        (card) =>
-            card.framed &&
-            card.showRating &&
-            card.textAlign == TextAlign.start &&
-            card.subtitle ==
-                (card.item.id == 'd' ? null : '2023 · 12 episodes'),
-      ),
-      isTrue,
-    );
-    expect(find.text('8.4'), findsNWidgets(4));
-    expect(find.text('2023 · 12 episodes'), findsNWidgets(3));
-    expect(find.byType(MediaProgressBar), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'library grid shows aligned posters and metadata without synopsis',
+    (tester) async {
+      await _pumpLibrary(tester, const Size(1280, 900));
+      final a = tester.getRect(_posterFrameFinder('a'));
+      final b = tester.getRect(_posterFrameFinder('b'));
+      final title = find.text('Series a');
+      final overview = find.text(_gridOverview);
+      expect(a.width / a.height, closeTo(2 / 3, 0.01));
+      expect(a.size, b.size);
+      expect(a.top, b.top);
+      expect(tester.getRect(title).top, greaterThan(a.bottom));
+      expect(overview, findsNothing);
+      expect(tester.widget<Text>(title).maxLines, 1);
+      _expectDurationBadge(tester, '00:24:00', a);
+      expect(find.text('8.4'), findsNWidgets(4));
+      expect(find.text('2023 · 12 episodes'), findsNWidgets(3));
+      expect(find.byType(MediaProgressBar), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final size in [const Size(320, 760), const Size(1280, 900)]) {
     testWidgets(
-      'library combines filters, sorts and switches views at ${size.width}',
+      'library combines filters and sorting in the grid at ${size.width}',
       (tester) async {
         final client = _GenreClient();
         await _pumpLibrary(
@@ -391,12 +332,8 @@ void main() {
           findsNothing,
         );
         expect(find.text('Animation title 0'), findsOneWidget);
-        await tester.tap(find.byKey(const ValueKey('library-list-view')));
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const ValueKey('library-list-item-view-Animation-0')),
-          findsOneWidget,
-        );
+        expect(find.byKey(const ValueKey('library-list-view')), findsNothing);
+        expect(find.byKey(const ValueKey('library-grid-view')), findsNothing);
         await tester.tap(find.byKey(const ValueKey('library-sort')));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('library-sort-rating')));
@@ -412,12 +349,6 @@ void main() {
         expect(client.filters.last.isPlayed, isNull);
         expect(client.filters.last.year, isNull);
         expect(client.filters.last.sort, MediaSort.rating);
-        await tester.tap(find.byKey(const ValueKey('library-grid-view')));
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const ValueKey('library-list-item-view-all-0')),
-          findsNothing,
-        );
         expect(find.text('All title 0'), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
@@ -738,7 +669,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('mobile library aligns equal-height posters in two columns', (
+  testWidgets('mobile library aligns landscape thumbnails in two columns', (
     tester,
   ) async {
     await _pumpLibrary(tester, const Size(390, 900));
@@ -758,15 +689,8 @@ void main() {
     expect(third.dx, first.dx);
     expect(third.dy, greaterThan(second.dy));
     expect(
-      tester
-          .getSize(find.byKey(const ValueKey('library-mobile-card-a')))
-          .height,
-      closeTo(
-        tester
-            .getSize(find.byKey(const ValueKey('library-mobile-card-b')))
-            .height,
-        0.01,
-      ),
+      tester.getSize(_posterFrameFinder('a')),
+      tester.getSize(_posterFrameFinder('b')),
     );
     expect(tester.takeException(), isNull);
   });
@@ -791,14 +715,17 @@ void main() {
     );
     expect(firstCardRect.top, fourthCardRect.top);
     expect(firstCardRect.width, closeTo(fourthCardRect.width, 0.01));
-    expect(firstCardRect.height, closeTo(fourthCardRect.height, 0.01));
+    expect(
+      tester.getSize(_posterFrameFinder('a')),
+      tester.getSize(_posterFrameFinder('d')),
+    );
     expect(tester.takeException(), isNull);
   });
 
   testWidgets(
     'library scrolls inside the grid while keeping heading and view chips pinned',
     (tester) async {
-      await _pumpLibrary(tester, const Size(1000, 560));
+      await _pumpLibrary(tester, const Size(1000, 560), items: _scrollItems());
 
       final headingFinder = find.text('Library');
       final viewChipFinder = find.text('Shows');
@@ -832,98 +759,73 @@ void main() {
     },
   );
 
-  for (final listView in [false, true]) {
-    testWidgets(
-      'library filters stay fixed while ${listView ? 'list' : 'grid'} scrolls',
-      (tester) async {
-        await _pumpLibrary(tester, const Size(1000, 560), expandFilters: true);
-        if (listView) {
-          await tester.tap(find.byKey(const ValueKey('library-list-view')));
-          await tester.pumpAndSettle();
-        }
-        final filters = find.byKey(const ValueKey('library-filter-panel'));
-        final search = find.byKey(const ValueKey('library-search'));
-        final scrollView = find.byType(CustomScrollView);
-        final filterRect = tester.getRect(filters);
-        final searchRect = tester.getRect(search);
-        expect(
-          tester.getRect(scrollView).top,
-          greaterThanOrEqualTo(filterRect.bottom),
-        );
-        final scrollable = find.descendant(
-          of: scrollView,
-          matching: find.byType(Scrollable),
-        );
-        final position = tester.state<ScrollableState>(scrollable).position;
-        expect(position.maxScrollExtent, greaterThan(0));
-        await tester.drag(scrollView, const Offset(0, -180));
-        await tester.pumpAndSettle();
-        expect(position.pixels, greaterThan(0));
-        expect(tester.getRect(filters), filterRect);
-        expect(tester.getRect(search), searchRect);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
-
-  testWidgets('resizing the library keeps poster URLs stable for cache hits', (
+  testWidgets('library filters stay fixed while the grid scrolls', (
     tester,
   ) async {
-    const client = ServerProfile(
-      id: 'server',
-      name: 'Test server',
-      baseUrl: 'http://127.0.0.1:8096',
-      apiKey: 'test-key',
+    await _pumpLibrary(
+      tester,
+      const Size(1000, 560),
+      expandFilters: true,
+      items: _scrollItems(),
     );
-    const taggedItem = MediaItem(
-      id: 'tagged-1',
-      name: 'Tagged Series',
-      type: MediaType.series,
-      poster: MediaImageResource(
-        urlTemplate: 'http://127.0.0.1:8096/Items/tagged-1/Images/Primary?maxWidth={width}&tag=tag-123',
-        cacheKey: 'tagged-1:tag-123',
-      ),
+    final filters = find.byKey(const ValueKey('library-filter-panel'));
+    final search = find.byKey(const ValueKey('library-search'));
+    final scrollView = find.byType(CustomScrollView);
+    final filterRect = tester.getRect(filters);
+    final searchRect = tester.getRect(search);
+    expect(
+      tester.getRect(scrollView).top,
+      greaterThanOrEqualTo(filterRect.bottom),
     );
-    final jellyfin = FakeMediaServerClient(server: client);
-    String? capturedUrl;
-
-    for (final width in [1440.0, 1265.0, 980.0, 390.0]) {
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            ...FLocalizations.localizationsDelegates,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          builder: (context, child) => FTheme(
-            data: createAppTheme(
-              const AppSettings(language: 'en'),
-              brightness: Brightness.light,
-              touch: width < 600,
-            ),
-            child: child!,
-          ),
-          home: Center(
-            child: SizedBox(
-              width: width / 4,
-              child: MediaPosterCard(
-                client: jellyfin,
-                item: taggedItem,
-                onPosterTap: (url) => capturedUrl = url,
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.tap(find.text('Tagged Series'));
-      expect(
-        capturedUrl,
-        'http://127.0.0.1:8096/Items/tagged-1/Images/Primary?maxWidth=600&tag=tag-123',
-      );
-    }
+    final scrollable = find.descendant(
+      of: scrollView,
+      matching: find.byType(Scrollable),
+    );
+    final position = tester.state<ScrollableState>(scrollable).position;
+    expect(position.maxScrollExtent, greaterThan(0));
+    await tester.drag(scrollView, const Offset(0, -180));
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(0));
+    expect(tester.getRect(filters), filterRect);
+    expect(tester.getRect(search), searchRect);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'resizing the library keeps thumbnail URLs stable for cache hits',
+    (tester) async {
+      const taggedItem = MediaItem(
+        id: 'tagged-1',
+        name: 'Tagged Series',
+        type: MediaType.series,
+        poster: MediaImageResource(
+          urlTemplate: 'http://127.0.0.1:8096/Items/tagged-1/Images/Primary?maxWidth={width}&tag=poster',
+          cacheKey: 'tagged-1:poster',
+          headers: {'Authorization': 'poster-token'},
+        ),
+        backdrop: MediaImageResource(
+          urlTemplate: 'http://127.0.0.1:8096/Items/tagged-1/Images/Backdrop?maxWidth={width}&tag=backdrop',
+          cacheKey: 'tagged-1:backdrop',
+          headers: {'Authorization': 'test'},
+        ),
+      );
+      await _pumpLibrary(tester, const Size(1440, 900), items: [taggedItem]);
+      final image = find.descendant(
+        of: _posterFrameFinder(taggedItem.id),
+        matching: find.byType(MediaImage),
+      );
+      final original = tester.widget<MediaImage>(image);
+      expect(original.url, taggedItem.poster!.url());
+      expect(original.headers, taggedItem.poster!.headers);
+
+      for (final width in [1265.0, 980.0, 390.0]) {
+        tester.view.physicalSize = Size(width, 900);
+        await tester.pumpAndSettle();
+        expect(tester.widget<MediaImage>(image).url, original.url);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'desktop library poster flies into detail page and flies back on return',
@@ -1267,6 +1169,31 @@ void main() {
   );
 }
 
+List<MediaItem> _scrollItems() => [
+  _item('a', 0.5),
+  for (var i = 0; i < 20; i++) _item('scroll-$i', 0.7),
+];
+
+void _expectDurationBadge(
+  WidgetTester tester,
+  String duration,
+  Rect thumbnail,
+) {
+  final badge = tester.getRect(find.text(duration));
+  expect(
+    thumbnail.contains(badge.topLeft),
+    isTrue,
+    reason: '$badge vs $thumbnail',
+  );
+  expect(
+    thumbnail.contains(badge.bottomRight),
+    isTrue,
+    reason: '$badge vs $thumbnail',
+  );
+  expect(badge.center.dx, greaterThanOrEqualTo(thumbnail.center.dx - 0.01));
+  expect(badge.center.dy, lessThan(thumbnail.center.dy));
+}
+
 Finder _posterFrameFinder(String id) =>
     find.byKey(ValueKey(('poster-hero-frame', posterHeroTag(id))));
 
@@ -1281,6 +1208,7 @@ Future<void> _pumpRoutedLibrary(
   required Size size,
   required FutureOr<MediaItem> Function(String itemId) loadItem,
   FakeMediaServerClient? client,
+  List<MediaItem>? items,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -1321,7 +1249,9 @@ Future<void> _pumpRoutedLibrary(
           ],
         ),
       ),
-      libraryItemsProvider.overrideWith2(_FakeItems.new),
+      libraryItemsProvider.overrideWith2(
+        (query) => _FakeItems(query, items: items),
+      ),
       libraryItemProvider.overrideWith((ref, query) => loadItem(query.itemId)),
     ],
   );

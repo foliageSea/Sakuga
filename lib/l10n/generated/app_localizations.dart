@@ -494,18 +494,6 @@ abstract class AppLocalizations {
   /// **'Descending'**
   String get librarySortDescending;
 
-  /// No description provided for @libraryGridView.
-  ///
-  /// In en, this message translates to:
-  /// **'Poster view'**
-  String get libraryGridView;
-
-  /// No description provided for @libraryListView.
-  ///
-  /// In en, this message translates to:
-  /// **'List view'**
-  String get libraryListView;
-
   /// No description provided for @libraryCount.
   ///
   /// In en, this message translates to:

@@ -220,12 +220,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get librarySortDescending => 'Descending';
 
   @override
-  String get libraryGridView => 'Poster view';
-
-  @override
-  String get libraryListView => 'List view';
-
-  @override
   String libraryCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

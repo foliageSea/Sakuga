@@ -12,6 +12,7 @@ import '../../data/media_server/media_server_factory.dart';
 import '../../data/media_server/media_models.dart';
 import '../../data/media_server/server_profile.dart';
 import '../../shared/localization.dart';
+import '../../shared/media_preview_card.dart';
 import '../../shared/media_widgets.dart';
 import '../../shared/poster_background.dart';
 import '../../shared/responsive_button.dart';
@@ -43,7 +44,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   MediaSort _sort = MediaSort.name;
   bool _descending = false;
   bool _showFilters = false;
-  bool _listView = false;
 
   @override
   void initState() {
@@ -225,11 +225,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       filtersVisible: _showFilters,
       hasFilters:
           _selectedGenre != null || _isPlayed != null || _selectedYear != null,
-      listView: _listView,
       sort: _sort,
       descending: _descending,
       onToggleFilters: () => setState(() => _showFilters = !_showFilters),
-      onView: (value) => _updateView(() => _listView = value),
       onSort: (sort, descending) => _updateView(() {
         _sort = sort;
         _descending = descending;
@@ -417,11 +415,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       return [
         SliverPadding(
           padding: const EdgeInsets.only(top: 24),
-          sliver: _SearchGrid(
-            client: library.client,
-            term: _searchTerm,
-            listView: _listView,
-          ),
+          sliver: _SearchGrid(client: library.client, term: _searchTerm),
         ),
       ];
     }
@@ -430,12 +424,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     }
     return [
       SliverPadding(
-        // Leave room inside the viewport for the first row's 3D hover effect.
         padding: const EdgeInsets.only(top: 24),
         sliver: _PagedGrid(
-          client: library.client,
           query: _query(library, viewId),
-          listView: _listView,
           onTap: (item, posterUrl) => context.go(
             '/library/${item.id}',
             extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
@@ -468,17 +459,10 @@ class _LibraryCount extends ConsumerWidget {
 typedef _OpenLibraryItem = void Function(MediaItem item, String? posterUrl);
 
 class _PagedGrid extends ConsumerWidget {
-  const _PagedGrid({
-    required this.client,
-    required this.query,
-    required this.onTap,
-    this.listView = false,
-  });
+  const _PagedGrid({required this.query, required this.onTap});
 
-  final MediaServerClient client;
   final LibraryQuery query;
   final _OpenLibraryItem onTap;
-  final bool listView;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -486,12 +470,7 @@ class _PagedGrid extends ConsumerWidget {
     return SliverMainAxisGroup(
       slivers: state.when(
         data: (value) => [
-          _LibraryGrid(
-            client: client,
-            items: value.items,
-            listView: listView,
-            onTap: onTap,
-          ),
+          _LibraryGrid(items: value.items, onTap: onTap),
           SliverToBoxAdapter(
             child: _PageFooter(query: query, state: value),
           ),
@@ -511,15 +490,10 @@ class _PagedGrid extends ConsumerWidget {
 }
 
 class _SearchGrid extends ConsumerWidget {
-  const _SearchGrid({
-    required this.client,
-    required this.term,
-    this.listView = false,
-  });
+  const _SearchGrid({required this.client, required this.term});
 
   final MediaServerClient client;
   final String term;
-  final bool listView;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -531,9 +505,7 @@ class _SearchGrid extends ConsumerWidget {
         .watch(results)
         .when(
           data: (items) => _LibraryGrid(
-            client: client,
             items: items,
-            listView: listView,
             onTap: (item, posterUrl) => context.go(
               '/library/${item.id}',
               extra: DetailRouteExtra(item: item, posterUrl: posterUrl),
@@ -571,17 +543,10 @@ class _LibraryEmptyState extends StatelessWidget {
 }
 
 class _LibraryGrid extends StatelessWidget {
-  const _LibraryGrid({
-    required this.client,
-    required this.items,
-    required this.onTap,
-    this.listView = false,
-  });
+  const _LibraryGrid({required this.items, required this.onTap});
 
-  final MediaServerClient client;
   final List<MediaItem> items;
   final _OpenLibraryItem onTap;
-  final bool listView;
 
   @override
   Widget build(BuildContext context) {
@@ -589,17 +554,6 @@ class _LibraryGrid extends StatelessWidget {
       return const _LibraryEmptyState();
     }
     final items = _uniqueItems(this.items);
-    if (listView) {
-      return SliverList.builder(
-        itemCount: items.length,
-        itemBuilder: (context, index) => _LibraryListItem(
-          key: ValueKey('library-list-item-${items[index].id}'),
-          client: client,
-          item: items[index],
-          onTap: onTap,
-        ),
-      );
-    }
     final mobile = isMobileLayout(context);
     final spacing = mobile ? 12.0 : 20.0;
     return SliverLayoutBuilder(
@@ -624,11 +578,10 @@ class _LibraryGrid extends StatelessWidget {
                     if (column > 0) SizedBox(width: spacing),
                     Expanded(
                       child: start + column < end
-                          ? _LibraryPoster(
-                              cardKey: ValueKey(
+                          ? _LibraryPreview(
+                              key: ValueKey(
                                 'library-${mobile ? 'mobile' : 'desktop'}-card-${items[start + column].id}',
                               ),
-                              client: client,
                               item: items[start + column],
                               onTap: onTap,
                             )
@@ -662,175 +615,28 @@ String? _libraryMetadata(BuildContext context, MediaItem item) {
       context.l10n.libraryEpisodeCount(item.recursiveItemCount!)
     else if (item.isSeries && item.childCount != null && item.childCount! > 0)
       context.l10n.librarySeasonCount(item.childCount!),
-    if (!item.isSeries && item.runtime != null)
-      context.l10n.libraryDuration(item.runtime!.inMinutes),
+    ?item.displaySubtitle,
   ];
   return parts.isEmpty ? null : parts.join(' · ');
 }
 
-class _LibraryPoster extends StatelessWidget {
-  const _LibraryPoster({
-    required this.cardKey,
-    required this.client,
-    required this.item,
-    required this.onTap,
-  });
-  final Key cardKey;
-  final MediaServerClient client;
+class _LibraryPreview extends StatelessWidget {
+  const _LibraryPreview({required this.item, required this.onTap, super.key});
+
   final MediaItem item;
   final _OpenLibraryItem onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return MediaPosterCard(
-      key: cardKey,
-      client: client,
-      item: item,
-      subtitle: _libraryMetadata(context, item),
-      showRating: true,
-      reserveMetadataSpace: true,
-      progress: item.progressFraction,
-      heroTag: posterHeroTag(item.id),
-      onPosterTap: (posterUrl) => onTap(item, posterUrl),
-    );
-  }
-}
-
-class _LibraryListItem extends StatelessWidget {
-  const _LibraryListItem({
-    required this.client,
-    required this.item,
-    required this.onTap,
-    super.key,
-  });
-  final MediaServerClient client;
-  final MediaItem item;
-  final _OpenLibraryItem onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-    final metadata = _libraryMetadata(context, item);
-    final rating = item.communityRating;
-    final progress = item.progressFraction;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 640;
-          final gap = wide ? 16.0 : 12.0;
-          final progressBar = progress == null
-              ? null
-              : SizedBox(
-                  key: ValueKey('library-list-progress-${item.id}'),
-                  width: 144,
-                  child: MediaProgressBar(value: progress),
-                );
-          return DecoratedBox(
-            decoration: BoxDecoration(
-              color: theme.colors.card.withValues(
-                alpha: theme.colors.brightness == Brightness.dark ? 0.32 : 0.4,
-              ),
-              borderRadius: theme.style.borderRadius.lg,
-            ),
-            child: FButton(
-              variant: .ghost,
-              style: .delta(
-                contentStyle: .delta(
-                  padding: .value(
-                    EdgeInsets.symmetric(
-                      horizontal: wide ? 16 : 12,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-              ),
-              builder: responsiveButtonContent,
-              onPress: () => onTap(item, item.poster?.url()),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 48,
-                    height: 72,
-                    child: PosterHero(
-                      tag: posterHeroTag(item.id),
-                      borderRadius: theme.style.borderRadius.md,
-                      child: MediaImage(
-                        url: item.poster?.url(),
-                        headers: item.poster?.headers ?? const {},
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: gap),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.displayTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.typography.body.sm.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        if (metadata != null) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            metadata,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.typography.body.xs.copyWith(
-                              color: theme.colors.mutedForeground,
-                            ),
-                          ),
-                        ],
-                        if (!wide && progressBar != null) ...[
-                          const SizedBox(height: 8),
-                          progressBar,
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (wide) ...[
-                    SizedBox(width: gap),
-                    SizedBox(width: 144, child: progressBar),
-                  ],
-                  SizedBox(width: gap),
-                  SizedBox(
-                    key: ValueKey('library-list-rating-${item.id}'),
-                    width: MediaQuery.textScalerOf(context).scale(32),
-                    child: rating != null && rating.isFinite && rating > 0
-                        ? Text(
-                            rating.toStringAsFixed(1),
-                            textAlign: TextAlign.end,
-                            style: theme.typography.body.sm.copyWith(
-                              color: const Color(0xFFE2BB6A),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    key: ValueKey('library-list-status-${item.id}'),
-                    width: 18,
-                    child: item.played
-                        ? Icon(
-                            FLucideIcons.circleCheck,
-                            size: 18,
-                            color: theme.colors.mutedForeground,
-                          )
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+  Widget build(BuildContext context) => MediaPreviewCard(
+    item: item,
+    title: item.displayTitle,
+    subtitle: _libraryMetadata(context, item),
+    heroTag: posterHeroTag(item.id),
+    aspectRatio: 2 / 3,
+    overview: '',
+    showRating: true,
+    onTap: () => onTap(item, item.poster?.url()),
+  );
 }
 
 class _PageFooter extends ConsumerWidget {
