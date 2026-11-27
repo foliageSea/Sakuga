@@ -939,7 +939,7 @@ void main() {
                   ),
               ],
             ),
-            latestItemsProvider.overrideWith((ref) async => const []),
+            latestItemsProvider.overrideWith((ref) async => const [featured]),
           ],
         );
         addTearDown(container.dispose);
@@ -970,10 +970,21 @@ void main() {
           final banner = tester.getRect(page);
           expect(banner.left, sidebar.right);
           expect(banner.right, windowSize.width);
-          expect(
-            tester.getTopLeft(find.text('Continue watching')).dx,
-            closeTo((sidebar.right + windowSize.width - 1440) / 2 + 32, 0.01),
+          final inset = banner.deflate(32);
+          for (final title in ['Continue watching', 'Recently added']) {
+            expect(tester.getTopLeft(find.text(title)).dx, inset.left);
+          }
+          final rows = find.byWidgetPredicate(
+            (widget) =>
+                widget is SingleChildScrollView &&
+                widget.scrollDirection == Axis.horizontal,
           );
+          expect(rows, findsNWidgets(2));
+          for (var i = 0; i < 2; i++) {
+            final row = tester.getRect(rows.at(i));
+            expect(row.left, inset.left);
+            expect(row.right, inset.right);
+          }
           expect(tester.getRect(find.byType(DesktopTitleBar)).top, 0);
           expect(
             find.descendant(
