@@ -892,7 +892,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('home preview cards show runtime and synopsis without a frame', (
+  testWidgets('home preview cards show runtime but no synopsis or frame', (
     tester,
   ) async {
     const overview = 'An overview that can span two lines beneath a title.';
@@ -905,6 +905,7 @@ void main() {
     );
     await pumpHome(
       tester,
+      resume: const [movie],
       latest: const [
         movie,
         MediaItem(
@@ -921,8 +922,7 @@ void main() {
       find.descendant(of: cards, matching: find.byType(Surface)),
       findsNothing,
     );
-    expect(find.text('00:24:07'), findsOneWidget);
-    expect(find.text('01:02:03'), findsOneWidget);
+    expect(find.text('01:02:03'), findsNWidgets(2));
     expect(find.text('00:00:00'), findsNothing);
     final card = cards.at(1);
     final thumbnail = tester.getRect(
@@ -932,21 +932,19 @@ void main() {
       find.descendant(of: card, matching: find.byType(ClipRRect)).first,
     );
     expect(clip.borderRadius, isNot(BorderRadius.zero));
-    final badge = tester.getRect(find.text('01:02:03'));
+    Finder inside(Finder matching) =>
+        find.descendant(of: card, matching: matching);
+    final badge = tester.getRect(inside(find.text('01:02:03')));
     expect(thumbnail.contains(badge.center), isTrue);
     expect(badge.center.dx, greaterThan(thumbnail.center.dx));
     expect(badge.center.dy, lessThan(thumbnail.center.dy));
-    final title = tester.widget<Text>(find.text('Preview Movie'));
+    final titleFinder = inside(find.text('Preview Movie'));
+    final title = tester.widget<Text>(titleFinder);
     expect(title.maxLines, 1);
     expect(title.overflow, TextOverflow.ellipsis);
     expect(title.style?.fontWeight, FontWeight.w600);
-    expect(
-      tester.getTopLeft(find.text('Preview Movie')).dy,
-      greaterThan(thumbnail.bottom),
-    );
-    final synopsis = tester.widget<Text>(find.text(overview));
-    expect(synopsis.maxLines, 2);
-    expect(synopsis.overflow, TextOverflow.ellipsis);
+    expect(tester.getTopLeft(titleFinder).dy, greaterThan(thumbnail.bottom));
+    expect(find.text(overview), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

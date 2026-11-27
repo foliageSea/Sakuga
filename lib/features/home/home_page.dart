@@ -863,6 +863,7 @@ class _MediaSection extends StatelessWidget {
                           child: MediaPreviewCard(
                             item: item,
                             title: _previewTitle(item),
+                            overview: '',
                             aspectRatio: resumesPlayback ? 16 / 9 : 2 / 3,
                             artwork: resumesPlayback
                                 ? item.poster
