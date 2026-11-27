@@ -1,7 +1,6 @@
 services:
   jellyfin:
     image: jellyfin/jellyfin@sha256:fea863d0cd9ec445985d9c75fc6ed64e38a1d2766cf0c250a33d553f4fc1b771
-    platform: linux/arm64
     container_name: sakuga-jellyfin-test
     restart: unless-stopped
     ports:
@@ -11,4 +10,4 @@ services:
     volumes:
       - ./config:/config
       - ./cache:/cache
-      - ../emby-test/media:/media:ro
+      - ./media:/media:ro

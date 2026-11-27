@@ -102,17 +102,35 @@ void main() {
           series.id,
           seasonId: seasons.single.id,
         );
-        expect(episodes, hasLength(2));
+        expect(episodes.map((item) => item.indexNumber), unorderedEquals([1, 2]));
+        expect(episodes.map((item) => item.parentIndexNumber), everyElement(1));
+        expect(episodes.map((item) => item.name), unorderedEquals([
+          '冒险的结束',
+          '也不一定要是魔法…',
+        ]));
+        expect(seasons.single.name, '第 1 季');
         final imageDio = Dio();
         try {
-          final image = await imageDio.get<List<int>>(
-            movie.poster!.url(width: 200),
-            options: Options(
-              headers: movie.poster!.headers,
-              responseType: ResponseType.bytes,
-            ),
-          );
-          expect(image.data!.length, greaterThan(100));
+          for (final artwork in [
+            movie.poster,
+            movie.backdrop,
+            movie.logo,
+            series.poster,
+            series.backdrop,
+            series.logo,
+            seasons.single.poster,
+            ...episodes.map((item) => item.poster),
+          ]) {
+            expect(artwork, isNotNull);
+            final image = await imageDio.get<List<int>>(
+              artwork!.url(width: 200),
+              options: Options(
+                headers: artwork.headers,
+                responseType: ResponseType.bytes,
+              ),
+            );
+            expect(image.data!.length, greaterThan(100));
+          }
         } finally {
           imageDio.close();
         }

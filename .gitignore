@@ -57,7 +57,9 @@ app.*.map.json
 /tool/emby-test/session.json
 /tool/emby-test/results/
 
-# Local Jellyfin runtime and private credentials
+# Local Jellyfin runtime, private credentials and downloaded media
+/tool/jellyfin-test/media/
+/tool/jellyfin-test/nfo/
 /tool/jellyfin-test/config/
 /tool/jellyfin-test/cache/
 /tool/jellyfin-test/session.json

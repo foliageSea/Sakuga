@@ -62,7 +62,7 @@ fvm flutter test
 ```
 
 - 单元与 Widget 测试在 [test/](../test/)；设备或真实服务集成测试在 [integration_test/](../integration_test/)，需要合适的设备和测试配置。
-- 真实服务：[Jellyfin Docker 联调环境](../tool/jellyfin-test/README.md) · [Emby Docker 联调环境](../tool/emby-test/README.md)。先准备测试电影、剧集及字幕，再启动服务并生成本地测试配置；全新检出不自带测试媒体，Jellyfin 复用 Emby 的媒体目录。默认 Compose 镜像指定 `linux/arm64` 且端口仅绑定回环，跨架构运行与异机设备连通性需单独处理。不要提交凭据。
+- 真实服务：[Jellyfin Docker 联调环境](../tool/jellyfin-test/README.md) · [Emby Docker 联调环境](../tool/emby-test/README.md)。先准备测试电影、剧集及字幕，再启动服务并生成本地测试配置；全新检出不自带测试媒体；Jellyfin 从 Emby 样片复制出独立媒体目录，并下载 TMDB 海报。两个测试服务的端口都只绑定回环，异机设备连通性需单独处理。不要提交凭据。
 - 专项测试：[飞牛影视与绿联影视](servers.md) · [转码与缓冲](playback.md) · [ASS / SSA](ass-subtitles.md)。
 
 ## 目录与约定
