@@ -104,22 +104,6 @@ class AppShell extends ConsumerWidget {
                       : null,
                   controller: window,
                   libraryServerAction: const LibraryServerAction(compact: true),
-                  compactSidebar: settings.compactSidebar,
-                  onToggleCompactSidebar: () async {
-                    try {
-                      await ref
-                          .read(settingsProvider.notifier)
-                          .update(
-                            (value) => value.copyWith(
-                              compactSidebar: !value.compactSidebar,
-                            ),
-                          );
-                    } catch (error) {
-                      if (context.mounted) {
-                        notifyUser(context, failureMessage(context, error));
-                      }
-                    }
-                  },
                   language: settings.language,
                   onLanguageChanged: (language) => _update(
                     context,
@@ -649,8 +633,6 @@ class _HeaderTitle extends StatelessWidget {
 class DesktopTitleBar extends StatelessWidget {
   const DesktopTitleBar({
     required this.controller,
-    this.compactSidebar = true,
-    this.onToggleCompactSidebar,
     this.language = 'system',
     this.onLanguageChanged,
     this.onToggleTheme,
@@ -663,8 +645,6 @@ class DesktopTitleBar extends StatelessWidget {
   /// Page action hosted in the title bar while the home artwork extends
   /// underneath it.
   final Widget? homeAction;
-  final bool compactSidebar;
-  final Future<void> Function()? onToggleCompactSidebar;
   final String language;
   final Future<void> Function(String language)? onLanguageChanged;
   final Future<void> Function()? onToggleTheme;
@@ -681,47 +661,13 @@ class DesktopTitleBar extends StatelessWidget {
             _MacWindowControls(controller: controller),
             const SizedBox(width: 12),
           ],
-          if (onToggleCompactSidebar != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: FButton.icon(
-                key: const ValueKey('toggle-compact-sidebar'),
-                variant: .ghost,
-                size: .xs,
-                semanticsLabel: l.compactSidebar,
-                onPress: onToggleCompactSidebar,
-                child: Icon(
-                  compactSidebar
-                      ? FLucideIcons.panelLeftOpen
-                      : FLucideIcons.panelLeftClose,
-                  size: 16,
-                ),
-              ),
-            ),
           Expanded(
             child: GestureDetector(
+              key: const ValueKey('window-drag-region'),
               behavior: HitTestBehavior.opaque,
               onPanStart: (_) => controller.drag(),
               onDoubleTap: controller.toggleMaximize,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: onToggleCompactSidebar != null ? 4 : 16,
-                  right: 16,
-                ),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    l.appTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.theme.typography.body.sm.copyWith(
-                      color: controller.focused
-                          ? context.theme.colors.foreground
-                          : context.theme.colors.mutedForeground,
-                    ),
-                  ),
-                ),
-              ),
+              child: const SizedBox.expand(),
             ),
           ),
           if (homeAction case final action?)

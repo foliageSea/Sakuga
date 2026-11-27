@@ -88,14 +88,16 @@ void main() {
     await settle(tester);
   });
 
-  testWidgets('desktop sidebar starts compact and can expand', (tester) async {
+  testWidgets('desktop sidebar stays compact without a title-bar toggle', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final container = appContainer(
-      window: FakeWindow(available: true, macOS: true),
-    );
+    final window = FakeWindow(available: true);
+    addTearDown(window.dispose);
+    final container = appContainer(window: window);
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const SakugaApp()),
@@ -112,23 +114,20 @@ void main() {
     expect(container.read(settingsProvider).compactSidebar, isTrue);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.byKey(const ValueKey('toggle-compact-sidebar')));
+    expect(find.byKey(const ValueKey('toggle-compact-sidebar')), findsNothing);
+    final dragRegion = find.byKey(const ValueKey('window-drag-region'));
+    expect(
+      find.descendant(of: dragRegion, matching: find.text('Sakuga')),
+      findsNothing,
+    );
+    await tester.drag(dragRegion, const Offset(80, 0));
+    expect(window.drags, 1);
+    final point = tester.getCenter(dragRegion);
+    await tester.tapAt(point);
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.tapAt(point);
     await settle(tester);
-    expect(tester.getSize(sidebar).width, 200);
-    expect(logo, findsOneWidget);
-    expect(container.read(settingsProvider).compactSidebar, isFalse);
-    expect(find.text('Home'), findsWidgets);
-    expect(find.text('Library'), findsWidgets);
-    expect(find.text('Search'), findsNothing);
-    expect(find.text('Downloads'), findsNothing);
-    expect(find.text('Settings'), findsWidgets);
-    expect(tester.takeException(), isNull);
-
-    await tester.tap(find.byKey(const ValueKey('toggle-compact-sidebar')));
-    await settle(tester);
-    expect(tester.getSize(sidebar).width, 76);
-    expect(logo, findsOneWidget);
-    expect(container.read(settingsProvider).compactSidebar, isTrue);
+    expect(window.maximized, isTrue);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await settle(tester);
