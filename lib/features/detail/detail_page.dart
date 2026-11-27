@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/widgets.dart';
@@ -644,24 +643,20 @@ class _Hero extends StatelessWidget {
     final inset = ImmersiveScope.insetOf(context);
     final chromeHeight = inset ?? 0;
     final pageInset = pagePadding(context);
+    final artHeight = headerArtworkHeight(context);
     if (mobile) {
       // Phones: edge-to-edge artwork fading into the page, with the centered
       // title art, facts, play action and synopsis stacked beneath it.
       final topBleed = inset == null ? pageInset : 0.0;
-      final screen = MediaQuery.sizeOf(context);
       final mobileArt =
           item.backdrop ??
           fallbackItem?.backdrop ??
           (pending ? null : item.poster ?? fallbackItem?.poster);
-      final artHeight = (screen.width * 0.9).clamp(
-        240.0,
-        math.max(240.0, screen.height * 0.5).toDouble(),
-      );
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: artHeight + chromeHeight - topBleed,
+            height: artHeight - topBleed,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
@@ -722,10 +717,6 @@ class _Hero extends StatelessWidget {
         ],
       );
     }
-    final height = (MediaQuery.sizeOf(context).height * 0.6).clamp(
-      440.0,
-      600.0,
-    );
     final bleed = inset == null ? 0.0 : pageInset;
     final background = Stack(
       fit: StackFit.expand,
@@ -765,7 +756,7 @@ class _Hero extends StatelessWidget {
       borderRadius: theme.style.borderRadius.lg,
       clipBehavior: inset == null ? Clip.antiAlias : Clip.none,
       child: SizedBox(
-        height: height + chromeHeight,
+        height: artHeight,
         child: Stack(
           clipBehavior: Clip.none,
           fit: StackFit.expand,

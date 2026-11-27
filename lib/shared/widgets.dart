@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'responsive_button.dart';
 
 import 'package:dio/dio.dart';
@@ -16,6 +18,19 @@ const mobileBreakpoint = 600.0;
 /// Whether the application is currently laid out for mobile.
 bool isMobileLayout(BuildContext context) =>
     MediaQuery.sizeOf(context).width < mobileBreakpoint;
+
+/// Full artwork height for the home carousel and detail header.
+/// Window chrome overlays this area and does not add to its height.
+double headerArtworkHeight(BuildContext context) {
+  final screen = MediaQuery.sizeOf(context);
+  if (screen.width < mobileBreakpoint) {
+    return (screen.width * 0.9).clamp(
+      240.0,
+      math.max(240.0, screen.height * 0.5),
+    );
+  }
+  return (screen.height * 0.6).clamp(440.0, 600.0);
+}
 
 /// The horizontal and vertical padding used by page-level layouts.
 double pagePadding(BuildContext context) {

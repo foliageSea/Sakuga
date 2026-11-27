@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
@@ -183,7 +182,8 @@ class _PosterCarouselSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(randomItemsProvider);
     final inset = ImmersiveScope.insetOf(context);
-    final height = carouselHeight(context) + (inset ?? 0);
+    final height =
+        headerArtworkHeight(context) + (isMobileLayout(context) ? 60.0 : 0.0);
     return items.when(
       data: (values) => values.isEmpty
           ? const SizedBox.shrink()
@@ -200,22 +200,6 @@ class _PosterCarouselSection extends ConsumerWidget {
       error: (_, _) => const SizedBox.shrink(),
     );
   }
-}
-
-/// Phone artwork height, matching the detail page's edge-to-edge header.
-double _mobileArtHeight(BuildContext context) {
-  final screen = MediaQuery.sizeOf(context);
-  return (screen.width * 0.9).clamp(
-    240.0,
-    math.max(240.0, screen.height * 0.5).toDouble(),
-  );
-}
-
-/// Featured carousel height: the detail banner on wide layouts; artwork plus
-/// the centered facts and page dots on phones.
-double carouselHeight(BuildContext context) {
-  if (isMobileLayout(context)) return _mobileArtHeight(context) + 60;
-  return (MediaQuery.sizeOf(context).height * 0.55).clamp(400.0, 560.0);
 }
 
 class _PosterCarousel extends ConsumerStatefulWidget {
@@ -671,7 +655,8 @@ class _CarouselSlide extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          height: _mobileArtHeight(context) + (immersiveInset ?? 0),
+          key: const ValueKey('home-carousel-mobile-art'),
+          height: headerArtworkHeight(context),
           child: Stack(
             fit: StackFit.expand,
             children: [

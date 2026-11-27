@@ -903,7 +903,7 @@ void main() {
 
   for (final mobile in [false, true]) {
     testWidgets(
-      'home carousel extends under the ${mobile ? 'phone header' : 'title bar'}',
+      'home carousel extends under the ${mobile ? 'phone header' : 'title bar'} and matches detail artwork height',
       (tester) async {
         // Short windows so the page content scrolls under the chrome.
         final windowSize = mobile
@@ -920,6 +920,10 @@ void main() {
           poster: MediaImageResource(
             urlTemplate: 'http://127.0.0.1:8096/Items/featured-1/Images/Primary?maxWidth={width}',
             cacheKey: 'featured-1:poster',
+          ),
+          backdrop: MediaImageResource(
+            urlTemplate: 'http://127.0.0.1:8096/Items/featured-1/Images/Backdrop/0?maxWidth={width}',
+            cacheKey: 'featured-1:backdrop',
           ),
           overview: 'A troupe of performers travelling across Japan.',
         );
@@ -942,6 +946,9 @@ void main() {
               ),
             ),
             randomItemsProvider.overrideWith((ref) async => const [featured]),
+            libraryItemProvider.overrideWith((ref, query) async => featured),
+            seriesSeasonsProvider.overrideWith((ref, query) async => const []),
+            seriesEpisodesProvider.overrideWith((ref, query) async => const []),
             resumeItemsProvider.overrideWith(
               (ref) async => [
                 for (var i = 0; i < 8; i++)
@@ -968,6 +975,10 @@ void main() {
 
         final carousel = find.byKey(const ValueKey('home-poster-carousel'));
         final page = find.byType(PageView);
+        final homeArt = mobile
+            ? find.byKey(const ValueKey('home-carousel-mobile-art'))
+            : page;
+        final artworkHeight = tester.getSize(homeArt).height;
         expect(tester.getRect(page).top, 0);
         if (mobile) {
           final header = find.byKey(const ValueKey('mobile-header'));
@@ -1002,6 +1013,15 @@ void main() {
           await tester.pump(const Duration(milliseconds: 100));
         }
         expect(backing(), 1);
+
+        container.read(routerProvider).go('/library/${featured.id}');
+        for (var i = 0; i < 6; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        final detailArt = find.byKey(
+          ValueKey(mobile ? 'detail-mobile-art' : 'detail-desktop-art'),
+        );
+        expect(tester.getSize(detailArt).height, artworkHeight);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       },
