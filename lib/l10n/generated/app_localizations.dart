@@ -644,18 +644,6 @@ abstract class AppLocalizations {
   /// **'More'**
   String get showMore;
 
-  /// No description provided for @episodeRowView.
-  ///
-  /// In en, this message translates to:
-  /// **'Row view'**
-  String get episodeRowView;
-
-  /// No description provided for @episodeGridView.
-  ///
-  /// In en, this message translates to:
-  /// **'Grid view'**
-  String get episodeGridView;
-
   /// No description provided for @noItems.
   ///
   /// In en, this message translates to:

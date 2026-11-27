@@ -899,55 +899,49 @@ void main() {
           find.byKey(const ValueKey('detail-episode-next-episode-2')),
           findsOneWidget,
         );
-        if (size.width >= 600) {
-          expect(
-            find.byKey(const ValueKey('detail-episode-duration-episode-1')),
-            findsOneWidget,
-          );
-          expect(find.text('00:13:29'), findsNWidgets(3));
-        } else {
-          expect(
-            find.byKey(const ValueKey('detail-episode-number-episode-3')),
-            findsOneWidget,
-          );
-        }
+        expect(
+          find.byKey(const ValueKey('detail-episode-duration-episode-1')),
+          findsOneWidget,
+        );
+        expect(find.text('00:13:29'), findsNWidgets(3));
         await tester.tap(play);
         await tester.pumpAndSettle();
         expect(find.text('player:episode-2'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
 
-      testWidgets('episodes switch between row and grid at ${size.width}', (
-        tester,
-      ) async {
-        await pumpDetailPage(
-          tester,
-          size: size,
-          item: _season,
-          episodes: [for (var i = 1; i <= 8; i++) ep(i)],
-        );
-        double top(int n) => tester
-            .getTopLeft(find.byKey(ValueKey('detail-episode-episode-$n')))
-            .dy;
-        expect(top(1), top(4));
-        expect(
-          find.byKey(const ValueKey('detail-episodes-row')),
-          findsOneWidget,
-        );
-        await tester.tap(
-          find.byKey(
-            ValueKey(
-              size.width < 600
-                  ? 'detail-episodes-toggle'
-                  : 'detail-episodes-grid-view',
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('detail-episodes-row')), findsNothing);
-        expect(top(8), greaterThan(top(1)));
-        expect(tester.takeException(), isNull);
-      });
+      testWidgets(
+        'episode thumbnails stay in one scrollable row at ${size.width}',
+        (tester) async {
+          await pumpDetailPage(
+            tester,
+            size: size,
+            item: _season,
+            episodes: [for (var i = 1; i <= 8; i++) ep(i)],
+          );
+          final row = find.byKey(const ValueKey('detail-episodes-row'));
+          Finder card(int n) =>
+              find.byKey(ValueKey('detail-episode-episode-$n'));
+          await tester.ensureVisible(card(1));
+          await tester.pumpAndSettle();
+          final first = tester.getTopLeft(card(1));
+          final last = tester.getTopLeft(card(8));
+          expect(last.dy, first.dy);
+          expect(last.dx, greaterThan(tester.getRect(row).right));
+          expect(
+            find.byKey(const ValueKey('detail-episode-title-episode-1')),
+            findsOneWidget,
+          );
+          expect(find.text('8 episodes'), findsOneWidget);
+          for (final key in ['toggle', 'row-view', 'grid-view']) {
+            expect(find.byKey(ValueKey('detail-episodes-$key')), findsNothing);
+          }
+          await tester.drag(row, const Offset(-160, 0));
+          await tester.pumpAndSettle();
+          expect(tester.getTopLeft(card(1)).dx, lessThan(first.dx));
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
 
     for (final width in [320.0, 390.0, 480.0]) {
@@ -981,15 +975,18 @@ void main() {
         expect(logo.height, lessThanOrEqualTo(80));
         final play = tester.getRect(find.byKey(const ValueKey('detail-play')));
         expect(play.bottom, lessThan(844 * 0.75));
-        await tester.ensureVisible(
-          find.byKey(const ValueKey('detail-episodes-toggle')),
-        );
-        await tester.tap(find.byKey(const ValueKey('detail-episodes-toggle')));
+        final row = find.byKey(const ValueKey('detail-episodes-row'));
+        await tester.ensureVisible(row);
         await tester.pumpAndSettle();
-        double left(int n) => tester
-            .getTopLeft(find.byKey(ValueKey('detail-episode-episode-$n')))
-            .dx;
-        expect(left(2), greaterThan(left(1)), reason: 'two-column grid');
+        final first = tester.getRect(
+          find.byKey(const ValueKey('detail-episode-episode-1')),
+        );
+        final second = tester.getRect(
+          find.byKey(const ValueKey('detail-episode-episode-2')),
+        );
+        expect(first.right, lessThan(tester.getRect(row).right));
+        expect(second.top, first.top);
+        expect(second.left, greaterThan(first.right));
         expect(tester.takeException(), isNull);
       });
     }

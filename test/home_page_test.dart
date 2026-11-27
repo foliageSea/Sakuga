@@ -534,35 +534,15 @@ void main() {
     });
   }
 
-  testWidgets('carousel arrows cross boundaries in the same direction', (
+  testWidgets('wide carousel has no arrows and dots still select slides', (
     tester,
   ) async {
     await pumpHome(tester, carousel: _loopItems);
-    final controller = tester
-        .widget<PageView>(find.byType(PageView))
-        .controller!;
     final container = ProviderScope.containerOf(
       tester.element(find.byType(HomePage)),
     );
-
-    // Moving backwards from the first item goes straight to the last item.
-    await tester.tap(find.byKey(const ValueKey('home-carousel-prev')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
-    expect(controller.page, inExclusiveRange(0, 1));
-    await tester.pumpAndSettle();
-    expect(container.read(homeCarouselIndexProvider), 2);
-    expect(find.text('Loop Three'), findsOneWidget);
-
-    // Moving forwards from the last item continues forwards to the first.
-    await tester.tap(find.byKey(const ValueKey('home-carousel-next')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
-    expect(controller.page, inExclusiveRange(3, 4));
-    await tester.pumpAndSettle();
-    expect(container.read(homeCarouselIndexProvider), 0);
-    expect(find.text('Loop One'), findsOneWidget);
-
+    expect(find.byKey(const ValueKey('home-carousel-prev')), findsNothing);
+    expect(find.byKey(const ValueKey('home-carousel-next')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('home-carousel-dot-1')));
     await tester.pumpAndSettle();
     expect(container.read(homeCarouselIndexProvider), 1);
@@ -1124,7 +1104,13 @@ void main() {
 
       // Server summary is replaced by the random poster carousel, and the
       // global window blurred background spans the entire window.
-      expect(find.text('Test server'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(HomePage),
+          matching: find.text('Test server'),
+        ),
+        findsNothing,
+      );
       expect(carouselFinder, findsOneWidget);
       expect(find.text('Sunflower Circus'), findsOneWidget);
       expect(tester.getRect(bgFinder), Offset.zero & windowSize);
@@ -1180,8 +1166,10 @@ void main() {
       await pumpFrames();
       expect(find.text('Starlight Sonata'), findsOneWidget);
 
-      // Clicking the previous arrow returns to the first slide.
-      await tester.tap(find.byKey(const ValueKey('home-carousel-prev')));
+      // Selecting the first dot returns to the first slide.
+      expect(find.byKey(const ValueKey('home-carousel-prev')), findsNothing);
+      expect(find.byKey(const ValueKey('home-carousel-next')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('home-carousel-dot-0')));
       await pumpFrames();
       expect(find.text('Sunflower Circus'), findsOneWidget);
       expect(

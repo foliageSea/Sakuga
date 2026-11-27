@@ -306,12 +306,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get showMore => '更多';
 
   @override
-  String get episodeRowView => '横向浏览';
-
-  @override
-  String get episodeGridView => '网格视图';
-
-  @override
   String get noItems => '暂无内容';
 
   @override

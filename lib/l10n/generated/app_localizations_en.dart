@@ -331,12 +331,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get showMore => 'More';
 
   @override
-  String get episodeRowView => 'Row view';
-
-  @override
-  String get episodeGridView => 'Grid view';
-
-  @override
   String get noItems => 'No items';
 
   @override

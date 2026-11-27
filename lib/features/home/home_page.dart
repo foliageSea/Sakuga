@@ -449,24 +449,7 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
       );
     }
 
-    final arrows = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _CarouselArrowButton(
-          key: const ValueKey('home-carousel-prev'),
-          icon: FLucideIcons.chevronLeft,
-          onTap: () => _moveBy(-1),
-        ),
-        const SizedBox(width: 8),
-        _CarouselArrowButton(
-          key: const ValueKey('home-carousel-next'),
-          icon: FLucideIcons.chevronRight,
-          onTap: () => _moveBy(1),
-        ),
-      ],
-    );
-
-    if (widget.immersiveInset case final inset?) {
+    if (widget.immersiveInset != null) {
       // Edge-to-edge under the title bar, fading into the page below.
       final bleed = pagePadding(context);
       return MouseRegion(
@@ -485,15 +468,13 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
                   fit: StackFit.expand,
                   children: [
                     pages,
-                    if (length > 1) ...[
-                      Positioned(top: inset + 16, right: bleed, child: arrows),
+                    if (length > 1)
                       Positioned(
                         left: 0,
                         right: 0,
                         bottom: 12,
                         child: Center(child: dots),
                       ),
-                    ],
                   ],
                 ),
               );
@@ -515,15 +496,13 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
             fit: StackFit.expand,
             children: [
               pages,
-              if (length > 1) ...[
-                Positioned(top: 16, right: 16, child: arrows),
+              if (length > 1)
                 Positioned(
                   left: 0,
                   right: 0,
                   bottom: 12,
                   child: Center(child: dots),
                 ),
-              ],
               IgnorePointer(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -541,36 +520,6 @@ class _PosterCarouselState extends ConsumerState<_PosterCarousel> {
       ),
     );
   }
-}
-
-class _CarouselArrowButton extends StatelessWidget {
-  const _CarouselArrowButton({
-    required this.icon,
-    required this.onTap,
-    super.key,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => MouseRegion(
-    cursor: SystemMouseCursors.click,
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: const Color(0x59000000),
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0x2EFFFFFF)),
-        ),
-        child: Icon(icon, size: 16, color: const Color(0xFFFFFFFF)),
-      ),
-    ),
-  );
 }
 
 class _CarouselSlide extends StatelessWidget {

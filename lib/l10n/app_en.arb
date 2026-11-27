@@ -102,8 +102,6 @@
   "@playSeasonEpisode": { "placeholders": { "season": { "type": "int" }, "episode": { "type": "int" } } },
   "@resumeSeasonEpisode": { "placeholders": { "season": { "type": "int" }, "episode": { "type": "int" } } },
   "showMore": "More",
-  "episodeRowView": "Row view",
-  "episodeGridView": "Grid view",
   "noItems": "No items",
   "testConnection": "Test",
   "serverNameRequired": "Enter a name.",

@@ -1512,10 +1512,7 @@ class _Episodes extends ConsumerStatefulWidget {
 }
 
 class _EpisodesState extends ConsumerState<_Episodes> {
-  static const _chipSize = 64.0;
-
   final _scroll = ScrollController();
-  bool _grid = false;
   String? _revealed;
 
   @override
@@ -1524,16 +1521,15 @@ class _EpisodesState extends ConsumerState<_Episodes> {
     super.dispose();
   }
 
-  /// Phones show compact numbered chips; wider layouts show 16:9 cards.
   double _itemWidth(BuildContext context) =>
-      isMobileLayout(context) ? _chipSize : 300;
+      isMobileLayout(context) ? 200 : 300;
 
   double _itemGap(BuildContext context) => isMobileLayout(context) ? 10 : 16;
 
   /// Brings the next episode into view once per episode list.
   void _revealNext(List<MediaItem> episodes, String? nextId) {
     final key = '${widget.seasonId}:${episodes.length}:$nextId';
-    if (_grid || nextId == null || _revealed == key) return;
+    if (nextId == null || _revealed == key) return;
     _revealed = key;
     final index = episodes.indexWhere((e) => e.id == nextId);
     if (index <= 0) return;
@@ -1587,128 +1583,49 @@ class _EpisodesState extends ConsumerState<_Episodes> {
               color: theme.colors.mutedForeground,
             ),
           );
-    final header = mobile
-        ? Padding(
-            padding: const EdgeInsets.only(top: 28, bottom: 12),
-            child: Row(
-              children: [
-                Expanded(child: _SectionTitle(l.episodes)),
-                if (hasEpisodes)
-                  Semantics(
-                    button: true,
-                    label: _grid ? l.episodeRowView : l.episodeGridView,
-                    child: GestureDetector(
-                      key: const ValueKey('detail-episodes-toggle'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => setState(() => _grid = !_grid),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ?count,
-                            const SizedBox(width: 4),
-                            AnimatedRotation(
-                              turns: _grid ? 0.25 : 0,
-                              duration: const Duration(milliseconds: 180),
-                              child: Icon(
-                                FLucideIcons.chevronRight,
-                                size: 18,
-                                color: theme.colors.mutedForeground,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  ?count,
-              ],
+    final header = Padding(
+      padding: EdgeInsets.only(top: mobile ? 28 : 24, bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [_SectionTitle(l.episodes), ?count],
             ),
-          )
-        : Padding(
-            padding: const EdgeInsets.only(top: 24, bottom: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: 12,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [_SectionTitle(l.episodes), ?count],
-                  ),
-                ),
-                if (hasEpisodes) ...[
-                  if (!_grid) ...[
-                    FButton.icon(
-                      key: const ValueKey('detail-episodes-prev'),
-                      variant: .ghost,
-                      size: .sm,
-                      semanticsLabel: l.back,
-                      onPress: () => _page(-1),
-                      child: const Icon(FLucideIcons.chevronLeft),
-                    ),
-                    const SizedBox(width: 2),
-                    FButton.icon(
-                      key: const ValueKey('detail-episodes-next'),
-                      variant: .ghost,
-                      size: .sm,
-                      semanticsLabel: l.nextEpisode,
-                      onPress: () => _page(1),
-                      child: const Icon(FLucideIcons.chevronRight),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  FButton.icon(
-                    key: const ValueKey('detail-episodes-row-view'),
-                    variant: _grid ? .ghost : .secondary,
-                    size: .sm,
-                    selected: !_grid,
-                    semanticsLabel: l.episodeRowView,
-                    onPress: () => setState(() => _grid = false),
-                    child: const Icon(FLucideIcons.galleryHorizontal),
-                  ),
-                  const SizedBox(width: 2),
-                  FButton.icon(
-                    key: const ValueKey('detail-episodes-grid-view'),
-                    variant: _grid ? .secondary : .ghost,
-                    size: .sm,
-                    selected: _grid,
-                    semanticsLabel: l.episodeGridView,
-                    onPress: () => setState(() => _grid = true),
-                    child: const Icon(FLucideIcons.layoutGrid),
-                  ),
-                ],
-              ],
+          ),
+          if (!mobile && hasEpisodes) ...[
+            FButton.icon(
+              key: const ValueKey('detail-episodes-prev'),
+              variant: .ghost,
+              size: .sm,
+              semanticsLabel: l.back,
+              onPress: () => _page(-1),
+              child: const Icon(FLucideIcons.chevronLeft),
             ),
-          );
+            const SizedBox(width: 2),
+            FButton.icon(
+              key: const ValueKey('detail-episodes-next'),
+              variant: .ghost,
+              size: .sm,
+              semanticsLabel: l.nextEpisode,
+              onPress: () => _page(1),
+              child: const Icon(FLucideIcons.chevronRight),
+            ),
+          ],
+        ],
+      ),
+    );
     final Widget body = episodes.when(
       data: (values) {
         if (values.isEmpty) {
           return EmptyNotice(l.noItems, translucent: ambient);
         }
         final nextId = resolveNextEpisode(values)?.episode.id;
-        if (_grid) {
-          final cards = [
-            for (final episode in values)
-              _EpisodeCard(item: episode, next: episode.id == nextId),
-          ];
-          return AdaptiveGrid(
-            minWidth: mobile ? 136 : 260,
-            maxColumns: 6,
-            children: cards,
-          );
-        }
         _revealNext(values, nextId);
         final width = _itemWidth(context);
         final gap = _itemGap(context);
-        final items = [
-          for (final episode in values)
-            mobile
-                ? _EpisodeChip(item: episode, next: episode.id == nextId)
-                : _EpisodeCard(item: episode, next: episode.id == nextId),
-        ];
         return ScrollConfiguration(
           behavior: ScrollConfiguration.of(context)
               .copyWith(dragDevices: PointerDeviceKind.values.toSet()),
@@ -1719,9 +1636,15 @@ class _EpisodesState extends ConsumerState<_Episodes> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final (index, item) in items.indexed) ...[
+                for (final (index, episode) in values.indexed) ...[
                   if (index > 0) SizedBox(width: gap),
-                  SizedBox(width: width, child: item),
+                  SizedBox(
+                    width: width,
+                    child: _EpisodeCard(
+                      item: episode,
+                      next: episode.id == nextId,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -1744,91 +1667,8 @@ class _EpisodesState extends ConsumerState<_Episodes> {
   }
 }
 
-/// A compact numbered episode chip for the phone layout.
-class _EpisodeChip extends StatelessWidget {
-  const _EpisodeChip({required this.item, this.next = false});
-
-  final MediaItem item;
-  final bool next;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-    final colors = theme.colors;
-    final ambient = WindowPosterBackgroundScope.isActive(context);
-    final dark = colors.brightness == Brightness.dark;
-    final progress = item.progressFraction;
-    final number = item.indexNumber;
-    final title = number == null
-        ? item.name
-        : context.l10n.episodeTitle(number, item.name);
-    return Semantics(
-      button: true,
-      label: title,
-      excludeSemantics: true,
-      child: GestureDetector(
-        key: ValueKey('detail-episode-${item.id}'),
-        behavior: HitTestBehavior.opaque,
-        onTap: () => context.push(playerLocation(item.id)),
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: DecoratedBox(
-            key: next ? ValueKey('detail-episode-next-${item.id}') : null,
-            decoration: BoxDecoration(
-              color: ambient
-                  ? colors.card.withValues(alpha: dark ? 0.56 : 0.64)
-                  : colors.muted,
-              borderRadius: theme.style.borderRadius.md,
-              border: next ? Border.all(color: colors.primary, width: 2) : null,
-            ),
-            child: Stack(
-              children: [
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      number?.toString() ?? item.name,
-                      key: ValueKey('detail-episode-number-${item.id}'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.typography.body.lg.copyWith(
-                        fontWeight: FontWeight.w500,
-                        color: item.played
-                            ? colors.mutedForeground
-                            : colors.foreground,
-                      ),
-                    ),
-                  ),
-                ),
-                if (item.played)
-                  Positioned(
-                    top: 5,
-                    right: 5,
-                    child: Icon(
-                      FLucideIcons.check,
-                      key: ValueKey('detail-episode-played-${item.id}'),
-                      size: 12,
-                      color: colors.mutedForeground,
-                    ),
-                  ),
-                if (progress != null)
-                  Positioned(
-                    left: 10,
-                    right: 10,
-                    bottom: 8,
-                    child: MediaProgressBar(value: progress),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// A 16:9 episode card with its runtime badge, watch state, and a two-line
-/// synopsis, laid out for both the horizontal row and the grid.
+/// synopsis.
 class _EpisodeCard extends StatefulWidget {
   const _EpisodeCard({required this.item, this.next = false});
 
