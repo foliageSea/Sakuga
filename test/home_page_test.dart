@@ -953,14 +953,15 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final mobile in [false, true]) {
+  for (final (layout, windowSize, hasTitleBar) in [
+    ('wide desktop', const Size(1920, 600), true),
+    ('narrow desktop', const Size(480, 560), true),
+    ('phone', const Size(390, 560), false),
+  ]) {
+    final mobile = windowSize.width < mobileBreakpoint;
     testWidgets(
-      'home carousel extends under the ${mobile ? 'phone header' : 'title bar'} and matches detail artwork height',
+      'home carousel extends under chrome and matches detail artwork height on $layout',
       (tester) async {
-        // Short windows so the page content scrolls under the chrome.
-        final windowSize = mobile
-            ? const Size(390, 560)
-            : const Size(1920, 600);
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = windowSize;
         addTearDown(tester.view.resetDevicePixelRatio);
@@ -987,7 +988,8 @@ void main() {
             ),
             settingsRepositoryProvider.overrideWithValue(MemorySettings()),
             desktopWindowProvider.overrideWithValue(
-              FakeWindow(available: !mobile, macOS: true)..maximized = !mobile,
+              FakeWindow(available: hasTitleBar, macOS: true)
+                ..maximized = hasTitleBar && !mobile,
             ),
             serverRepositoryProvider.overrideWithValue(servers),
             libraryViewsProvider.overrideWith(
@@ -1032,9 +1034,24 @@ void main() {
             : page;
         final artworkHeight = tester.getSize(homeArt).height;
         expect(tester.getRect(page).top, 0);
+        final titleBar = find.byType(DesktopTitleBar);
+        final header = find.byKey(const ValueKey('mobile-header'));
+        expect(titleBar, hasTitleBar ? findsOneWidget : findsNothing);
+        if (hasTitleBar) {
+          final bar = tester.getRect(titleBar);
+          expect(bar.top, 0);
+          expect(tester.getRect(homeArt).bottom, greaterThan(bar.bottom));
+        }
         if (mobile) {
-          final header = find.byKey(const ValueKey('mobile-header'));
-          expect(tester.getRect(header).top, 0);
+          final headerTop = hasTitleBar ? tester.getRect(titleBar).bottom : 0;
+          expect(tester.getRect(header).top, headerTop);
+          expect(
+            find.descendant(
+              of: header,
+              matching: find.byKey(const ValueKey('home-refresh')),
+            ),
+            findsOneWidget,
+          );
           expect(tester.getRect(page).left, 0);
           expect(tester.getRect(page).width, windowSize.width);
         } else {
@@ -1057,7 +1074,6 @@ void main() {
             expect(row.left, inset.left);
             expect(row.right, inset.right);
           }
-          expect(tester.getRect(find.byType(DesktopTitleBar)).top, 0);
           expect(
             find.descendant(
               of: find.byType(DesktopTitleBar),
@@ -1073,17 +1089,17 @@ void main() {
         }
         expect(find.byKey(const ValueKey('home-refresh')), findsOneWidget);
 
-        double backing() => tester
-            .widget<AnimatedOpacity>(
-              find.byKey(const ValueKey('immersive-chrome-backing')),
-            )
-            .opacity;
-        expect(backing(), 0);
+        final backings = find.byKey(const ValueKey('immersive-chrome-backing'));
+        expect(backings, findsNWidgets(hasTitleBar && mobile ? 2 : 1));
+        Iterable<double> backingOpacities() => tester
+            .widgetList<AnimatedOpacity>(backings)
+            .map((backing) => backing.opacity);
+        expect(backingOpacities(), everyElement(0));
         await tester.drag(carousel, const Offset(0, -300));
         for (var i = 0; i < 4; i++) {
           await tester.pump(const Duration(milliseconds: 100));
         }
-        expect(backing(), 1);
+        expect(backingOpacities(), everyElement(1));
 
         container.read(routerProvider).go('/library/${featured.id}');
         for (var i = 0; i < 6; i++) {

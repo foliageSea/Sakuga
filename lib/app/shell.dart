@@ -82,9 +82,8 @@ class AppShell extends ConsumerWidget {
             alpha: dark ? 0.115 : 0.045,
           );
           final showTitleBar = window.available && !window.fullScreen;
-          final immersiveDesktop =
-              showTitleBar &&
-              (detailSpec != null || (immersiveRoute != null && !mobile));
+          // The custom title bar remains on desktop below the mobile breakpoint.
+          final immersiveDesktop = showTitleBar && immersiveRoute != null;
           final immersiveMobile =
               immersiveRoute != null && mobile && backLocation == null;
           final overlayHeader = immersiveMobile || detailSpec != null;
@@ -99,7 +98,7 @@ class AppShell extends ConsumerWidget {
           );
           final Widget? titleBar = showTitleBar
               ? DesktopTitleBar(
-                  homeAction: immersiveDesktop && canRefreshHome
+                  homeAction: immersiveDesktop && !mobile && canRefreshHome
                       ? refreshHomeButton
                       : null,
                   controller: window,
@@ -476,7 +475,7 @@ class AppShell extends ConsumerWidget {
                           right: 0,
                           height: 48,
                           child: ImmersiveChrome(
-                            route: immersiveRoute!,
+                            route: immersiveRoute,
                             overArtworkTheme: overArtworkTheme,
                             child: titleBar,
                           ),
