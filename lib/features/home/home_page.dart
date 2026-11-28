@@ -864,6 +864,7 @@ class _MediaSection extends StatelessWidget {
                             item: item,
                             title: _previewTitle(item),
                             overview: '',
+                            zoomOnHover: true,
                             aspectRatio: resumesPlayback ? 16 / 9 : 2 / 3,
                             artwork: resumesPlayback
                                 ? item.poster

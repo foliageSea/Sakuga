@@ -918,6 +918,11 @@ void main() {
     );
 
     final cards = find.byType(MediaPreviewCard);
+    expect(cards, findsNWidgets(3));
+    expect(
+      find.descendant(of: cards, matching: find.byType(AnimatedScale)),
+      findsNWidgets(3),
+    );
     expect(
       find.descendant(of: cards, matching: find.byType(Surface)),
       findsNothing,

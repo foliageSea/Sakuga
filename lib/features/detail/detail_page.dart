@@ -1469,6 +1469,8 @@ class _SeasonCard extends StatelessWidget {
       aspectRatio: 2 / 3,
       item: preview,
       subtitle: metadata.isNotEmpty ? metadata : null,
+      overview: '',
+      zoomOnHover: true,
       heroTag: posterHeroTag(season.id),
       onTap: () => context.push(
         '/library/${season.id}',

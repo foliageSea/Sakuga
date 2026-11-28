@@ -634,6 +634,7 @@ class _LibraryPreview extends StatelessWidget {
     heroTag: posterHeroTag(item.id),
     aspectRatio: 2 / 3,
     overview: '',
+    zoomOnHover: true,
     showRating: true,
     onTap: () => onTap(item, item.poster?.url()),
   );

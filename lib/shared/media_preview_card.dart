@@ -17,6 +17,7 @@ class MediaPreviewCard extends StatefulWidget {
     this.posterAction,
     this.heroTag,
     this.playOnTap = false,
+    this.zoomOnHover = false,
     this.highlighted = false,
     this.showRating = false,
     this.titleKey,
@@ -37,6 +38,7 @@ class MediaPreviewCard extends StatefulWidget {
   final Widget? posterAction;
   final Object? heroTag;
   final bool playOnTap;
+  final bool zoomOnHover;
   final bool highlighted;
   final bool showRating;
   final Key? titleKey;
@@ -95,6 +97,14 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
       ),
     );
 
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final hoverDuration = reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 160);
+    final image = MediaImage(
+      url: artwork?.url(),
+      headers: artwork?.headers ?? const {},
+    );
     final thumbnail = AspectRatio(
       aspectRatio: widget.aspectRatio,
       child: ClipRRect(
@@ -105,16 +115,20 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
             PosterHero(
               tag: widget.heroTag,
               borderRadius: radius,
-              child: MediaImage(
-                url: artwork?.url(),
-                headers: artwork?.headers ?? const {},
-              ),
+              // Zoom the image within its frame; keep the hit area, badges
+              // and hero bounds still.
+              child: widget.zoomOnHover
+                  ? AnimatedScale(
+                      scale: _hovered && !reduceMotion ? 1.05 : 1,
+                      duration: hoverDuration,
+                      curve: Curves.easeOutCubic,
+                      child: image,
+                    )
+                  : image,
             ),
             AnimatedOpacity(
               opacity: _hovered ? 1 : 0,
-              duration: MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : const Duration(milliseconds: 160),
+              duration: hoverDuration,
               child: ColoredBox(
                 color: const Color(0x33000000),
                 child: widget.playOnTap
@@ -246,7 +260,6 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
       button: true,
       child: FocusableActionDetector(
         mouseCursor: SystemMouseCursors.click,
-        onShowHoverHighlight: (value) => setState(() => _hovered = value),
         onShowFocusHighlight: (value) => setState(() => _focused = value),
         actions: {
           ActivateIntent: CallbackAction<ActivateIntent>(
@@ -259,9 +272,14 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [thumbnail, const SizedBox(height: 10), text],
+          child: MouseRegion(
+            // Hover should work even when keyboard focus highlights are hidden.
+            onEnter: (_) => setState(() => _hovered = true),
+            onExit: (_) => setState(() => _hovered = false),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [thumbnail, const SizedBox(height: 10), text],
+            ),
           ),
         ),
       ),

@@ -289,6 +289,7 @@ void main() {
       final b = tester.getRect(_posterFrameFinder('b'));
       final title = find.text('Series a');
       final overview = find.text(_gridOverview);
+      expect(find.byType(AnimatedScale), findsNWidgets(4));
       expect(a.width / a.height, closeTo(2 / 3, 0.01));
       expect(a.size, b.size);
       expect(a.top, b.top);

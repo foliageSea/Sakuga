@@ -529,14 +529,15 @@ void main() {
       expect(season, findsOneWidget);
       final card = tester.widget<MediaPreviewCard>(season);
       expect(card.subtitle, '13 episodes');
+      expect(card.zoomOnHover, isTrue);
       Finder inside(Finder child) =>
           find.descendant(of: season, matching: child);
       final thumbnail = inside(find.byType(AspectRatio));
       expect(tester.widget<AspectRatio>(thumbnail).aspectRatio, 2 / 3);
       expect(inside(find.byType(Surface)), findsNothing);
       expect(inside(find.text('Season 1')), findsOneWidget);
-      final overview = inside(find.text(_season().overview!));
-      expect(tester.widget<Text>(overview).maxLines, 2);
+      expect(inside(find.text('13 episodes')), findsOneWidget);
+      expect(inside(find.text(_season().overview!)), findsNothing);
       expect(queries, isEmpty);
       await tester.ensureVisible(season);
       await tester.tap(season);
@@ -546,6 +547,7 @@ void main() {
       ]);
       final headerTitle = find.byKey(const ValueKey('detail-title'));
       expect(tester.widget<Text>(headerTitle).data, 'Season 1');
+      expect(find.text(_season().overview!), findsOneWidget);
       expect(find.byKey(const ValueKey('detail-series-name')), findsNothing);
       final episode = find.byKey(const ValueKey('detail-episode-episode-1'));
       await tester.ensureVisible(episode);
@@ -1028,6 +1030,7 @@ void main() {
         find.byKey(const ValueKey('detail-season-season-1')),
         findsNothing,
       );
+      expect(find.text(_season().overview!), findsNothing);
       expect(queries.last.seasonId, 'season-1');
       expect(
         find.byKey(const ValueKey('detail-episode-season-1-1')),
