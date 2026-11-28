@@ -1057,6 +1057,16 @@ void main() {
         } else {
           final sidebar = tester.getRect(find.byType(FSidebar));
           final banner = tester.getRect(page);
+          final fade = find.descendant(
+            of: page,
+            matching: find.byType(BannerBottomFade),
+          );
+          expect(tester.getRect(fade), banner);
+          final mask = find.descendant(
+            of: fade,
+            matching: find.byType(ShaderMask),
+          );
+          expect(tester.getRect(mask).bottom, greaterThan(banner.bottom));
           expect(banner.left, sidebar.right);
           expect(banner.right, windowSize.width);
           final inset = banner.deflate(32);

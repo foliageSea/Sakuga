@@ -52,6 +52,55 @@ class MediaPlaceholder extends StatelessWidget {
   );
 }
 
+/// Fades a desktop banner into its ambient background without changing its
+/// layout size or leaving a visible line at a fractional pixel boundary.
+class BannerBottomFade extends StatelessWidget {
+  const BannerBottomFade({
+    required this.fadeStart,
+    required this.child,
+    super.key,
+  });
+
+  final double fadeStart;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    // Extend the mask past the content so its last physical pixel is masked
+    // even when the banner ends between device pixels.
+    const overscan = 2.0;
+    return Stack(
+      alignment: Alignment.topLeft,
+      fit: StackFit.expand,
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(
+          bottom: -overscan,
+          child: ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (bounds) {
+              final height = bounds.height - overscan;
+              return LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: const [Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+                stops: [
+                  height * fadeStart / bounds.height,
+                  (height - overscan) / bounds.height,
+                ],
+              ).createShader(bounds);
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: overscan),
+              child: child,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Builds the [Hero] tag shared between a library poster card and the detail
 /// page's poster frame.
 Object posterHeroTag(String itemId) => ('library-poster', itemId);

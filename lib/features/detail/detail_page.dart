@@ -768,16 +768,7 @@ class _Hero extends StatelessWidget {
               right: -bleed,
               child: inset == null
                   ? background
-                  : ShaderMask(
-                      blendMode: BlendMode.dstIn,
-                      shaderCallback: (bounds) => const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Color(0xFFFFFFFF), Color(0x00FFFFFF)],
-                        stops: [0.92, 1],
-                      ).createShader(bounds),
-                      child: background,
-                    ),
+                  : BannerBottomFade(fadeStart: 0.92, child: background),
             ),
             Positioned(
               left: 32,

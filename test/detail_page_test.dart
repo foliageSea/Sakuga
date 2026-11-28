@@ -1505,9 +1505,14 @@ void main() {
       detailCompleter.complete(taggedSeries);
       await pumpFrames();
       expect(blurMaskFinder, findsOneWidget);
-      final artwork = tester.getRect(
-        find.byKey(const ValueKey('detail-desktop-art')),
+      final artworkFinder = find.byKey(const ValueKey('detail-desktop-art'));
+      final artwork = tester.getRect(artworkFinder);
+      final fade = find.ancestor(
+        of: artworkFinder,
+        matching: find.byType(ShaderMask),
       );
+      expect(tester.getRect(fade).bottom, greaterThan(artwork.bottom));
+      expect(tester.widget<ShaderMask>(fade).blendMode, BlendMode.dstIn);
       final titleBar = tester.getRect(find.byType(DesktopTitleBar));
       final detailHeader = tester.getRect(
         find.byKey(const ValueKey('desktop-detail-header')),

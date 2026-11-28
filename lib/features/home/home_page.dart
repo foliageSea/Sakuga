@@ -778,18 +778,9 @@ class _CarouselSlide extends StatelessWidget {
         ),
       ],
     );
-    if (inset == null) return slide;
-    // Fade the bottom edge into the page instead of ending on a hard line.
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (bounds) => const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0xFFFFFFFF), Color(0x00FFFFFF)],
-        stops: [0.88, 1],
-      ).createShader(bounds),
-      child: slide,
-    );
+    return inset == null
+        ? slide
+        : BannerBottomFade(fadeStart: 0.88, child: slide);
   }
 }
 
